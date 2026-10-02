@@ -56,7 +56,7 @@
                                         <StackPanel Orientation="Horizontal" Spacing="6">
                                             <Ellipse Width="6" Height="6" Fill="#D04040" IsVisible="{Binding IsConflicted}" VerticalAlignment="Center"/>
                                             <Ellipse Width="6" Height="6" Fill="#E0A100" IsVisible="{Binding ShowDirtyDot}" VerticalAlignment="Center"/>
-                                            <Button Content="{Binding Title}" Command="{Binding ActivateTabCommand}" Background="Transparent" BorderThickness="0" Padding="0"/>
+                                            <TextBlock Text="{Binding Title}" VerticalAlignment="Center" Background="Transparent"/>
                                             <Button Classes="flat" Content="×" Command="{Binding CloseTabCommand}" Padding="4,0" MinWidth="0"/>
                                         </StackPanel>
                                     </Border>

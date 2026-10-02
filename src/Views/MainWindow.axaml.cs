@@ -333,7 +333,7 @@ public partial class MainWindow : Window
             return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
-            EndDrag();
+            FinishTabGesture(activateIfClick: true);
             return;
         }
 
@@ -360,9 +360,20 @@ public partial class MainWindow : Window
             return;
         if (_dragMoved)
             e.Handled = true;
-        EndDrag();
+        FinishTabGesture(activateIfClick: true);
         if (e.Pointer.Captured == this)
             e.Pointer.Capture(null);
+    }
+
+    private void FinishTabGesture(bool activateIfClick)
+    {
+        if (_dragTab is null)
+            return;
+        var tab = _dragTab;
+        var moved = _dragMoved;
+        EndDrag();
+        if (activateIfClick && !moved && DataContext is MainViewModel vm)
+            vm.Activate(tab);
     }
 
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
