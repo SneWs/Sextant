@@ -35,4 +35,10 @@ public partial class App : Application
 
         base.OnFrameworkInitializationCompleted();
     }
+
+    private void OnOpenSettings(object? sender, EventArgs e)
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime { MainWindow.DataContext: MainViewModel vm })
+            vm.OpenSettingsCommand.Execute(null);
+    }
 }

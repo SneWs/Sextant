@@ -62,7 +62,7 @@ Checked items are in the app. The rest are still ahead. [PLAN.md](PLAN.md) is th
 ### Daily loop
 
 - [x] One window, with each repository as a tab. Tabs are not torn off into their own windows.
-- [x] Open, clone, and init from the File menu and from an empty window.
+- [x] Open, clone, and init from the File menu and from an empty window. The menu uses the system menu bar. On macOS that is the menu at the top of the screen, and Settings is under the Sextant menu.
 - [x] One tab per repository. Opening a path that is already open focuses that tab.
 - [x] Opening a subdirectory, an existing worktree, or a submodule checkout opens that repository.
 - [x] Open tabs come back on the next launch. A tab you have not selected stays unloaded.

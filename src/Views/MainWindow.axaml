@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Sextant.ViewModels"
+        xmlns:app="using:Sextant"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="760"
@@ -12,26 +13,37 @@
         MinWidth="880" MinHeight="520"
         Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
 
+    <!-- The platform shows this menu. macOS uses the screen menu bar, so the bar below stays hidden there. -->
+    <NativeMenu.Menu>
+        <NativeMenu>
+            <NativeMenuItem Header="_File">
+                <NativeMenu>
+                    <NativeMenuItem Header="_Open repository…" Command="{Binding OpenFolderCommand}" Gesture="{app:CommandGesture Key=O}"/>
+                    <NativeMenuItem Header="_Clone repository…" Command="{Binding CloneCommand}"/>
+                    <NativeMenuItem Header="_Init repository…" Command="{Binding InitCommand}"/>
+                </NativeMenu>
+            </NativeMenuItem>
+            <NativeMenuItem Header="_Settings" IsVisible="{Binding ShowWindowSettingsMenu}">
+                <NativeMenu>
+                    <NativeMenuItem Header="_Settings…" Command="{Binding OpenSettingsCommand}"/>
+                </NativeMenu>
+            </NativeMenuItem>
+            <NativeMenuItem Header="_Repository" IsEnabled="{Binding HasActiveTab}">
+                <NativeMenu>
+                    <NativeMenuItem Header="_Branch…" Command="{Binding CreateBranchCommand}" Gesture="{app:CommandGesture Key=B}"/>
+                    <NativeMenuItem Header="_Stash…" Command="{Binding StashCommand}" Gesture="{app:CommandGesture Key=S, Shift=True}"/>
+                    <NativeMenuItem Header="Add _remote…" Command="{Binding AddRemoteCommand}"/>
+                    <NativeMenuItem Header="Add _worktree…" Command="{Binding AddWorktreeCommand}"/>
+                    <NativeMenuItem Header="Command _log" Command="{Binding ToggleCommandsCommand}"/>
+                    <NativeMenuItemSeparator/>
+                    <NativeMenuItem Header="_Search" Command="{Binding ToggleHistorySearchCommand}" Gesture="{app:CommandGesture Key=F}"/>
+                </NativeMenu>
+            </NativeMenuItem>
+        </NativeMenu>
+    </NativeMenu.Menu>
+
     <Grid RowDefinitions="Auto,Auto,*,Auto">
-        <Menu Grid.Row="0">
-            <MenuItem Header="_File">
-                <MenuItem x:Name="OpenRepositoryItem" Header="_Open repository…" Command="{Binding OpenFolderCommand}" IsEnabled="{Binding CanUseGit}"/>
-                <MenuItem Header="_Clone repository…" Command="{Binding CloneCommand}" IsEnabled="{Binding CanUseGit}"/>
-                <MenuItem Header="_Init repository…" Command="{Binding InitCommand}" IsEnabled="{Binding CanUseGit}"/>
-            </MenuItem>
-            <MenuItem Header="_Settings">
-                <MenuItem Header="_Settings…" Command="{Binding OpenSettingsCommand}"/>
-            </MenuItem>
-            <MenuItem Header="_Repository" IsEnabled="{Binding HasActiveTab}">
-                <MenuItem x:Name="BranchMenuItem" Header="_Branch…" Command="{Binding ActiveTab.CreateBranchCommand}" IsEnabled="{Binding ActiveTab.CanRunCommands}"/>
-                <MenuItem x:Name="StashMenuItem" Header="_Stash…" Command="{Binding ActiveTab.StashCommand}" IsEnabled="{Binding ActiveTab.CanRunCommands}"/>
-                <MenuItem Header="Add _remote…" Command="{Binding ActiveTab.AddRemoteCommand}" IsEnabled="{Binding ActiveTab.CanRunCommands}"/>
-                <MenuItem Header="Add _worktree…" Command="{Binding ActiveTab.AddWorktreeCommand}" IsEnabled="{Binding ActiveTab.CanRunCommands}"/>
-                <MenuItem Header="Command _log" Command="{Binding ActiveTab.ToggleCommandsCommand}"/>
-                <Separator/>
-                <MenuItem x:Name="SearchMenuItem" Header="_Search" Command="{Binding ActiveTab.ToggleHistorySearchCommand}"/>
-            </MenuItem>
-        </Menu>
+        <NativeMenuBar Grid.Row="0"/>
 
         <Border Grid.Row="1" IsVisible="{Binding HasGitProblem}" Padding="12,8" Background="#33C42B1C">
             <DockPanel>

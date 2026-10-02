@@ -25,6 +25,13 @@
         <local:ViewLocator />
     </Application.DataTemplates>
 
+    <!-- Replaces the default application menu. macOS shows this under the Sextant name and adds Hide and Quit. -->
+    <NativeMenu.Menu>
+        <NativeMenu>
+            <NativeMenuItem Header="Settings…" Click="OnOpenSettings" Gesture="Meta+,"/>
+        </NativeMenu>
+    </NativeMenu.Menu>
+
     <Application.Styles>
         <FluentTheme DensityStyle="Compact">
             <FluentTheme.Palettes>

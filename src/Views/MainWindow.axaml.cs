@@ -16,10 +16,6 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        OpenRepositoryItem.InputGesture = AppGestures.CommandKey(Key.O);
-        BranchMenuItem.InputGesture = AppGestures.CommandKey(Key.B);
-        StashMenuItem.InputGesture = AppGestures.CommandKey(Key.S, KeyModifiers.Shift);
-        SearchMenuItem.InputGesture = AppGestures.CommandKey(Key.F);
         AddHandler(KeyDownEvent, OnTunnelKey, RoutingStrategies.Tunnel);
         AddHandler(PointerMovedEvent, OnWindowPointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(PointerReleasedEvent, OnWindowPointerReleased, RoutingStrategies.Tunnel, handledEventsToo: true);

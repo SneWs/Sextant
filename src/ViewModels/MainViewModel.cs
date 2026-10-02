@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using Sextant.Git;
 using Sextant.Services;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 
 namespace Sextant.ViewModels;
 
@@ -84,9 +85,15 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     public bool CanUseGit => GitReady && !IsBusy;
 
+    /// <summary>Branch, stash, and the other repository commands need an open tab that is not busy.</summary>
+    public bool CanRunRepositoryCommands => ActiveTab is { CanRunCommands: true };
+
     public bool HasStatusText => !string.IsNullOrWhiteSpace(StatusText);
 
     public bool HasActiveTab => ActiveTab is not null;
+
+    /// <summary>macOS shows Settings in the application menu, so the window does not repeat it.</summary>
+    public bool ShowWindowSettingsMenu => !OperatingSystem.IsMacOS();
 
     public bool ShowEmpty => ActiveTab is null;
 
@@ -212,14 +219,32 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             Tabs[i].ShortcutHint = TabShortcut.Hint(i);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanUseGit))]
     public Task OpenFolder() => OpenFolderAsync();
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanUseGit))]
     public Task Clone() => CloneAsync();
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanUseGit))]
     public Task Init() => InitAsync();
+
+    [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
+    private Task CreateBranch() => ActiveTab?.CreateBranch() ?? Task.CompletedTask;
+
+    [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
+    private Task Stash() => ActiveTab?.StashCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+
+    [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
+    private Task AddRemote() => ActiveTab?.AddRemoteCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+
+    [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
+    private Task AddWorktree() => ActiveTab?.AddWorktreeCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+
+    [RelayCommand(CanExecute = nameof(HasActiveTab))]
+    private void ToggleCommands() => ActiveTab?.ToggleCommandsCommand.Execute(null);
+
+    [RelayCommand(CanExecute = nameof(HasActiveTab))]
+    private void ToggleHistorySearch() => ActiveTab?.ToggleHistorySearchCommand.Execute(null);
 
     [RelayCommand]
     public Task LocateGit() => LocateGitAsync();
@@ -283,16 +308,58 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         SelectedPalette = PaletteMatches[next];
     }
 
-    partial void OnGitReadyChanged(bool value) => OnPropertyChanged(nameof(CanUseGit));
+    partial void OnGitReadyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanUseGit));
+        NotifyFileCommands();
+    }
 
-    partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(CanUseGit));
+    partial void OnIsBusyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanUseGit));
+        NotifyFileCommands();
+    }
+
+    private void NotifyFileCommands()
+    {
+        OpenFolderCommand.NotifyCanExecuteChanged();
+        CloneCommand.NotifyCanExecuteChanged();
+        InitCommand.NotifyCanExecuteChanged();
+    }
 
     partial void OnStatusTextChanged(string value) => OnPropertyChanged(nameof(HasStatusText));
 
+    private RepositoryViewModel? _menuTab;
+
     partial void OnActiveTabChanged(RepositoryViewModel? value)
     {
+        if (_menuTab is not null)
+            _menuTab.PropertyChanged -= OnMenuTabChanged;
+        _menuTab = value;
+        if (value is not null)
+            value.PropertyChanged += OnMenuTabChanged;
         OnPropertyChanged(nameof(HasActiveTab));
         OnPropertyChanged(nameof(ShowEmpty));
+        OnPropertyChanged(nameof(CanRunRepositoryCommands));
+        NotifyRepositoryCommands();
+    }
+
+    private void OnMenuTabChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is not (nameof(RepositoryViewModel.CanRunCommands) or nameof(RepositoryViewModel.IsBusy)))
+            return;
+        OnPropertyChanged(nameof(CanRunRepositoryCommands));
+        NotifyRepositoryCommands();
+    }
+
+    private void NotifyRepositoryCommands()
+    {
+        CreateBranchCommand.NotifyCanExecuteChanged();
+        StashCommand.NotifyCanExecuteChanged();
+        AddRemoteCommand.NotifyCanExecuteChanged();
+        AddWorktreeCommand.NotifyCanExecuteChanged();
+        ToggleCommandsCommand.NotifyCanExecuteChanged();
+        ToggleHistorySearchCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnPaletteQueryChanged(string value) => FilterPalette();
