@@ -5,14 +5,63 @@
              xmlns:views="using:Sextant.Views"
              Name="Sextant"
              RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+             <!-- "Default" follows the system until settings choose Light or Dark. -->
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <!-- Text on the accent fill. Catppuccin puts Base on top of Blue. -->
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="CatppuccinOnAccentBrush" Color="#EFF1F5"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="CatppuccinOnAccentBrush" Color="#1E1E2E"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
 
     <Application.DataTemplates>
         <local:ViewLocator />
     </Application.DataTemplates>
 
     <Application.Styles>
-        <FluentTheme DensityStyle="Compact" />
+        <FluentTheme DensityStyle="Compact">
+            <FluentTheme.Palettes>
+                <!-- Catppuccin Latte. Base steps are the Text color at the Fluent alphas. -->
+                <ColorPaletteResources x:Key="Light"
+                                       Accent="#1E66F5"
+                                       AltHigh="#FFFFFFFF" AltLow="#33FFFFFF" AltMedium="#99FFFFFF"
+                                       AltMediumHigh="#CCFFFFFF" AltMediumLow="#66FFFFFF"
+                                       BaseHigh="#FF4C4F69" BaseMediumHigh="#CC4C4F69" BaseMedium="#994C4F69"
+                                       BaseMediumLow="#664C4F69" BaseLow="#334C4F69"
+                                       ChromeAltLow="#FF4C4F69"
+                                       ChromeBlackHigh="#FF000000" ChromeBlackLow="#33000000"
+                                       ChromeBlackMediumLow="#66000000" ChromeBlackMedium="#CC000000"
+                                       ChromeDisabledHigh="#FFCCD0DA" ChromeDisabledLow="#FF9CA0B0"
+                                       ChromeGray="#FF8C8FA1" ChromeHigh="#FFACB0BE"
+                                       ChromeLow="#FFEFF1F5" ChromeMedium="#FFE6E9EF" ChromeMediumLow="#FFEFF1F5"
+                                       ChromeWhite="#FFFFFFFF"
+                                       ListLow="#194C4F69" ListMedium="#334C4F69"
+                                       ErrorText="#FFD20F39" RegionColor="#FFEFF1F5"/>
+                <!-- Catppuccin Mocha. -->
+                <ColorPaletteResources x:Key="Dark"
+                                       Accent="#89B4FA"
+                                       AltHigh="#FF000000" AltLow="#33000000" AltMedium="#99000000"
+                                       AltMediumHigh="#CC000000" AltMediumLow="#66000000"
+                                       BaseHigh="#FFCDD6F4" BaseMediumHigh="#CCCDD6F4" BaseMedium="#99CDD6F4"
+                                       BaseMediumLow="#66CDD6F4" BaseLow="#33CDD6F4"
+                                       ChromeAltLow="#FFCDD6F4"
+                                       ChromeBlackHigh="#FF000000" ChromeBlackLow="#33000000"
+                                       ChromeBlackMediumLow="#66000000" ChromeBlackMedium="#CC000000"
+                                       ChromeDisabledHigh="#FF313244" ChromeDisabledLow="#FF6C7086"
+                                       ChromeGray="#FF7F849C" ChromeHigh="#FF585B70"
+                                       ChromeLow="#FF11111B" ChromeMedium="#FF181825" ChromeMediumLow="#FF1E1E2E"
+                                       ChromeWhite="#FFFFFFFF"
+                                       ListLow="#19CDD6F4" ListMedium="#33CDD6F4"
+                                       ErrorText="#FFF38BA8" RegionColor="#FF1E1E2E"/>
+            </FluentTheme.Palettes>
+        </FluentTheme>
         <Styles>
             <Styles.Resources>
                 <ControlTheme x:Key="FlatButton" TargetType="Button">
@@ -56,6 +105,15 @@
             </Styles.Resources>
             <Style Selector="Button.flat">
                 <Setter Property="Theme" Value="{StaticResource FlatButton}"/>
+            </Style>
+            <Style Selector="Button.accent /template/ ContentPresenter">
+                <Setter Property="Foreground" Value="{DynamicResource CatppuccinOnAccentBrush}"/>
+            </Style>
+            <Style Selector="Button.accent:pointerover /template/ ContentPresenter">
+                <Setter Property="Foreground" Value="{DynamicResource CatppuccinOnAccentBrush}"/>
+            </Style>
+            <Style Selector="Button.accent:pressed /template/ ContentPresenter">
+                <Setter Property="Foreground" Value="{DynamicResource CatppuccinOnAccentBrush}"/>
             </Style>
         </Styles>
         <Style Selector="ListBoxItem">

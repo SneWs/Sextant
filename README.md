@@ -84,7 +84,7 @@ Checked items are in the app. The rest are still ahead. [PLAN.md](PLAN.md) is th
 - [x] Command palette on Ctrl/Cmd+P, plus Open, next tab, close tab, and Refresh.
 - [x] The running command, a failure banner you can copy, and a full-width command log with secrets stripped out.
 - [x] Progress while cloning, fetching, pulling, and pushing.
-- [x] Fluent compact theme that follows the system light or dark appearance.
+- [x] Fluent compact theme. Light is Catppuccin Latte and dark is Catppuccin Mocha. Settings chooses light, dark, or follow the system.
 - [x] Watch the git directory, refresh when the window is focused, and refresh with F5.
 - [x] After a slow status, offer `feature.manyFiles` and `core.fsmonitor`, and write them only after you apply them.
 - [x] Ask before trusting a repository that git reports as dubious ownership.

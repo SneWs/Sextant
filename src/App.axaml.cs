@@ -19,9 +19,11 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var store = new WorkspaceStore(AppPaths.ConfigDirectory());
+            var settings = store.LoadSettings();
+            RequestedThemeVariant = AppTheme.Variant(settings.Theme);
             var window = new MainWindow
             {
-                DataContext = new MainViewModel(store, store.LoadWorkspace(), store.LoadSettings(), new GitProcessRunner()),
+                DataContext = new MainViewModel(store, store.LoadWorkspace(), settings, new GitProcessRunner()),
             };
             desktop.MainWindow = window;
             desktop.ShutdownRequested += (_, _) =>

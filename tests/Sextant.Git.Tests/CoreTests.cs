@@ -219,6 +219,7 @@ public class CoreTests
                 ReopenTabs = false,
                 SideBySide = true,
                 IgnoreWhitespace = true,
+                Theme = ThemePreference.Dark,
             });
 
             var loaded = store.LoadWorkspace();
@@ -237,6 +238,10 @@ public class CoreTests
             Assert.False(settings.ReopenTabs);
             Assert.True(settings.SideBySide);
             Assert.True(settings.IgnoreWhitespace);
+            Assert.Equal(ThemePreference.Dark, settings.Theme);
+            Assert.Equal(ThemePreference.System, ThemePreference.Normalize(null));
+            Assert.Equal(ThemePreference.Light, ThemePreference.Normalize(" Light "));
+            Assert.Equal(ThemePreference.System, ThemePreference.Normalize("nope"));
 
             File.WriteAllText(Path.Combine(directory, "settings.json"), """{ "reopenTabs": true }""");
             var older = store.LoadSettings();
@@ -244,6 +249,7 @@ public class CoreTests
             Assert.True(older.ReopenTabs);
             Assert.False(older.SideBySide);
             Assert.False(older.IgnoreWhitespace);
+            Assert.Equal(ThemePreference.System, older.Theme);
 
             File.WriteAllText(Path.Combine(directory, "workspace.json"), """
                 {

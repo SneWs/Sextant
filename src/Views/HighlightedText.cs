@@ -14,14 +14,15 @@ public class HighlightedText : CopyableText
     public static readonly StyledProperty<string?> LanguageProperty =
         AvaloniaProperty.Register<HighlightedText, string?>(nameof(Language));
 
-    private static readonly IBrush DarkKeyword = Freeze(Color.Parse("#79B8FF"));
-    private static readonly IBrush LightKeyword = Freeze(Color.Parse("#0000FF"));
-    private static readonly IBrush DarkString = Freeze(Color.Parse("#CE9178"));
-    private static readonly IBrush LightString = Freeze(Color.Parse("#A31515"));
-    private static readonly IBrush DarkComment = Freeze(Color.Parse("#6A9955"));
-    private static readonly IBrush LightComment = Freeze(Color.Parse("#008000"));
-    private static readonly IBrush DarkNumber = Freeze(Color.Parse("#B5CEA8"));
-    private static readonly IBrush LightNumber = Freeze(Color.Parse("#098658"));
+    // Catppuccin Mocha on a dark diff, Latte on a light one: mauve, green, overlay, peach.
+    private static readonly IBrush DarkKeyword = Freeze(Color.Parse("#CBA6F7"));
+    private static readonly IBrush LightKeyword = Freeze(Color.Parse("#8839EF"));
+    private static readonly IBrush DarkString = Freeze(Color.Parse("#A6E3A1"));
+    private static readonly IBrush LightString = Freeze(Color.Parse("#40A02B"));
+    private static readonly IBrush DarkComment = Freeze(Color.Parse("#9399B2"));
+    private static readonly IBrush LightComment = Freeze(Color.Parse("#7C7F93"));
+    private static readonly IBrush DarkNumber = Freeze(Color.Parse("#FAB387"));
+    private static readonly IBrush LightNumber = Freeze(Color.Parse("#FE640B"));
     private int _paint;
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)

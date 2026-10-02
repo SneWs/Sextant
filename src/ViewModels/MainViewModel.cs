@@ -481,7 +481,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         var edit = await Dialogs.EditSettingsAsync(new SettingsDraft(
             _settings.GitExecutable ?? "",
             _settings.SideBySide,
-            _settings.IgnoreWhitespace));
+            _settings.IgnoreWhitespace,
+            _settings.Theme));
         if (edit is null)
             return;
         var path = string.IsNullOrWhiteSpace(edit.GitExecutable) ? null : edit.GitExecutable.Trim();
@@ -491,7 +492,9 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         _settings.GitExecutable = path;
         _settings.SideBySide = edit.SideBySide;
         _settings.IgnoreWhitespace = edit.IgnoreWhitespace;
+        _settings.Theme = ThemePreference.Normalize(edit.Theme);
         _store.SaveSettings(_settings);
+        AppTheme.Apply(_settings.Theme);
         if (diffChanged)
             ApplyDiffPreferences();
         if (gitChanged)

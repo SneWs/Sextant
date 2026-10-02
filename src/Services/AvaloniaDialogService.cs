@@ -305,6 +305,29 @@ public sealed class AvaloniaDialogService : IDialogService
     public async Task<SettingsDraft?> EditSettingsAsync(SettingsDraft current)
     {
         var window = Create("Settings");
+        var theme = ThemePreference.Normalize(current.Theme);
+        var followSystem = new RadioButton
+        {
+            Content = "Follow system",
+            GroupName = "Theme",
+            IsChecked = theme == ThemePreference.System,
+        };
+        var light = new RadioButton
+        {
+            Content = "Light",
+            GroupName = "Theme",
+            IsChecked = theme == ThemePreference.Light,
+        };
+        var dark = new RadioButton
+        {
+            Content = "Dark",
+            GroupName = "Theme",
+            IsChecked = theme == ThemePreference.Dark,
+        };
+        var appearance = new StackPanel { Spacing = 4 };
+        appearance.Children.Add(followSystem);
+        appearance.Children.Add(light);
+        appearance.Children.Add(dark);
         var inline = new RadioButton
         {
             Content = "Inline",
@@ -358,7 +381,10 @@ public sealed class AvaloniaDialogService : IDialogService
                 return;
             }
 
-            result = new SettingsDraft(path, sideBySide.IsChecked == true, whitespace.IsChecked == true);
+            var chosen = dark.IsChecked == true ? ThemePreference.Dark
+                : light.IsChecked == true ? ThemePreference.Light
+                : ThemePreference.System;
+            result = new SettingsDraft(path, sideBySide.IsChecked == true, whitespace.IsChecked == true, chosen);
             window.Close();
         };
         cancel.Click += (_, _) => window.Close();
@@ -377,6 +403,9 @@ public sealed class AvaloniaDialogService : IDialogService
         diff.Children.Add(sideBySide);
         diff.Children.Add(whitespace);
         window.Content = Column(
+            Heading("Appearance"),
+            appearance,
+            Message("Light is Catppuccin Latte. Dark is Catppuccin Mocha. Follow system picks the palette that matches the operating system."),
             Heading("Diff"),
             diff,
             Heading("Git"),

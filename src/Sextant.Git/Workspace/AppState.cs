@@ -133,6 +133,9 @@ public sealed class AppSettings
     public bool SideBySide { get; set; }
 
     public bool IgnoreWhitespace { get; set; }
+
+    /// <summary><see cref="ThemePreference.System"/>, <see cref="ThemePreference.Light"/>, or <see cref="ThemePreference.Dark"/>.</summary>
+    public string Theme { get; set; } = ThemePreference.System;
 }
 
 public static class AppPaths

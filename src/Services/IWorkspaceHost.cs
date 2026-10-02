@@ -26,7 +26,7 @@ public interface IDialogService
     Task CopyAsync(string text);
 }
 
-public sealed record SettingsDraft(string GitExecutable, bool SideBySide, bool IgnoreWhitespace);
+public sealed record SettingsDraft(string GitExecutable, bool SideBySide, bool IgnoreWhitespace, string Theme);
 
 public sealed record CloneRequest(string Url, string Destination);
 
