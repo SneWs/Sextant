@@ -73,14 +73,37 @@
 
                 <Panel x:Name="PaneHost" Grid.Row="1">
                     <ContentControl Content="{Binding ActiveTab}" IsVisible="{Binding HasActiveTab}"/>
-                    <StackPanel IsVisible="{Binding ShowEmpty}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-                        <TextBlock Text="Open a repository to start." HorizontalAlignment="Center" Opacity="0.75"/>
-                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-                            <Button Content="Open" Command="{Binding OpenFolderCommand}" IsEnabled="{Binding CanUseGit}"/>
-                            <Button Content="Clone" Command="{Binding CloneCommand}" IsEnabled="{Binding CanUseGit}"/>
-                            <Button Content="Init" Command="{Binding InitCommand}" IsEnabled="{Binding CanUseGit}"/>
+                    <Grid IsVisible="{Binding ShowEmpty}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="32,24">
+                            <Image Width="120" Height="120" Stretch="Uniform" HorizontalAlignment="Center"
+                                   RenderOptions.BitmapInterpolationMode="HighQuality"
+                                   Source="avares://Sextant/Assets/sextant.png"/>
+                            <TextBlock Text="Sextant" FontSize="36" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" Margin="0,18,0,0"/>
+                            <TextBlock Text="Open a repository to start." FontSize="16"
+                                       HorizontalAlignment="Center" Opacity="0.8" Margin="0,36,0,0"/>
+                            <Grid ColumnDefinitions="200,32,200,32,200" HorizontalAlignment="Center" Margin="0,32,0,0">
+                                <StackPanel Grid.Column="0" Spacing="10">
+                                    <Button Classes="accent" Content="Open" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                            Padding="12,8" Command="{Binding OpenFolderCommand}" IsEnabled="{Binding CanUseGit}"/>
+                                    <TextBlock Text="Choose a folder that is already a Git repository."
+                                               TextWrapping="Wrap" TextAlignment="Center" Opacity="0.75"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="10">
+                                    <Button Content="Clone" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                            Padding="12,8" Command="{Binding CloneCommand}" IsEnabled="{Binding CanUseGit}"/>
+                                    <TextBlock Text="Copy a remote repository into a new folder and open it."
+                                               TextWrapping="Wrap" TextAlignment="Center" Opacity="0.75"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="4" Spacing="10">
+                                    <Button Content="Init" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                            Padding="12,8" Command="{Binding InitCommand}" IsEnabled="{Binding CanUseGit}"/>
+                                    <TextBlock Text="Create a new Git repository in a folder you choose."
+                                               TextWrapping="Wrap" TextAlignment="Center" Opacity="0.75"/>
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
-                    </StackPanel>
+                    </Grid>
                     <Border x:Name="PaneRuleLeft" Height="1" VerticalAlignment="Top" HorizontalAlignment="Left"
                             IsHitTestVisible="False" Background="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
                     <Border x:Name="PaneRuleRight" Height="1" VerticalAlignment="Top" HorizontalAlignment="Left"
