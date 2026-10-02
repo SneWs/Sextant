@@ -42,7 +42,10 @@ public partial class RepositoryViewModel : ViewModelBase
     private string? _jumpPath;
     private string? _jumpOriginal;
     private readonly List<DiffSection> _sections = [];
-    private readonly HashSet<string> _collapsed = new(StringComparer.Ordinal);
+    // A loaded changelist starts collapsed. Exceptions are the files the user opened, or closed after Expand all.
+    private readonly HashSet<string> _foldExceptions = new(StringComparer.Ordinal);
+    private bool _foldsOpen;
+    private string? _foldScope;
     private List<DiffRow>? _rowSink;
 
     public bool ShowSectionFolds => AllFiles && ShowingDiff && _sections.Count > 0;
@@ -1898,6 +1901,7 @@ public partial class RepositoryViewModel : ViewModelBase
 
         if (AllFiles)
         {
+            NoteChangelist();
             _allFilesShown = true;
             var files = string.IsNullOrEmpty(document.RawPatch) ? [] : DiffParser.ParseFiles(document.RawPatch);
             if (files.Count == 0)
@@ -1919,7 +1923,7 @@ public partial class RepositoryViewModel : ViewModelBase
                     Path = entry.Path,
                     Label = label,
                     CanFold = true,
-                    Expanded = !_collapsed.Contains(key),
+                    Expanded = IsFoldOpen(key),
                     FileMenu = FileMenuFor(entry.Path),
                 };
                 var section = new DiffSection(key, header);
@@ -2163,10 +2167,7 @@ public partial class RepositoryViewModel : ViewModelBase
             return;
         var index = DiffRows.IndexOf(section.Header);
         section.Header.Expanded = expanded;
-        if (expanded)
-            _collapsed.Remove(section.Key);
-        else if (section.Key.Length > 0)
-            _collapsed.Add(section.Key);
+        SetFold(section.Key, expanded);
         if (index >= 0)
         {
             if (expanded)
@@ -2197,6 +2198,9 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private void OpenForJump(string path, string? original)
     {
+        SetFold(path, true);
+        if (original is { Length: > 0 } old)
+            SetFold(old, true);
         foreach (var section in _sections)
         {
             if (!SectionMatches(section, path, original))
@@ -2204,6 +2208,8 @@ public partial class RepositoryViewModel : ViewModelBase
             SetExpanded(section, true);
             return;
         }
+
+        ApplyImageFolds();
     }
 
     private static bool SectionMatches(DiffSection section, string path, string? original) =>
@@ -2217,7 +2223,8 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         if (_sections.Count == 0)
             return;
-        _collapsed.Clear();
+        _foldsOpen = true;
+        _foldExceptions.Clear();
         foreach (var section in _sections)
             section.Header.Expanded = true;
         PublishSections();
@@ -2229,12 +2236,10 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         if (_sections.Count == 0)
             return;
+        _foldsOpen = false;
+        _foldExceptions.Clear();
         foreach (var section in _sections)
-        {
             section.Header.Expanded = false;
-            if (section.Key.Length > 0)
-                _collapsed.Add(section.Key);
-        }
 
         PublishSections();
         ApplyImageFolds();
@@ -2269,19 +2274,77 @@ public partial class RepositoryViewModel : ViewModelBase
             row.IsOpen = !IsCollapsed(row.Path);
     }
 
+    private void NoteChangelist()
+    {
+        var scope = FoldScope();
+        if (string.Equals(scope, _foldScope, StringComparison.Ordinal))
+            return;
+        _foldScope = scope;
+        _foldsOpen = false;
+        _foldExceptions.Clear();
+    }
+
+    /// <summary>Working copy, index, one commit, and a commit range each start collapsed.</summary>
+    private string FoldScope()
+    {
+        if (_rangeOlder is not null && _rangeNewer is not null)
+            return "range\n" + _rangeOlder + "\n" + _rangeNewer;
+        var row = SelectedGraphRow;
+        if (row is null || row.IsWorkingCopy)
+            return _viewingStaged ? "staged" : "unstaged";
+        return "commit\n" + (row.Sha ?? "") + "\n" + (_diffParent ?? "");
+    }
+
+    private void SetFold(string key, bool open)
+    {
+        if (key.Length == 0)
+            return;
+        if (open == _foldsOpen)
+            RemoveFold(key);
+        else
+            _foldExceptions.Add(key);
+    }
+
+    private void RemoveFold(string key)
+    {
+        List<string>? drop = null;
+        foreach (var item in _foldExceptions)
+        {
+            if (string.Equals(item, key, StringComparison.Ordinal) || DiffParser.SameFile(item, key))
+                (drop ??= []).Add(item);
+        }
+
+        if (drop is null)
+            return;
+        foreach (var item in drop)
+            _foldExceptions.Remove(item);
+    }
+
+    private bool IsFoldOpen(string key)
+    {
+        if (key.Length == 0)
+            return true;
+        var exception = _foldExceptions.Contains(key);
+        if (!exception)
+        {
+            foreach (var item in _foldExceptions)
+            {
+                if (DiffParser.SameFile(item, key))
+                {
+                    exception = true;
+                    break;
+                }
+            }
+        }
+
+        return _foldsOpen ? !exception : exception;
+    }
+
     private bool IsCollapsed(string path)
     {
         if (path.Length == 0)
             return false;
-        if (_collapsed.Contains(path))
-            return true;
-        foreach (var folded in _collapsed)
-        {
-            if (DiffParser.SameFile(folded, path))
-                return true;
-        }
-
-        return false;
+        return !IsFoldOpen(path);
     }
 
     private void ClearDiff(string notice)
