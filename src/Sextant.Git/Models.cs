@@ -40,7 +40,7 @@ public sealed record CommitRecord(
     string AuthorEmail,
     string Subject);
 
-public sealed record GitRef(string Oid, string Name, bool IsHead, string? Upstream);
+public sealed record GitRef(string Oid, string Name, bool IsHead, string? Upstream, int? Ahead = null, int? Behind = null);
 
 public sealed record CommitFileChange(string Path, string? OriginalPath, ChangeKind Kind);
 

@@ -25,6 +25,18 @@ public static class GitCommands
         "--format=%(objectname)\t%(refname)\t%(HEAD)\t%(upstream:short)",
     ];
 
+    /// <summary>
+    /// Ahead/behind for every local branch. Remote-tracking refs are left out.
+    /// A fetch should say when upstream has commits a local branch does not,
+    /// including one that is not the branch checked out in this worktree.
+    /// </summary>
+    public static IReadOnlyList<string> LocalUpstream(string toplevel) =>
+    [
+        "-C", toplevel, "--no-optional-locks", "for-each-ref",
+        "--format=%(refname)\t%(upstream:short)\t%(upstream:track)",
+        "refs/heads",
+    ];
+
     public static IReadOnlyList<string> Remotes(string toplevel) =>
         ["-C", toplevel, "--no-optional-locks", "remote"];
 

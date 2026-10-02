@@ -1124,7 +1124,7 @@ public partial class RepositoryViewModel : ViewModelBase
             branches.Add(new LocationItem
             {
                 Key = "b:" + name,
-                Label = name,
+                Label = name + UpstreamTrackParser.Suffix(branch.Ahead, branch.Behind),
                 IsCurrent = current,
                 Oid = branch.Oid,
                 ShowCheckout = !current,
@@ -1260,13 +1260,17 @@ public partial class RepositoryViewModel : ViewModelBase
             foreach (var tree in state.Worktrees.OrderBy(tree => tree.Path, StringComparer.Ordinal))
             {
                 var current = Toplevel is not null && RepoPath.Same(tree.Path, Toplevel);
+                var tracked = tree.Branch is null
+                    ? null
+                    : state.Refs.FirstOrDefault(reference => reference.Name == tree.Branch);
                 var name = tree.Bare
                     ? "bare"
                     : tree.Detached ? "detached " + Short(tree.Head) : ShortHead(tree.Branch ?? "");
+                var pending = tracked is null ? "" : UpstreamTrackParser.Suffix(tracked.Ahead, tracked.Behind);
                 trees.Add(new LocationItem
                 {
                     Key = "w:" + tree.Path,
-                    Label = name + "  " + tree.Path,
+                    Label = name + pending + "  " + tree.Path,
                     IsCurrent = current,
                     ShowOpen = !current,
                     OpenCommand = new AsyncRelayCommand(() => _host.OpenRepositoryAsync(tree.Path)),

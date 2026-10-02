@@ -907,8 +907,32 @@ public sealed partial class RepositorySession : IAsyncDisposable
             var worktrees = worktreeOutput.ExitCode == 0
                 ? WorktreeParser.Parse(Encoding.UTF8.GetString(worktreeOutput.Stdout))
                 : Array.Empty<WorktreeEntry>();
+            parsed = await ApplyLocalUpstreamAsync(parsed, token).ConfigureAwait(false);
             return new RefLoad(parsed, names, stashes, submodules, worktrees);
         }, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<GitRef>> ApplyLocalUpstreamAsync(
+        IReadOnlyList<GitRef> refs,
+        CancellationToken cancellationToken)
+    {
+        if (!refs.Any(reference => reference.Name.StartsWith("refs/heads/", StringComparison.Ordinal)))
+            return refs;
+
+        var output = Checked(await ExecuteAsync(GitCommands.LocalUpstream(_toplevel), null, cancellationToken).ConfigureAwait(false));
+        var tracking = UpstreamTrackParser.Parse(_encoding.GetString(output.Stdout));
+        if (tracking.Count == 0)
+            return refs;
+
+        var annotated = new List<GitRef>(refs.Count);
+        foreach (var reference in refs)
+        {
+            annotated.Add(tracking.TryGetValue(reference.Name, out var counts)
+                ? reference with { Ahead = counts.Ahead, Behind = counts.Behind }
+                : reference);
+        }
+
+        return annotated;
     }
 
     private async Task<LogLoad> QueryLogAsync(int skip, int count, CancellationToken cancellationToken)

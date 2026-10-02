@@ -147,6 +147,33 @@ public class LogAndRefParserTests
     }
 }
 
+public class UpstreamTrackParserTests
+{
+    [Fact]
+    public void Parses_ahead_behind_and_skips_a_missing_upstream()
+    {
+        var text =
+            "refs/heads/main\torigin/main\t[behind 2]\n" +
+            "refs/heads/feature\torigin/feature\t[ahead 1, behind 3]\n" +
+            "refs/heads/topic\torigin/topic\t[ahead 4]\n" +
+            "refs/heads/sync\torigin/sync\t\n" +
+            "refs/heads/local\t\t\n" +
+            "refs/heads/gone\torigin/gone\t[gone]\n";
+        var counts = UpstreamTrackParser.Parse(text);
+
+        Assert.Equal(new UpstreamCounts(0, 2), counts["refs/heads/main"]);
+        Assert.Equal(new UpstreamCounts(1, 3), counts["refs/heads/feature"]);
+        Assert.Equal(new UpstreamCounts(4, 0), counts["refs/heads/topic"]);
+        Assert.Equal(new UpstreamCounts(0, 0), counts["refs/heads/sync"]);
+        Assert.False(counts.ContainsKey("refs/heads/local"));
+        Assert.False(counts.ContainsKey("refs/heads/gone"));
+        Assert.Equal("  ↓2", UpstreamTrackParser.Suffix(0, 2));
+        Assert.Equal("  ↑1  ↓3", UpstreamTrackParser.Suffix(1, 3));
+        Assert.Equal("", UpstreamTrackParser.Suffix(0, 0));
+        Assert.Equal("", UpstreamTrackParser.Suffix(null, null));
+    }
+}
+
 public class NameStatusAndDiffTests
 {
     [Fact]
