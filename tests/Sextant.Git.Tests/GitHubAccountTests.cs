@@ -37,5 +37,22 @@ public class GitHubAccountTests
         Assert.False(GitHubAccounts.IsAccessFailure(""));
         Assert.Contains("cannot see this repository", GitHubAccounts.AccessHint("batch response: Not Found"), StringComparison.Ordinal);
         Assert.Contains("not on the server", GitHubAccounts.AccessHint("Object does not exist on the server"), StringComparison.Ordinal);
+        Assert.False(GitHubAccounts.IsAccessFailure("git-lfs filter-process: git-lfs: command not found"));
+        Assert.Contains("git-lfs was not found", GitHubAccounts.AccessHint("git-lfs: command not found"), StringComparison.Ordinal);
+    }
+}
+
+public class ToolPathTests
+{
+    [Fact]
+    public void Git_directory_is_first_and_is_not_repeated()
+    {
+        var separator = Path.PathSeparator;
+        var path = GitProcessRunner.ToolPath("/usr/bin" + separator + "/bin", "/opt/custom/bin/git");
+        Assert.StartsWith("/opt/custom/bin" + separator, path);
+
+        var again = GitProcessRunner.ToolPath("/opt/custom/bin" + separator + "/usr/bin", "/opt/custom/bin/git");
+        Assert.Equal(1, again.Split(separator).Count(entry => entry == "/opt/custom/bin"));
+        Assert.Contains("/usr/bin", again.Split(separator));
     }
 }

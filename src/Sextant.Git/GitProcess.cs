@@ -29,6 +29,11 @@ public sealed class GitProcessRunner
                 info.Environment[pair.Key] = pair.Value;
         }
 
+        // A macOS app launched from Finder does not inherit the shell PATH, so Homebrew's
+        // git-lfs is invisible. git then fails the smudge with "git-lfs: command not found".
+        info.Environment.TryGetValue("PATH", out var path);
+        info.Environment["PATH"] = ToolPath(path, request.Executable);
+
         using var process = new Process { StartInfo = info, EnableRaisingEvents = true };
         if (!process.Start())
             throw new InvalidOperationException("Failed to start git.");
@@ -79,6 +84,44 @@ public sealed class GitProcessRunner
             Duration = start.Elapsed,
             DisplayArguments = display,
         };
+    }
+
+    /// <summary>
+    /// Puts the git executable's directory first, then Homebrew and /usr/local/bin when they exist.
+    /// git-lfs and gh are installed beside Homebrew git, and a GUI launch does not see that directory.
+    /// </summary>
+    internal static string ToolPath(string? path, string executable)
+    {
+        var directories = new List<string>();
+        var gitDirectory = Path.GetDirectoryName(executable);
+        if (!string.IsNullOrEmpty(gitDirectory) && Path.IsPathRooted(executable))
+            directories.Add(gitDirectory);
+        if (!OperatingSystem.IsWindows())
+        {
+            if (Directory.Exists("/opt/homebrew/bin"))
+                directories.Add("/opt/homebrew/bin");
+            if (Directory.Exists("/usr/local/bin"))
+                directories.Add("/usr/local/bin");
+        }
+
+        var seen = new HashSet<string>(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        var merged = new List<string>();
+        void Add(string directory)
+        {
+            if (directory.Length == 0 || !seen.Add(directory))
+                return;
+            merged.Add(directory);
+        }
+
+        foreach (var directory in directories)
+            Add(directory);
+        if (!string.IsNullOrEmpty(path))
+        {
+            foreach (var entry in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+                Add(entry);
+        }
+
+        return string.Join(Path.PathSeparator, merged);
     }
 
     private static void TryKill(Process process)

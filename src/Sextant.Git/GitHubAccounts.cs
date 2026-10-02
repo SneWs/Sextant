@@ -63,6 +63,8 @@ internal static class GitHubAccounts
             return false;
         if (stderr.Contains("does not exist", StringComparison.OrdinalIgnoreCase))
             return false;
+        if (IsMissingTool(stderr))
+            return false;
         return stderr.Contains("Not Found", StringComparison.OrdinalIgnoreCase)
             || stderr.Contains("Authentication", StringComparison.OrdinalIgnoreCase)
             || stderr.Contains("Authorization", StringComparison.OrdinalIgnoreCase)
@@ -71,12 +73,18 @@ internal static class GitHubAccounts
 
     public static string AccessHint(string stderr)
     {
+        if (IsMissingTool(stderr))
+            return "git-lfs was not found.";
         if (IsAccessFailure(stderr))
             return "The signed-in GitHub account cannot see this repository.";
         if (stderr.Contains("does not exist", StringComparison.OrdinalIgnoreCase))
             return "The LFS object is not on the server.";
         return "";
     }
+
+    private static bool IsMissingTool(string stderr) =>
+        stderr.Contains("command not found", StringComparison.OrdinalIgnoreCase)
+        || stderr.Contains("not recognized", StringComparison.OrdinalIgnoreCase);
 
     private sealed class GhLogin : IGitHubLogin
     {
