@@ -362,10 +362,17 @@
                             </views:CopyListBox.ItemsPanel>
                             <views:CopyListBox.DataTemplates>
                                 <DataTemplate DataType="vm:DiffHunkRow" x:DataType="vm:DiffHunkRow">
-                                    <DockPanel Margin="8,6,8,2">
-                                        <Button Classes="flat" DockPanel.Dock="Right" Content="{Binding ActionLabel}" Command="{Binding ActionCommand}" IsVisible="{Binding ShowAction}" Padding="6,0"/>
-                                        <views:CopyableText Classes="diff" CopyKey="span" Text="{Binding Header}" Opacity="0.7"/>
-                                    </DockPanel>
+                                    <Border Margin="8,10,8,4" Padding="8,6" CornerRadius="6" BorderThickness="1"
+                                            HorizontalAlignment="Stretch"
+                                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                                            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+                                        <DockPanel>
+                                            <Button Classes="accent" DockPanel.Dock="Right" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                    Content="{Binding ActionLabel}" Command="{Binding ActionCommand}" IsVisible="{Binding ShowAction}" Margin="12,0,0,0"/>
+                                            <views:CopyableText Classes="diff" CopyKey="span" Text="{Binding Header}" Opacity="0.85"
+                                                                VerticalAlignment="Center" HorizontalAlignment="Stretch" TextTrimming="CharacterEllipsis"/>
+                                        </DockPanel>
+                                    </Border>
                                 </DataTemplate>
                                 <DataTemplate DataType="vm:DiffLineRow" x:DataType="vm:DiffLineRow">
                                     <DockPanel>
