@@ -125,9 +125,14 @@ public static class RepoLayouts
 
 public sealed class AppSettings
 {
+    /// <summary>Absolute path of the git executable. Empty means the git on PATH.</summary>
     public string? GitExecutable { get; set; }
 
     public bool ReopenTabs { get; set; } = true;
+
+    public bool SideBySide { get; set; }
+
+    public bool IgnoreWhitespace { get; set; }
 }
 
 public static class AppPaths

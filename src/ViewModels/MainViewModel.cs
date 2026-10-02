@@ -473,6 +473,53 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         }
     }
 
+    [RelayCommand]
+    private async Task OpenSettingsAsync()
+    {
+        if (Dialogs is null)
+            return;
+        var edit = await Dialogs.EditSettingsAsync(new SettingsDraft(
+            _settings.GitExecutable ?? "",
+            _settings.SideBySide,
+            _settings.IgnoreWhitespace));
+        if (edit is null)
+            return;
+        var path = string.IsNullOrWhiteSpace(edit.GitExecutable) ? null : edit.GitExecutable.Trim();
+        var previous = string.IsNullOrWhiteSpace(_settings.GitExecutable) ? null : _settings.GitExecutable;
+        var gitChanged = !string.Equals(path, previous, StringComparison.Ordinal);
+        var diffChanged = edit.SideBySide != _settings.SideBySide || edit.IgnoreWhitespace != _settings.IgnoreWhitespace;
+        _settings.GitExecutable = path;
+        _settings.SideBySide = edit.SideBySide;
+        _settings.IgnoreWhitespace = edit.IgnoreWhitespace;
+        _store.SaveSettings(_settings);
+        if (diffChanged)
+            ApplyDiffPreferences();
+        if (gitChanged)
+            await ProbeAsync();
+    }
+
+    private void ApplyDiffPreferences()
+    {
+        foreach (var tab in Tabs)
+            tab.ApplyDiffPreferences(_settings.SideBySide, _settings.IgnoreWhitespace);
+    }
+
+    private Task ToggleSavedSideBySide()
+    {
+        _settings.SideBySide = !_settings.SideBySide;
+        _store.SaveSettings(_settings);
+        ApplyDiffPreferences();
+        return Task.CompletedTask;
+    }
+
+    private Task ToggleSavedWhitespace()
+    {
+        _settings.IgnoreWhitespace = !_settings.IgnoreWhitespace;
+        _store.SaveSettings(_settings);
+        ApplyDiffPreferences();
+        return Task.CompletedTask;
+    }
+
     private async Task LocateGitAsync()
     {
         if (Dialogs is null || IsBusy)
@@ -512,6 +559,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         tab.LocationsWidth = layout.LocationsWidth;
         tab.GraphWidth = layout.GraphWidth;
         tab.FilesHeight = layout.FilesHeight;
+        tab.SideBySide = _settings.SideBySide;
+        tab.IgnoreWhitespace = _settings.IgnoreWhitespace;
         return tab;
     }
 
@@ -536,6 +585,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         _palette.Add(new PaletteItem { Title = "Clone repository", Run = CloneAsync });
         _palette.Add(new PaletteItem { Title = "Init repository", Run = InitAsync });
         _palette.Add(new PaletteItem { Title = "Locate git", Run = LocateGitAsync });
+        _palette.Add(new PaletteItem { Title = "Settings", Run = OpenSettingsAsync });
         if (ActiveTab is { } tab)
         {
             _palette.Add(new PaletteItem { Title = "Refresh", Run = tab.Refresh });
@@ -556,8 +606,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _palette.Add(new PaletteItem { Title = "Stash", Run = () => tab.StashCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Add remote", Run = () => tab.AddRemoteCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Add worktree", Run = () => tab.AddWorktreeCommand.ExecuteAsync(null) });
-            _palette.Add(new PaletteItem { Title = "Toggle side-by-side diff", Run = () => tab.ToggleSideBySideCommand.ExecuteAsync(null) });
-            _palette.Add(new PaletteItem { Title = "Toggle ignore whitespace", Run = () => tab.ToggleWhitespaceCommand.ExecuteAsync(null) });
+            _palette.Add(new PaletteItem { Title = "Toggle side-by-side diff", Run = ToggleSavedSideBySide });
+            _palette.Add(new PaletteItem { Title = "Toggle ignore whitespace", Run = ToggleSavedWhitespace });
             _palette.Add(new PaletteItem { Title = "Toggle all files", Run = () => tab.ToggleAllFilesCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Toggle blame", Run = () => tab.ToggleBlameCommand.ExecuteAsync(null) });
             if (tab.IsConflicted)

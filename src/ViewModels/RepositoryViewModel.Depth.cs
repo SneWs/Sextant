@@ -6,6 +6,7 @@ using Sextant;
 using Sextant.Git;
 using Sextant.Git.Parsing;
 using System.Text;
+using System.Windows.Input;
 
 namespace Sextant.ViewModels;
 
@@ -300,7 +301,11 @@ public partial class RepositoryViewModel
         var load = ++_imageLoad;
         var rows = new List<ImageCompareRow>(targets.Count);
         foreach (var target in targets)
-            rows.Add(new ImageCompareRow(target.Path, null, null, "", "") { IsLoading = true });
+        {
+            var row = CreateImageRow(target.Path);
+            row.IsLoading = true;
+            rows.Add(row);
+        }
         var visible = new List<ImageCompareRow>();
         var published = false;
         // A local file is often ready immediately. The spinner waits a moment so that case does not flash.
@@ -592,9 +597,15 @@ public partial class RepositoryViewModel
             return;
         }
 
+        ClearSections();
         DiffRows.Clear();
         var language = DiffSyntax.Language(path);
-        DiffRows.Add(new DiffFileRow { Path = path, Label = path + "  (loaded)" });
+        DiffRows.Add(new DiffFileRow
+        {
+            Path = path,
+            Label = path + "  (loaded)",
+            FileMenu = FileMenuFor(path),
+        });
         foreach (var line in lines)
             AddFoldedLine("  " + line, language, DiffColors.Clear, false, "", UiCommands.Disabled);
 
@@ -622,14 +633,22 @@ public partial class RepositoryViewModel
             old.Release();
         ImageCompares.Reset(rows);
         ShowingImages = ImageCompares.Count > 0;
+        ApplyImageFolds();
     }
+
+    private ImageCompareRow CreateImageRow(string path, string beforeNotice = "", string afterNotice = "") =>
+        new(path, null, null, beforeNotice, afterNotice)
+        {
+            FileMenu = FileMenuFor(path),
+            ToggleCommand = new RelayCommand(() => ToggleFileSection(path)),
+        };
 
     private void PlaceImage(string path, Bitmap bitmap)
     {
         var row = ImageCompares.FirstOrDefault(item => string.Equals(item.Path, path, StringComparison.Ordinal));
         if (row is null)
         {
-            row = new ImageCompareRow(path, null, null, "", "");
+            row = CreateImageRow(path);
             ImageCompares.Add(row);
             ShowingImages = true;
         }
@@ -644,6 +663,8 @@ public partial class RepositoryViewModel
             row.Before = bitmap;
             row.BeforeNotice = "";
         }
+
+        ApplyImageFolds();
     }
 
     private void PlaceImageNotice(string path, string notice)
@@ -651,9 +672,10 @@ public partial class RepositoryViewModel
         var row = ImageCompares.FirstOrDefault(item => string.Equals(item.Path, path, StringComparison.Ordinal));
         if (row is null)
         {
-            row = new ImageCompareRow(path, null, null, _lfsAfter ? "" : notice, _lfsAfter ? notice : "");
+            row = CreateImageRow(path, _lfsAfter ? "" : notice, _lfsAfter ? notice : "");
             ImageCompares.Add(row);
             ShowingImages = true;
+            ApplyImageFolds();
             return;
         }
 
@@ -661,6 +683,7 @@ public partial class RepositoryViewModel
             row.AfterNotice = notice;
         else
             row.BeforeNotice = notice;
+        ApplyImageFolds();
     }
 
     private static Bitmap? DecodeImage(string path, byte[]? data) => DecodeBitmap(ImageRaster.Prepare(path, data));
@@ -722,6 +745,18 @@ public sealed class ImageCompareRow : ObservableObject
     }
 
     public string Path { get; }
+
+    public WorktreeFileMenu? FileMenu { get; set; }
+
+    public ICommand ToggleCommand { get; set; } = UiCommands.Disabled;
+
+    private bool _open = true;
+
+    public bool IsOpen
+    {
+        get => _open;
+        set => SetProperty(ref _open, value);
+    }
 
     private bool _loading;
 

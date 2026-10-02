@@ -21,8 +21,12 @@ public interface IDialogService
 
     Task<IReadOnlyList<RebaseStep>?> EditRebaseAsync(IReadOnlyList<RebaseStep> steps);
 
+    Task<SettingsDraft?> EditSettingsAsync(SettingsDraft current);
+
     Task CopyAsync(string text);
 }
+
+public sealed record SettingsDraft(string GitExecutable, bool SideBySide, bool IgnoreWhitespace);
 
 public sealed record CloneRequest(string Url, string Destination);
 

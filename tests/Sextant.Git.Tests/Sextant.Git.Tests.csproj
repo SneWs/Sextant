@@ -31,6 +31,7 @@
     <Compile Include="..\..\src\ImageRaster.cs" Link="ImageRaster.cs" />
     <Compile Include="..\..\src\FbxPreview.cs" Link="FbxPreview.cs" />
     <Compile Include="..\..\src\TabShortcut.cs" Link="TabShortcut.cs" />
+    <Compile Include="..\..\src\DesktopOpen.cs" Link="DesktopOpen.cs" />
     <Content Include="Fixtures\box.fbx" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Fixtures\animation.fbx" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

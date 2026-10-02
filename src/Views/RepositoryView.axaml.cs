@@ -8,6 +8,7 @@ using Sextant;
 using Sextant.Git.Parsing;
 using Sextant.ViewModels;
 using System.Collections.ObjectModel;
+using System.Windows.Input;
 using System.Collections.Specialized;
 using System.ComponentModel;
 
@@ -108,6 +109,24 @@ public partial class RepositoryView : UserControl
             _diffRows.CollectionChanged -= OnDiffRowsChanged;
             _diffRows = null;
         }
+    }
+
+    private void OnDiffHeaderPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Border border || !e.GetCurrentPoint(border).Properties.IsLeftButtonPressed)
+            return;
+        if (e.Source is Visual source && source.FindAncestorOfType<Button>(includeSelf: true) is not null)
+            return;
+        ICommand? command = border.DataContext switch
+        {
+            DiffFileRow { CanFold: true } row => row.ToggleCommand,
+            ImageCompareRow image => image.ToggleCommand,
+            _ => null,
+        };
+        if (command is null || !command.CanExecute(null))
+            return;
+        command.Execute(null);
+        e.Handled = true;
     }
 
     private void OnFilePointerReleased(object? sender, PointerReleasedEventArgs e)
@@ -625,6 +644,8 @@ public partial class RepositoryView : UserControl
             return;
         menu.DataContext = target.DataContext;
         if (target.DataContext is LocationItem item && !HasLocationMenu(item))
+            e.Cancel = true;
+        if (target.DataContext is DiffFileRow { FileMenu: null } || target.DataContext is ImageCompareRow { FileMenu: null })
             e.Cancel = true;
     }
 }

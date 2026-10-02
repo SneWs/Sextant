@@ -213,7 +213,13 @@ public class CoreTests
                 WindowMaximized = true,
             };
             store.SaveWorkspace(state);
-            store.SaveSettings(new AppSettings { GitExecutable = @"C:\git\git.exe", ReopenTabs = false });
+            store.SaveSettings(new AppSettings
+            {
+                GitExecutable = @"C:\git\git.exe",
+                ReopenTabs = false,
+                SideBySide = true,
+                IgnoreWhitespace = true,
+            });
 
             var loaded = store.LoadWorkspace();
             var settings = store.LoadSettings();
@@ -229,6 +235,15 @@ public class CoreTests
             Assert.True(loaded.WindowMaximized);
             Assert.Equal(@"C:\git\git.exe", settings.GitExecutable);
             Assert.False(settings.ReopenTabs);
+            Assert.True(settings.SideBySide);
+            Assert.True(settings.IgnoreWhitespace);
+
+            File.WriteAllText(Path.Combine(directory, "settings.json"), """{ "reopenTabs": true }""");
+            var older = store.LoadSettings();
+            Assert.Null(older.GitExecutable);
+            Assert.True(older.ReopenTabs);
+            Assert.False(older.SideBySide);
+            Assert.False(older.IgnoreWhitespace);
 
             File.WriteAllText(Path.Combine(directory, "workspace.json"), """
                 {

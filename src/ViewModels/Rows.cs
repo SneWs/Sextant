@@ -263,12 +263,54 @@ public sealed class DiffSideRow : DiffRow
     public required IBrush RightBackground { get; init; }
 }
 
-public sealed class DiffFileRow : DiffRow
+public sealed class DiffFileRow : DiffRow, INotifyPropertyChanged
 {
+    private bool _expanded = true;
+
     /// <summary>Repository path this header names. Scroll-to-file matches this, not the display label.</summary>
     public string Path { get; init; } = "";
 
     public required string Label { get; init; }
+
+    /// <summary>All-files headers fold. A loaded-file banner does not.</summary>
+    public bool CanFold { get; init; }
+
+    public ICommand ToggleCommand { get; set; } = UiCommands.Disabled;
+
+    /// <summary>Copy and open actions for this path. Absent when the row has no repository path.</summary>
+    public WorktreeFileMenu? FileMenu { get; set; }
+
+    public bool Expanded
+    {
+        get => _expanded;
+        set
+        {
+            if (_expanded == value)
+                return;
+            _expanded = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Expanded)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ExpandAngle)));
+        }
+    }
+
+    public double ExpandAngle => Expanded ? 90 : 0;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+
+public sealed class WorktreeFileMenu
+{
+    public required string OpenFolderLabel { get; init; }
+
+    public ICommand CopyFileNameCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand CopyPathCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand CopyFullPathCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand OpenFolderCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand OpenEditorCommand { get; init; } = UiCommands.Disabled;
 }
 
 public sealed class BlameRow

@@ -41,7 +41,7 @@ public partial class RepositoryViewModel
     public partial bool SideBySide { get; set; }
 
     [ObservableProperty]
-    public partial bool AllFiles { get; set; }
+    public partial bool AllFiles { get; set; } = true;
 
     [ObservableProperty]
     public partial bool ShowingBlame { get; set; }
@@ -72,15 +72,24 @@ public partial class RepositoryViewModel
 
     partial void OnIgnoreWhitespaceChanged(bool value) => OnPropertyChanged(nameof(WhitespaceLabel));
 
-    partial void OnAllFilesChanged(bool value) => OnPropertyChanged(nameof(FilesModeLabel));
+    partial void OnAllFilesChanged(bool value)
+    {
+        OnPropertyChanged(nameof(FilesModeLabel));
+        OnPropertyChanged(nameof(ShowSectionFolds));
+    }
 
     partial void OnShowingBlameChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowingDiff));
         OnPropertyChanged(nameof(BlameLabel));
+        OnPropertyChanged(nameof(ShowSectionFolds));
     }
 
-    partial void OnShowingMergeChanged(bool value) => OnPropertyChanged(nameof(ShowingDiff));
+    partial void OnShowingMergeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowingDiff));
+        OnPropertyChanged(nameof(ShowSectionFolds));
+    }
 
     partial void OnHasHistoryFilterChanged(bool value) => OnPropertyChanged(nameof(ShowHistoryChrome));
 
@@ -168,6 +177,15 @@ public partial class RepositoryViewModel
 
     [RelayCommand]
     private Task AddRemote() => AddRemoteAsync();
+
+    public void ApplyDiffPreferences(bool sideBySide, bool ignoreWhitespace)
+    {
+        var changed = SideBySide != sideBySide || IgnoreWhitespace != ignoreWhitespace;
+        SideBySide = sideBySide;
+        IgnoreWhitespace = ignoreWhitespace;
+        if (changed && _session is not null)
+            _ = ReloadDiffViewAsync();
+    }
 
     [RelayCommand]
     private Task ToggleWhitespace()
@@ -370,6 +388,7 @@ public partial class RepositoryViewModel
             if (document is null || token.IsCancellationRequested)
                 return;
             BlameRows.Clear();
+            ClearSections();
             DiffRows.Clear();
             ShowLoadDiff = document.IsTooLarge;
             if (document.IsTooLarge)

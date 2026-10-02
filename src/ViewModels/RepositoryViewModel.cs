@@ -41,6 +41,11 @@ public partial class RepositoryViewModel : ViewModelBase
     private bool _armJump;
     private string? _jumpPath;
     private string? _jumpOriginal;
+    private readonly List<DiffSection> _sections = [];
+    private readonly HashSet<string> _collapsed = new(StringComparer.Ordinal);
+    private List<DiffRow>? _rowSink;
+
+    public bool ShowSectionFolds => AllFiles && ShowingDiff && _sections.Count > 0;
 
     /// <summary>The all-files diff should move this file's header to the top of the diff.</summary>
     public event Action<string, string?>? JumpToFile;
@@ -527,6 +532,7 @@ public partial class RepositoryViewModel : ViewModelBase
             return false;
         if (!DiffHasFile(file) && !ImageHasFile(file))
             return false;
+        OpenForJump(file.Path, file.OriginalPath);
         JumpToFile?.Invoke(file.Path, file.OriginalPath);
         return true;
     }
@@ -1786,7 +1792,10 @@ public partial class RepositoryViewModel : ViewModelBase
             RememberObjects(range, workingCopy, file);
             RenderDiff(document, file, workingCopy);
             if (armJump && AllFiles && jumpPath is { Length: > 0 })
+            {
+                OpenForJump(jumpPath, jumpOriginal);
                 JumpToFile?.Invoke(jumpPath, jumpOriginal);
+            }
             await LoadImageAsync(file, workingCopy, range, token);
         }
         catch (OperationCanceledException)
@@ -1860,6 +1869,7 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private void RenderDiff(DiffDocument document, FileRowViewModel? file, bool workingCopy)
     {
+        ClearSections();
         ClearMerge();
         ClearPreview();
         DiffRows.Clear();
@@ -1893,11 +1903,38 @@ public partial class RepositoryViewModel : ViewModelBase
             foreach (var entry in files)
             {
                 var label = string.IsNullOrEmpty(entry.Path) ? "Diff" : entry.Path;
-                DiffRows.Add(new DiffFileRow { Path = entry.Path, Label = label });
-                AppendFileDiff(entry.Document, workingCopy, KindForDiff(entry.Document), path: entry.Path, notes: document.LfsFiles);
+                var key = entry.Path.Length > 0 ? entry.Path : label;
+                var header = new DiffFileRow
+                {
+                    Path = entry.Path,
+                    Label = label,
+                    CanFold = true,
+                    Expanded = !_collapsed.Contains(key),
+                    FileMenu = FileMenuFor(entry.Path),
+                };
+                var section = new DiffSection(key, header);
+                header.ToggleCommand = new RelayCommand(() => SetExpanded(section, !header.Expanded));
+                _rowSink = section.Body;
+                try
+                {
+                    AppendFileDiff(entry.Document, workingCopy, KindForDiff(entry.Document), path: entry.Path, notes: document.LfsFiles);
+                }
+                finally
+                {
+                    _rowSink = null;
+                }
+
+                _sections.Add(section);
+                DiffRows.Add(header);
+                if (header.Expanded)
+                {
+                    foreach (var row in section.Body)
+                        DiffRows.Add(row);
+                }
             }
 
             _diffReady = true;
+            OnPropertyChanged(nameof(ShowSectionFolds));
             return;
         }
 
@@ -1943,7 +1980,7 @@ public partial class RepositoryViewModel : ViewModelBase
         {
             var hunk = document.Hunks[index];
             var hunkIndex = index;
-            DiffRows.Add(new DiffHunkRow
+            AddRow(new DiffHunkRow
             {
                 Header = hunk.Header,
                 ShowAction = parts,
@@ -1968,7 +2005,7 @@ public partial class RepositoryViewModel : ViewModelBase
             return;
         }
 
-        DiffRows.Add(new DiffLineRow { Text = message, Background = DiffColors.Clear });
+        AddRow(new DiffLineRow { Text = message, Background = DiffColors.Clear });
     }
 
     private void AppendInline(DiffHunk hunk, bool parts, string patch, int hunkIndex, string lineLabel)
@@ -1996,7 +2033,7 @@ public partial class RepositoryViewModel : ViewModelBase
         var count = LineFold.Count(text);
         for (var index = 0; index < count; index++)
         {
-            DiffRows.Add(new DiffLineRow
+            AddRow(new DiffLineRow
             {
                 Text = LineFold.Piece(text, index) ?? "",
                 Language = language,
@@ -2048,7 +2085,7 @@ public partial class RepositoryViewModel : ViewModelBase
         {
             var leftPiece = LineFold.Piece(left, index);
             var rightPiece = LineFold.Piece(right, index);
-            DiffRows.Add(new DiffSideRow
+            AddRow(new DiffSideRow
             {
                 Left = leftPiece ?? "",
                 Right = rightPiece ?? "",
@@ -2102,8 +2139,144 @@ public partial class RepositoryViewModel : ViewModelBase
         }
     }
 
+    private void AddRow(DiffRow row)
+    {
+        if (_rowSink is not null)
+            _rowSink.Add(row);
+        else
+            DiffRows.Add(row);
+    }
+
+    private void SetExpanded(DiffSection section, bool expanded)
+    {
+        if (section.Header.Expanded == expanded)
+            return;
+        var index = DiffRows.IndexOf(section.Header);
+        section.Header.Expanded = expanded;
+        if (expanded)
+            _collapsed.Remove(section.Key);
+        else if (section.Key.Length > 0)
+            _collapsed.Add(section.Key);
+        if (index >= 0)
+        {
+            if (expanded)
+            {
+                for (var i = 0; i < section.Body.Count; i++)
+                    DiffRows.Insert(index + 1 + i, section.Body[i]);
+            }
+            else
+            {
+                for (var i = 0; i < section.Body.Count; i++)
+                    DiffRows.RemoveAt(index + 1);
+            }
+        }
+
+        ApplyImageFolds();
+    }
+
+    private void ToggleFileSection(string path)
+    {
+        foreach (var section in _sections)
+        {
+            if (!SectionMatches(section, path, null))
+                continue;
+            SetExpanded(section, !section.Header.Expanded);
+            return;
+        }
+    }
+
+    private void OpenForJump(string path, string? original)
+    {
+        foreach (var section in _sections)
+        {
+            if (!SectionMatches(section, path, original))
+                continue;
+            SetExpanded(section, true);
+            return;
+        }
+    }
+
+    private static bool SectionMatches(DiffSection section, string path, string? original) =>
+        DiffParser.SameFile(section.Key, path)
+        || DiffParser.SameFile(section.Header.Path, path)
+        || (original is { Length: > 0 } old
+            && (DiffParser.SameFile(section.Key, old) || DiffParser.SameFile(section.Header.Path, old)));
+
+    [RelayCommand]
+    private void ExpandAllSections()
+    {
+        if (_sections.Count == 0)
+            return;
+        _collapsed.Clear();
+        foreach (var section in _sections)
+            section.Header.Expanded = true;
+        PublishSections();
+        ApplyImageFolds();
+    }
+
+    [RelayCommand]
+    private void CollapseAllSections()
+    {
+        if (_sections.Count == 0)
+            return;
+        foreach (var section in _sections)
+        {
+            section.Header.Expanded = false;
+            if (section.Key.Length > 0)
+                _collapsed.Add(section.Key);
+        }
+
+        PublishSections();
+        ApplyImageFolds();
+    }
+
+    private void PublishSections()
+    {
+        var rows = new List<DiffRow>();
+        foreach (var section in _sections)
+        {
+            rows.Add(section.Header);
+            if (section.Header.Expanded)
+                rows.AddRange(section.Body);
+        }
+
+        DiffRows.Clear();
+        foreach (var row in rows)
+            DiffRows.Add(row);
+    }
+
+    private void ClearSections()
+    {
+        if (_sections.Count == 0)
+            return;
+        _sections.Clear();
+        OnPropertyChanged(nameof(ShowSectionFolds));
+    }
+
+    private void ApplyImageFolds()
+    {
+        foreach (var row in ImageCompares)
+            row.IsOpen = !IsCollapsed(row.Path);
+    }
+
+    private bool IsCollapsed(string path)
+    {
+        if (path.Length == 0)
+            return false;
+        if (_collapsed.Contains(path))
+            return true;
+        foreach (var folded in _collapsed)
+        {
+            if (DiffParser.SameFile(folded, path))
+                return true;
+        }
+
+        return false;
+    }
+
     private void ClearDiff(string notice)
     {
+        ClearSections();
         ClearMerge();
         ClearPreview();
         DiffRows.Clear();
@@ -2321,4 +2494,71 @@ public partial class RepositoryViewModel : ViewModelBase
     }
 
     private Task CopyText(string text) => _host.Dialogs is null ? Task.CompletedTask : _host.Dialogs.CopyAsync(text);
+
+    private WorktreeFileMenu? FileMenuFor(string relative)
+    {
+        var name = DesktopOpen.FileName(relative);
+        if (name is null)
+            return null;
+        var full = string.IsNullOrEmpty(Toplevel) ? null : DesktopOpen.FullPath(Toplevel, relative);
+        return new WorktreeFileMenu
+        {
+            OpenFolderLabel = DesktopOpen.FolderLabel(DesktopOpen.Current),
+            CopyFileNameCommand = new RelayCommand(() => _ = CopyText(name)),
+            CopyPathCommand = new RelayCommand(() => _ = CopyText(relative)),
+            CopyFullPathCommand = full is null ? UiCommands.Disabled : new RelayCommand(() => _ = CopyText(full)),
+            OpenFolderCommand = full is null ? UiCommands.Disabled : new RelayCommand(() => OpenFolder(full)),
+            OpenEditorCommand = full is null ? UiCommands.Disabled : new RelayCommand(() => OpenEditor(full)),
+        };
+    }
+
+    private void OpenFolder(string fullPath)
+    {
+        try
+        {
+            if (File.Exists(fullPath) || Directory.Exists(fullPath))
+                DesktopOpen.Start(DesktopOpen.RevealFile(DesktopOpen.Current, fullPath));
+            else if (DesktopOpen.NearestDirectory(fullPath) is { } folder)
+                DesktopOpen.Start(DesktopOpen.OpenDirectory(DesktopOpen.Current, folder));
+            else
+                Fail("That file is not in the working tree.");
+        }
+        catch (Exception exception)
+        {
+            Fail(exception.Message);
+        }
+    }
+
+    private void OpenEditor(string fullPath)
+    {
+        if (!File.Exists(fullPath))
+        {
+            Fail("That file is not in the working tree.");
+            return;
+        }
+
+        try
+        {
+            DesktopOpen.Start(DesktopOpen.EditFile(DesktopOpen.Current, fullPath));
+        }
+        catch (Exception exception)
+        {
+            Fail(exception.Message);
+        }
+    }
+
+    private sealed class DiffSection
+    {
+        public DiffSection(string key, DiffFileRow header)
+        {
+            Key = key;
+            Header = header;
+        }
+
+        public string Key { get; }
+
+        public DiffFileRow Header { get; }
+
+        public List<DiffRow> Body { get; } = [];
+    }
 }
