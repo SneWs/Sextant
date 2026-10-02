@@ -229,6 +229,8 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public bool ShowDirtyDot => IsDirty && !IsConflicted;
 
+    public bool ShowCleanDot => !IsDirty && !IsConflicted;
+
     public Task EnsureLoadedAsync() => _load ??= LoadCoreAsync();
 
     public async ValueTask DisposeAsync()
@@ -481,9 +483,17 @@ public partial class RepositoryViewModel : ViewModelBase
 
     partial void OnNothingStagedChanged(bool value) => OnPropertyChanged(nameof(CanCommit));
 
-    partial void OnIsDirtyChanged(bool value) => OnPropertyChanged(nameof(ShowDirtyDot));
+    partial void OnIsDirtyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowDirtyDot));
+        OnPropertyChanged(nameof(ShowCleanDot));
+    }
 
-    partial void OnIsConflictedChanged(bool value) => OnPropertyChanged(nameof(ShowDirtyDot));
+    partial void OnIsConflictedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowDirtyDot));
+        OnPropertyChanged(nameof(ShowCleanDot));
+    }
 
     partial void OnSelectedGraphRowChanged(GraphRowViewModel? value)
     {

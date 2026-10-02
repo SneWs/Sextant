@@ -23,6 +23,8 @@ public partial class MainWindow : Window
         AddHandler(KeyDownEvent, OnTunnelKey, RoutingStrategies.Tunnel);
         AddHandler(PointerMovedEvent, OnWindowPointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(PointerReleasedEvent, OnWindowPointerReleased, RoutingStrategies.Tunnel, handledEventsToo: true);
+        TabsList.LayoutUpdated += (_, _) => PlacePaneRule();
+        TabScroll.ScrollChanged += (_, _) => PlacePaneRule();
         SizeChanged += (_, _) => RememberWindow();
         PositionChanged += (_, _) => RememberWindow();
         PropertyChanged += OnWindowPropertyChanged;
@@ -63,6 +65,78 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(MainViewModel.PaletteOpen) && sender is MainViewModel { PaletteOpen: true })
             PaletteBox.Focus();
+        if (e.PropertyName is nameof(MainViewModel.ActiveTab) or nameof(MainViewModel.HasActiveTab))
+            PlacePaneRule();
+    }
+
+    private bool _placingPaneRule;
+
+    /// <summary>
+    /// The repository pane's top rule runs the full width and stops under the selected tab,
+    /// so that tab's side borders meet the rule and its bottom stays open.
+    /// </summary>
+    private void PlacePaneRule()
+    {
+        if (_placingPaneRule || PaneHost is null)
+            return;
+        var hostWidth = PaneHost.Bounds.Width;
+        if (hostWidth <= 0)
+            return;
+        _placingPaneRule = true;
+        try
+        {
+            double left;
+            double rightStart;
+            if (!TryActiveTabSpan(out var x, out var tabWidth))
+            {
+                left = hostWidth;
+                rightStart = hostWidth;
+            }
+            else
+            {
+                var innerLeft = x + 1;
+                var innerRight = x + tabWidth - 1;
+                left = Math.Clamp(innerLeft, 0, hostWidth);
+                rightStart = Math.Clamp(innerRight, 0, hostWidth);
+                if (rightStart < left)
+                    rightStart = left;
+            }
+
+            SetRule(PaneRuleLeft, 0, left);
+            SetRule(PaneRuleRight, rightStart, Math.Max(0, hostWidth - rightStart));
+        }
+        finally
+        {
+            _placingPaneRule = false;
+        }
+    }
+
+    private bool TryActiveTabSpan(out double x, out double width)
+    {
+        x = 0;
+        width = 0;
+        if (DataContext is not MainViewModel vm || vm.ActiveTab is null)
+            return false;
+        var index = vm.Tabs.IndexOf(vm.ActiveTab);
+        if (index < 0 || TabsList.ContainerFromIndex(index) is not Visual container)
+            return false;
+        var chrome = container.GetVisualDescendants().OfType<Border>().FirstOrDefault(border => border.Classes.Contains("tab"));
+        if (chrome is null || chrome.Bounds.Width <= 0)
+            return false;
+        var origin = chrome.TranslatePoint(default, PaneHost);
+        if (origin is null)
+            return false;
+        x = origin.Value.X;
+        width = chrome.Bounds.Width;
+        return true;
+    }
+
+    private static void SetRule(Border rule, double x, double width)
+    {
+        if (Math.Abs(rule.Margin.Left - x) > 0.5)
+            rule.Margin = new Thickness(x, 0, 0, 0);
+        if (double.IsNaN(rule.Width) || Math.Abs(rule.Width - width) > 0.5)
+            rule.Width = width;
     }
 
     private void OnTunnelKey(object? sender, KeyEventArgs e)
