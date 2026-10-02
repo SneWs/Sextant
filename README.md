@@ -26,7 +26,34 @@ Status, history, and the file list ask git for a slice and paint what is on scre
 - Stage files, hunks, and lines. Commit, or commit without hooks.
 - Fetch, pull with rebase, and push. Push can skip the pre-push hook for that one push.
 - Blame, file history, and a diff you can read side by side.
+- Image and model diffs, up to 8 MB. PNG, JPG, TIFF, SVG, and the other common image types (JPEG, GIF, BMP, WebP, and ICO) show the previous version and the new one side by side. SVG is drawn without running scripts, and TIFF shows the first page. An FBX file shows both versions as a model you can turn: drag to rotate, scroll to zoom, and double-click to reset. Under each view are the mesh, vertex, and triangle counts, the material names, and the animation takes.
 - When a merge, rebase, cherry-pick, or revert conflicts, continue, abort, or edit a text file in the three-way view.
+
+## In the window
+
+<p align="center">
+  <img src="screenshots/screenshot-01.png" alt="Empty Sextant window with the logo, the name, and Open, Clone, and Init" width="900">
+</p>
+
+An empty window starts with the mark, then Open, Clone, or Init.
+
+<p align="center">
+  <img src="screenshots/screenshot-02.png" alt="Three repository tabs, with branches, the commit graph, and the files in the selected commit" width="900">
+</p>
+
+Several repositories stay open as tabs. Locations, the graph, and the files for the selected commit share the window.
+
+<p align="center">
+  <img src="screenshots/screenshot-03.png" alt="Side-by-side diff of a C++ change, removed lines on the left and added lines on the right" width="900">
+</p>
+
+A side-by-side diff keeps both copies in view. One horizontal bar moves them together.
+
+<p align="center">
+  <img src="screenshots/screenshot-04.png" alt="Before and after FBX previews of a missile mesh, each with a mesh summary" width="900">
+</p>
+
+PNG, JPG, TIFF, SVG, and FBX changes open as a preview. An FBX diff shows both models, and you can turn each one.
 
 ## Planned features
 
@@ -99,7 +126,7 @@ Checked items are in the app. The rest are still ahead. [PLAN.md](PLAN.md) is th
 - [ ] When sparse checkout is on, say so, and do not try to materialize excluded paths.
 - [ ] Show Git LFS pointers as pointers, and download a blob only when you ask.
 - [ ] Highlight syntax in the visible diff only.
-- [ ] Diff images in common formats, with a size cap.
+- [x] Diff images and FBX models, up to 8 MB. PNG, JPG, JPEG, GIF, BMP, WebP, ICO, SVG, and TIFF show before and after. An FBX file shows a clay view you can turn, with the mesh summary underneath.
 
 ## Run
 
