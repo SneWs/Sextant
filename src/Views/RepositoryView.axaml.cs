@@ -1,13 +1,16 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Sextant;
 using Sextant.Git.Parsing;
 using Sextant.ViewModels;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Windows.Input;
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -28,6 +31,20 @@ public partial class RepositoryView : UserControl
     private string? _jumpOriginal;
     private bool _followImages;
     private string _appliedCommandLog = "";
+    private bool _sideScrollHooked;
+    private bool _sideScrollQueued;
+    private bool _resetSideScroll;
+    private double _charWidth;
+
+    /// <summary>Shared horizontal offset of the two side-by-side columns, in pixels.</summary>
+    public static readonly StyledProperty<double> SideShiftProperty =
+        AvaloniaProperty.Register<RepositoryView, double>(nameof(SideShift));
+
+    public double SideShift
+    {
+        get => GetValue(SideShiftProperty);
+        set => SetValue(SideShiftProperty, value);
+    }
 
     public RepositoryView()
     {
@@ -37,6 +54,7 @@ public partial class RepositoryView : UserControl
     protected override void OnLoaded(RoutedEventArgs e)
     {
         base.OnLoaded(e);
+        HookSideScroll();
         if (DataContext is RepositoryViewModel vm && !_widthsApplied)
         {
             _widthsApplied = true;
@@ -87,6 +105,8 @@ public partial class RepositoryView : UserControl
         _diffRows = _watched.DiffRows;
         _diffRows.CollectionChanged += OnDiffRowsChanged;
         ApplyCommandLog(_watched.CommandLog);
+        _resetSideScroll = true;
+        QueueSideScroll();
     }
 
     private void UnwatchViewModel()
@@ -160,8 +180,13 @@ public partial class RepositoryView : UserControl
         Dispatcher.UIThread.Post(() => ScrollImageTo(path, original), DispatcherPriority.Loaded);
     }
 
-    private void OnDiffRowsChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+    private void OnDiffRowsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
         _followImages = false;
+        if (e.Action == NotifyCollectionChangedAction.Reset)
+            _resetSideScroll = true;
+        QueueSideScroll();
+    }
 
     private void ScrollDiffTo(string path, string? original)
     {
@@ -342,6 +367,132 @@ public partial class RepositoryView : UserControl
             Dispatcher.UIThread.Post(ScrollCommandLogToEnd, DispatcherPriority.Loaded);
         else if (_widthsApplied && e.PropertyName is nameof(RepositoryViewModel.LocationsWidth) or nameof(RepositoryViewModel.GraphWidth) or nameof(RepositoryViewModel.FilesHeight))
             ApplyWidths(vm);
+        else if (e.PropertyName is nameof(RepositoryViewModel.SideBySide) or nameof(RepositoryViewModel.ShowingDiff))
+            QueueSideScroll();
+    }
+
+    private void HookSideScroll()
+    {
+        if (_sideScrollHooked)
+            return;
+        _sideScrollHooked = true;
+        DiffList.AddHandler(InputElement.PointerWheelChangedEvent, OnDiffWheel, RoutingStrategies.Tunnel);
+        DiffList.SizeChanged += (_, _) => QueueSideScroll();
+        SideBar.PropertyChanged += (_, change) =>
+        {
+            if (change.Property == RangeBase.ValueProperty)
+                SideShift = SideBar.Value;
+        };
+    }
+
+    private void OnDiffWheel(object? sender, PointerWheelEventArgs e)
+    {
+        if (!SideBar.IsVisible)
+            return;
+        double delta;
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+            delta = e.Delta.Y;
+        else if (Math.Abs(e.Delta.X) > Math.Abs(e.Delta.Y))
+            delta = e.Delta.X;
+        else
+            return;
+        SideBar.Value = Math.Clamp(SideBar.Value - delta * 48, SideBar.Minimum, SideBar.Maximum);
+        e.Handled = true;
+    }
+
+    private void QueueSideScroll()
+    {
+        if (_sideScrollQueued)
+            return;
+        _sideScrollQueued = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _sideScrollQueued = false;
+            UpdateSideScroll();
+        }, DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// The list measures each row at the pane width, so a folded line is clipped.
+    /// One bar slides both columns by the same amount.
+    /// </summary>
+    private void UpdateSideScroll()
+    {
+        if (DataContext is not RepositoryViewModel { SideBySide: true, ShowingDiff: true })
+        {
+            HideSideScroll();
+            return;
+        }
+
+        var pane = (DiffList.Bounds.Width - 20) / 2;
+        if (pane < 1)
+            return;
+
+        var content = LongestSide(_diffRows) * CharWidth + 24;
+        var max = Math.Max(0, content - pane);
+        SideBar.Maximum = max;
+        SideBar.ViewportSize = pane;
+        SideBar.LargeChange = Math.Max(CharWidth, pane * 0.9);
+        SideBar.SmallChange = CharWidth * 4;
+        if (_resetSideScroll)
+        {
+            _resetSideScroll = false;
+            SideBar.Value = 0;
+        }
+        else if (SideBar.Value > SideBar.Maximum)
+        {
+            SideBar.Value = SideBar.Maximum;
+        }
+
+        SideShift = SideBar.Value;
+        SideBar.IsVisible = SideBar.Maximum > 1;
+    }
+
+    private void HideSideScroll()
+    {
+        SideBar.IsVisible = false;
+        if (SideBar.Value != 0)
+            SideBar.Value = 0;
+        if (SideShift != 0)
+            SideShift = 0;
+    }
+
+    private double CharWidth
+    {
+        get
+        {
+            if (_charWidth > 0)
+                return _charWidth;
+            var text = new FormattedText(
+                "0000000000",
+                CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                new Typeface(new FontFamily("Cascadia Mono, Consolas, DejaVu Sans Mono")),
+                12,
+                Brushes.Black);
+            _charWidth = text.Width / 10;
+            if (_charWidth < 1)
+                _charWidth = 7.2;
+            return _charWidth;
+        }
+    }
+
+    private static int LongestSide(ObservableCollection<DiffRow>? rows)
+    {
+        if (rows is null)
+            return 0;
+        var columns = 0;
+        foreach (var row in rows)
+        {
+            if (row is not DiffSideRow side)
+                continue;
+            if (side.Left.Length > columns)
+                columns = side.Left.Length;
+            if (side.Right.Length > columns)
+                columns = side.Right.Length;
+        }
+
+        return columns;
     }
 
     private ColumnDefinition LocationsColumn => Columns.ColumnDefinitions[0];

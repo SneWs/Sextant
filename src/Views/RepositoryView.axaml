@@ -346,8 +346,9 @@
                         <TextBlock Grid.Column="2" Text="Result" FontWeight="SemiBold" Opacity="0.75"/>
                         <TextBlock Grid.Column="4" Text="Theirs" FontWeight="SemiBold" Opacity="0.75"/>
                     </Grid>
-                    <Grid>
-                        <views:CopyListBox x:Name="DiffList" ItemsSource="{Binding DiffRows}" Background="Transparent" IsVisible="{Binding ShowingDiff}">
+                    <Grid RowDefinitions="*,Auto">
+                        <views:CopyListBox x:Name="DiffList" ItemsSource="{Binding DiffRows}" Background="Transparent" IsVisible="{Binding ShowingDiff}"
+                                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                             <views:CopyListBox.Styles>
                                 <Style Selector="ListBoxItem">
                                     <Setter Property="HorizontalAlignment" Value="Stretch"/>
@@ -373,9 +374,18 @@
                                     </DockPanel>
                                 </DataTemplate>
                                 <DataTemplate DataType="vm:DiffSideRow" x:DataType="vm:DiffSideRow">
-                                    <Grid ColumnDefinitions="*,*">
-                                        <views:HighlightedText Classes="diff" CopyKey="left" Source="{Binding Left}" Language="{Binding Language}" Background="{Binding LeftBackground}" Padding="8,0"/>
-                                        <views:HighlightedText Grid.Column="1" Classes="diff" CopyKey="right" Source="{Binding Right}" Language="{Binding Language}" Background="{Binding RightBackground}" Padding="8,0"/>
+                                    <Grid ColumnDefinitions="*,Auto,*">
+                                        <Border Background="{Binding LeftBackground}">
+                                            <views:ClipShift Shift="{Binding $parent[views:RepositoryView].SideShift}">
+                                                <views:HighlightedText Classes="diff" CopyKey="left" Source="{Binding Left}" Language="{Binding Language}" Padding="8,0" HorizontalAlignment="Left"/>
+                                            </views:ClipShift>
+                                        </Border>
+                                        <Border Grid.Column="1" Width="1" Background="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
+                                        <Border Grid.Column="2" Background="{Binding RightBackground}">
+                                            <views:ClipShift Shift="{Binding $parent[views:RepositoryView].SideShift}">
+                                                <views:HighlightedText Classes="diff" CopyKey="right" Source="{Binding Right}" Language="{Binding Language}" Padding="8,0" HorizontalAlignment="Left"/>
+                                            </views:ClipShift>
+                                        </Border>
                                     </Grid>
                                 </DataTemplate>
                                 <DataTemplate DataType="vm:DiffFileRow" x:DataType="vm:DiffFileRow">
@@ -455,6 +465,8 @@
                                 </DataTemplate>
                             </views:CopyListBox.ItemTemplate>
                         </views:CopyListBox>
+                        <ScrollBar x:Name="SideBar" Grid.Row="1" Orientation="Horizontal"
+                                   Minimum="0" AllowAutoHide="False" IsVisible="False"/>
                     </Grid>
                 </DockPanel>
             </Grid>
