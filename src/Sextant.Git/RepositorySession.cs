@@ -647,6 +647,12 @@ public sealed partial class RepositorySession : IAsyncDisposable
     public Task FetchAsync(IProgress<string>? progress, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.Fetch(_toplevel), progress, cancellationToken);
 
+    public Task FetchAllAsync(IProgress<string>? progress, CancellationToken cancellationToken) =>
+        MutateAsync(GitCommands.FetchAll(_toplevel), progress, cancellationToken);
+
+    public Task FetchAllPruneAsync(IProgress<string>? progress, CancellationToken cancellationToken) =>
+        MutateAsync(GitCommands.FetchAllPrune(_toplevel), progress, cancellationToken);
+
     public Task PullAsync(IProgress<string>? progress, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.Pull(_toplevel), progress, cancellationToken);
 

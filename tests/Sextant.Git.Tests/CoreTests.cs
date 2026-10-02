@@ -45,6 +45,10 @@ public class CoreTests
         Assert.Equal(":", GitCommands.UnstageAll("repo")[^1]);
         Assert.Equal(["rm", "-r", "--cached", "-f", "--", "."], GitCommands.UnstageAllUnborn("repo").Skip(2));
         Assert.DoesNotContain("--no-optional-locks", GitCommands.Fetch("repo"));
+        Assert.DoesNotContain("--all", GitCommands.Fetch("repo"));
+        Assert.DoesNotContain("--prune", GitCommands.Fetch("repo"));
+        Assert.Equal(["-C", "repo", "fetch", "--all", "--progress"], GitCommands.FetchAll("repo"));
+        Assert.Equal(["-C", "repo", "fetch", "--all", "--prune", "--progress"], GitCommands.FetchAllPrune("repo"));
         Assert.Equal(["-C", "repo", "branch", "-d", "topic"], GitCommands.DeleteBranch("repo", "topic"));
         Assert.Equal(["-C", "repo", "branch", "-D", "topic"], GitCommands.ForceDeleteBranch("repo", "topic"));
         Assert.Equal(["-C", "repo", "push", "--progress", "origin", "--delete", "topic"], GitCommands.DeleteRemoteBranch("repo", "origin", "topic"));

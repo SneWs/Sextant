@@ -292,6 +292,20 @@ public partial class RepositoryViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    public Task FetchAll()
+    {
+        var progress = Progress();
+        return RunAsync("Fetching all…", ct => Session.FetchAllAsync(progress, ct));
+    }
+
+    [RelayCommand]
+    public Task FetchAllAndCleanUp()
+    {
+        var progress = Progress();
+        return RunAsync("Fetching all and cleaning up…", ct => Session.FetchAllPruneAsync(progress, ct));
+    }
+
+    [RelayCommand]
     public Task Pull()
     {
         var progress = Progress();

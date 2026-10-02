@@ -391,6 +391,12 @@ public static class GitCommands
     public static IReadOnlyList<string> Fetch(string toplevel) =>
         ["-C", toplevel, "fetch", "--progress"];
 
+    public static IReadOnlyList<string> FetchAll(string toplevel) =>
+        ["-C", toplevel, "fetch", "--all", "--progress"];
+
+    public static IReadOnlyList<string> FetchAllPrune(string toplevel) =>
+        ["-C", toplevel, "fetch", "--all", "--prune", "--progress"];
+
     public static IReadOnlyList<string> Pull(string toplevel) =>
         ["-C", toplevel, "pull", "--rebase", "--progress", "--no-edit"];
 

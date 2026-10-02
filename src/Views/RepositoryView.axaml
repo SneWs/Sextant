@@ -59,6 +59,8 @@
                     <SplitButton.Flyout>
                         <MenuFlyout>
                             <MenuItem Header="Fetch" Command="{Binding FetchCommand}"/>
+                            <MenuItem Header="Fetch all" Command="{Binding FetchAllCommand}"/>
+                            <MenuItem Header="Fetch all and clean up" Command="{Binding FetchAllAndCleanUpCommand}"/>
                         </MenuFlyout>
                     </SplitButton.Flyout>
                 </SplitButton>

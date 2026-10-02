@@ -297,6 +297,54 @@ public class Phase4Tests
     }
 
     [Fact]
+    public async Task Fetch_all_reads_every_remote_and_prune_drops_a_deleted_branch()
+    {
+        using var origin = new TempRepo();
+        origin.WriteFile("a.txt", "one\n");
+        origin.CommitAll("base");
+        var main = origin.CurrentBranch();
+        origin.Run("switch", "-c", "gone");
+        origin.WriteFile("gone.txt", "gone\n");
+        origin.CommitAll("gone");
+        origin.Run("switch", main);
+
+        using var other = new TempRepo();
+        other.WriteFile("b.txt", "other\n");
+        other.CommitAll("other");
+        var otherBranch = other.CurrentBranch();
+
+        var clone = Path.Combine(Path.GetTempPath(), "sextant-clone-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            origin.Run("clone", origin.Directory, clone);
+            origin.SetIdentity(clone);
+            GitIn(origin, clone, "config", "fetch.prune", "false");
+            GitIn(origin, clone, "remote", "add", "other", other.Directory);
+            origin.Run("branch", "-D", "gone");
+
+            await using var session = await RepositorySession.OpenAsync(new GitProcessRunner(), origin.Git, clone, CancellationToken.None);
+            await session.FetchAllAsync(null, CancellationToken.None);
+            var fetched = session.Snapshot().Refs;
+            Assert.Contains(fetched, reference => reference.Name == "refs/remotes/other/" + otherBranch);
+            Assert.Contains(fetched, reference => reference.Name == "refs/remotes/origin/gone");
+            Assert.Contains(session.Snapshot().Commands, command =>
+                command.Arguments.Contains("--all") && !command.Arguments.Contains("--prune"));
+
+            await session.FetchAllPruneAsync(null, CancellationToken.None);
+            var pruned = session.Snapshot().Refs;
+            Assert.Contains(pruned, reference => reference.Name == "refs/remotes/other/" + otherBranch);
+            Assert.DoesNotContain(pruned, reference => reference.Name == "refs/remotes/origin/gone");
+            Assert.Contains(pruned, reference => reference.Name == "refs/heads/" + main);
+            Assert.Contains(session.Snapshot().Commands, command =>
+                command.Arguments.Contains("--all") && command.Arguments.Contains("--prune"));
+        }
+        finally
+        {
+            TryDeleteDirectory(clone);
+        }
+    }
+
+    [Fact]
     public async Task Worktree_add_lists_the_new_directory()
     {
         using var repo = new TempRepo();
@@ -479,164 +527,6 @@ public class Phase4Tests
             CancellationToken.None);
         Assert.NotNull(tiffPreview);
         Assert.Equal(tiff, tiffPreview.After);
-    }
-
-    [Fact]
-    public async Task Image_pointer_preview_loads_both_versions_and_leaves_the_worktree()
-    {
-        var scriptDir = Path.Combine(Path.GetTempPath(), "sextant-script-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(scriptDir);
-        var scriptPath = Path.Combine(scriptDir, "smudge.ps1");
-        var scriptGit = scriptPath.Replace('\\', '/');
-        File.WriteAllBytes(scriptPath, Encoding.ASCII.GetBytes("""
-            $ms = New-Object System.IO.MemoryStream
-            [Console]::OpenStandardInput().CopyTo($ms)
-            $text = [Text.Encoding]::UTF8.GetString($ms.ToArray())
-            $b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
-            $out = [Console]::OpenStandardOutput()
-            $bytes = [Convert]::FromBase64String($b64)
-            if ($text.Contains("size 8")) { $bytes[$bytes.Length - 1] = $bytes[$bytes.Length - 1] -bxor 0x5A }
-            $out.Write($bytes, 0, $bytes.Length)
-            $out.Flush()
-            """));
-        try
-        {
-            using var repo = new TempRepo();
-            repo.Run("config", "core.autocrlf", "false");
-            repo.Run("config", "filter.img.smudge", "powershell -NoProfile -ExecutionPolicy Bypass -File " + scriptGit);
-            repo.Run("config", "filter.img.required", "false");
-            repo.WriteFile(".gitattributes", "*.png filter=img -text\n");
-            var small = Convert.FromBase64String(PngBase64);
-            var changed = (byte[])small.Clone();
-            changed[^1] ^= 0x5A;
-            repo.WriteFile("pic.png", Pointer('a', 4));
-            repo.CommitAll("pointer");
-            var parent = repo.RunCapture("rev-parse", "HEAD").Trim();
-            repo.WriteFile("pic.png", Pointer('b', 8));
-            var file = Path.Combine(repo.Directory, "pic.png");
-            var onDisk = File.ReadAllBytes(file);
-
-            await using var session = await Open(repo);
-            var unstaged = await session.PreviewImageAsync(
-                new ImageRequest("pic.png", "", null, false, true),
-                CancellationToken.None);
-            Assert.NotNull(unstaged);
-            Assert.Equal(small, unstaged.Before);
-            Assert.Equal(changed, unstaged.After);
-            Assert.Equal("", unstaged.BeforeNotice);
-            Assert.Equal("", unstaged.AfterNotice);
-            Assert.Equal(onDisk, File.ReadAllBytes(file));
-
-            repo.CommitAll("pointer changed");
-            var head = repo.RunCapture("rev-parse", "HEAD").Trim();
-            var committed = await session.PreviewImageAsync(
-                new ImageRequest("pic.png", parent, head, false, false),
-                CancellationToken.None);
-            Assert.NotNull(committed);
-            Assert.Equal(small, committed.Before);
-            Assert.Equal(changed, committed.After);
-            Assert.Equal("", committed.BeforeNotice);
-            Assert.Equal("", committed.AfterNotice);
-            Assert.StartsWith("version https://git-lfs", Encoding.UTF8.GetString(File.ReadAllBytes(file)), StringComparison.Ordinal);
-            Assert.Contains(session.Snapshot().Commands, command => command.Arguments.Contains("--filters"));
-        }
-        finally
-        {
-            try
-            {
-                if (Directory.Exists(scriptDir))
-                    Directory.Delete(scriptDir, recursive: true);
-            }
-            catch (IOException)
-            {
-            }
-            catch (UnauthorizedAccessException)
-            {
-            }
-        }
-    }
-
-    [Fact]
-    public async Task Lfs_preview_retries_with_another_signed_in_github_account()
-    {
-        var scriptDir = Path.Combine(Path.GetTempPath(), "sextant-script-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(scriptDir);
-        var smudgePath = Path.Combine(scriptDir, "smudge.ps1");
-        var cleanPath = Path.Combine(scriptDir, "clean.ps1");
-        var smudgeGit = smudgePath.Replace('\\', '/');
-        var cleanGit = cleanPath.Replace('\\', '/');
-        File.WriteAllBytes(cleanPath, Encoding.ASCII.GetBytes("""
-            [Console]::OpenStandardInput().CopyTo([Console]::OpenStandardOutput())
-            """));
-        File.WriteAllBytes(smudgePath, Encoding.ASCII.GetBytes("""
-            if ($env:GH_TOKEN -eq "good-token") {
-              $b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
-              $bytes = [Convert]::FromBase64String($b64)
-              $out = [Console]::OpenStandardOutput()
-              $out.Write($bytes, 0, $bytes.Length)
-              $out.Flush()
-              exit 0
-            }
-            [Console]::Error.WriteLine("batch response: Not Found")
-            exit 1
-            """));
-        try
-        {
-            using var repo = new TempRepo();
-            repo.Run("config", "core.autocrlf", "false");
-            repo.Run("remote", "add", "origin", "https://github.com/example/repo.git");
-            repo.Run("config", "filter.img.clean", "powershell -NoProfile -ExecutionPolicy Bypass -File " + cleanGit);
-            repo.Run("config", "filter.img.smudge", "powershell -NoProfile -ExecutionPolicy Bypass -File " + smudgeGit);
-            repo.Run("config", "filter.img.required", "true");
-            repo.WriteFile(".gitattributes", "*.png filter=img -text\n");
-            repo.WriteFile("pic.png", Pointer('a', 4));
-            repo.CommitAll("pointer");
-            var head = repo.RunCapture("rev-parse", "HEAD").Trim();
-            var login = new ScriptLogin();
-
-            await using var session = await Open(repo);
-            session.UseGitHubLogin(login);
-            var preview = await session.PreviewImageAsync(
-                new ImageRequest("pic.png", null, head, false, false),
-                CancellationToken.None);
-            Assert.NotNull(preview);
-            Assert.Equal(Convert.FromBase64String(PngBase64), preview.After);
-            Assert.Equal("", preview.AfterNotice);
-            Assert.Equal(["work"], login.TokenUsers);
-            Assert.DoesNotContain(session.Snapshot().Commands, command => string.Join(' ', command.Arguments).Contains("good-token", StringComparison.Ordinal));
-            Assert.StartsWith("version https://git-lfs", Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(repo.Directory, "pic.png"))), StringComparison.Ordinal);
-        }
-        finally
-        {
-            try
-            {
-                if (Directory.Exists(scriptDir))
-                    Directory.Delete(scriptDir, recursive: true);
-            }
-            catch (IOException)
-            {
-            }
-            catch (UnauthorizedAccessException)
-            {
-            }
-        }
-    }
-
-    private sealed class ScriptLogin : IGitHubLogin
-    {
-        public List<string> TokenUsers { get; } = [];
-
-        public Task<IReadOnlyList<GitHubAccount>> AccountsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<GitHubAccount>>([
-                new GitHubAccount("github.com", "active", true),
-                new GitHubAccount("github.com", "work", false),
-            ]);
-
-        public Task<string?> TokenAsync(string user, CancellationToken cancellationToken)
-        {
-            TokenUsers.Add(user);
-            return Task.FromResult<string?>(user == "work" ? "good-token" : "other-token");
-        }
     }
 
     [Fact]

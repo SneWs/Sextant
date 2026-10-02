@@ -660,6 +660,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         {
             _palette.Add(new PaletteItem { Title = "Refresh", Run = tab.Refresh });
             _palette.Add(new PaletteItem { Title = "Fetch", Run = tab.Fetch });
+            _palette.Add(new PaletteItem { Title = "Fetch all", Run = tab.FetchAll });
+            _palette.Add(new PaletteItem { Title = "Fetch all and clean up", Run = tab.FetchAllAndCleanUp });
             _palette.Add(new PaletteItem { Title = "Pull", Run = tab.Pull });
             _palette.Add(new PaletteItem { Title = "Push", Run = tab.Push });
             _palette.Add(new PaletteItem { Title = "Push ignoring local checks", Run = () => tab.PushIgnoringLocalChecksCommand.ExecuteAsync(null) });
