@@ -19,11 +19,19 @@ public static class DesktopOpen
         _ => "Open in File Manager",
     };
 
+    /// <summary>
+    /// Last segment of a repository path. Git paths use either separator, and
+    /// <see cref="Path.GetFileName"/> only treats <c>\</c> as a separator on Windows.
+    /// </summary>
     public static string? FileName(string relative)
     {
         if (string.IsNullOrWhiteSpace(relative))
             return null;
-        var name = Path.GetFileName(relative.TrimEnd('/', '\\'));
+        var trimmed = relative.TrimEnd('/', '\\');
+        if (trimmed.Length == 0)
+            return null;
+        var index = trimmed.LastIndexOfAny(['/', '\\']);
+        var name = index < 0 ? trimmed : trimmed[(index + 1)..];
         return string.IsNullOrEmpty(name) ? null : name;
     }
 
