@@ -184,7 +184,14 @@ public sealed partial class RepositorySession : IAsyncDisposable
         string? after = staged ? "" : null;
         return ReadDiffAsync(token, allowLarge, cancellationToken, inner =>
             ExecuteAsync(GitCommands.DiffWorktree(_toplevel, staged, ignoreWhitespace), null, inner),
-            (document, inner) => AnnotateAsync(document, null, before, after, !staged, inner));
+            async (document, inner) =>
+            {
+                // git diff omits untracked paths. Without them, a working copy whose only
+                // change is a new file has an empty diff, and the view falls through to history.
+                if (!staged)
+                    document = await AppendUntrackedAsync(document, allowLarge, ignoreWhitespace, inner).ConfigureAwait(false);
+                return await AnnotateAsync(document, null, before, after, !staged, inner).ConfigureAwait(false);
+            });
     }
 
     public Task<DiffDocument?> CommitDiffAsync(
@@ -1248,11 +1255,75 @@ public sealed partial class RepositorySession : IAsyncDisposable
         standardError.Contains("could not resolve 'HEAD'", StringComparison.OrdinalIgnoreCase)
         || standardError.Contains("ambiguous argument 'HEAD'", StringComparison.OrdinalIgnoreCase);
 
+    private async Task<DiffDocument> AppendUntrackedAsync(
+        DiffDocument tracked,
+        bool allowLarge,
+        bool ignoreWhitespace,
+        CancellationToken cancellationToken)
+    {
+        if (tracked.IsTooLarge)
+            return tracked;
+
+        List<string> listed;
+        lock (_stateLock)
+            listed = _entries.Where(entry => entry.Kind == ChangeKind.Untracked).Select(entry => entry.Path).ToList();
+        if (listed.Count == 0)
+            return tracked;
+
+        var files = new List<string>();
+        foreach (var path in listed)
+        {
+            var expanded = await ExpandUntrackedAsync(path, cancellationToken).ConfigureAwait(false);
+            foreach (var file in expanded)
+            {
+                if (!files.Contains(file, StringComparer.Ordinal))
+                    files.Add(file);
+            }
+        }
+
+        if (files.Count == 0)
+            return tracked;
+
+        var builder = new StringBuilder(tracked.RawPatch);
+        var bytes = _encoding.GetByteCount(builder.ToString());
+        foreach (var file in files)
+        {
+            var extra = await DiffUntrackedAsync(file, allowLarge, ignoreWhitespace, cancellationToken).ConfigureAwait(false);
+            if (extra.IsTooLarge)
+                return DiffDocument.TooLarge;
+            if (extra.RawPatch.Length == 0)
+                continue;
+            if (builder.Length > 0 && builder[^1] != '\n')
+                builder.Append('\n');
+            builder.Append(extra.RawPatch);
+            bytes += _encoding.GetByteCount(extra.RawPatch) + 1;
+            if (!allowLarge && bytes > HistoryLimits.MaxDiffBytes)
+                return DiffDocument.TooLarge;
+        }
+
+        return FromPatch(builder.ToString(), allowLarge);
+    }
+
+    private async Task<IReadOnlyList<string>> ExpandUntrackedAsync(string path, CancellationToken cancellationToken)
+    {
+        if (!path.EndsWith('/') && !path.EndsWith('\\'))
+            return [path];
+
+        var output = Checked(await ExecuteAsync(GitCommands.UntrackedIn(_toplevel, path), null, cancellationToken).ConfigureAwait(false));
+        return _encoding.GetString(output.Stdout).Split('\0', StringSplitOptions.RemoveEmptyEntries);
+    }
+
     private DiffDocument ToDiff(GitOutput output, bool allowLarge)
     {
         if (!allowLarge && output.Stdout.Length > HistoryLimits.MaxDiffBytes)
             return DiffDocument.TooLarge;
-        var text = _encoding.GetString(output.Stdout);
+        return FromPatch(_encoding.GetString(output.Stdout), allowLarge);
+    }
+
+    private DiffDocument FromPatch(string text, bool allowLarge)
+    {
+        if (!allowLarge && _encoding.GetByteCount(text) > HistoryLimits.MaxDiffBytes)
+            return DiffDocument.TooLarge;
         var files = DiffParser.ParseFiles(text);
         var lines = 0;
         foreach (var file in files)

@@ -93,6 +93,29 @@ public class SessionTests
     }
 
     [Fact]
+    public async Task Worktree_diff_includes_untracked_files_and_not_the_last_commit()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "only-in-commit\n");
+        repo.CommitAll("base");
+        repo.WriteFile("new.txt", "only-untracked\n");
+        repo.WriteFile("extra/note.txt", "inside-directory\n");
+        await using var session = await Open(repo);
+
+        var diff = await session.WorktreeDiffAsync(false, true, false, CancellationToken.None);
+        Assert.NotNull(diff);
+        Assert.Contains("new.txt", diff.RawPatch, StringComparison.Ordinal);
+        Assert.Contains("only-untracked", diff.RawPatch, StringComparison.Ordinal);
+        Assert.Contains("inside-directory", diff.RawPatch, StringComparison.Ordinal);
+        Assert.DoesNotContain("only-in-commit", diff.RawPatch, StringComparison.Ordinal);
+
+        var staged = await session.WorktreeDiffAsync(true, true, false, CancellationToken.None);
+        Assert.NotNull(staged);
+        Assert.DoesNotContain("only-untracked", staged.RawPatch, StringComparison.Ordinal);
+        Assert.DoesNotContain("inside-directory", staged.RawPatch, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Untracked_diff_shows_the_new_file()
     {
         using var repo = new TempRepo();

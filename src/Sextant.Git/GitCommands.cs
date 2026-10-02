@@ -214,6 +214,12 @@ public static class GitCommands
     public static IReadOnlyList<string> DiffUnstaged(string toplevel, string path, bool ignoreWhitespace = false) =>
         DiffWorktree(toplevel, staged: false, ignoreWhitespace, path);
 
+    public static IReadOnlyList<string> UntrackedIn(string toplevel, string directory) =>
+    [
+        "-C", toplevel, "--no-optional-locks", "ls-files", "-z", "--others", "--exclude-standard", "--",
+        directory.TrimEnd('/', '\\'),
+    ];
+
     public static IReadOnlyList<string> DiffUntracked(string toplevel, string path, bool ignoreWhitespace = false)
     {
         var arguments = new List<string> { "-C", toplevel, "--no-optional-locks", "diff", "--no-textconv", "--no-index" };
