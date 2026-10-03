@@ -606,8 +606,12 @@ public partial class RepositoryViewModel
             Label = path + "  (loaded)",
             FileMenu = FileMenuFor(path),
         });
-        foreach (var line in lines)
-            AddFoldedLine("  " + line, language, DiffColors.Clear, false, "", UiCommands.Disabled);
+        var endsWithNewline = text.EndsWith('\n');
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var number = DiffLineNumbers.FileLine(index, lines.Length, endsWithNewline);
+            AddFoldedLine("  " + lines[index], language, DiffColors.Clear, false, "", UiCommands.Disabled, number, "");
+        }
 
         ShowLfsDownload = false;
         HasLfsNotice = true;

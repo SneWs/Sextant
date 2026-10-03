@@ -234,6 +234,12 @@ public sealed class DiffLineRow : DiffRow
 {
     public required string Text { get; init; }
 
+    /// <summary>Old file line. Empty when this row has no old line, or it continues a wrapped line.</summary>
+    public string OldNumber { get; init; } = "";
+
+    /// <summary>New file line. Empty when this row has no new line, or it continues a wrapped line.</summary>
+    public string NewNumber { get; init; } = "";
+
     /// <summary>This row is the rest of the previous logical line. Copy does not insert a break.</summary>
     public bool Continues { get; init; }
 
@@ -253,6 +259,12 @@ public sealed class DiffSideRow : DiffRow
     public required string Left { get; init; }
 
     public required string Right { get; init; }
+
+    /// <summary>Old file line, on the left column. Empty when that side is absent or this row continues it.</summary>
+    public string LeftNumber { get; init; } = "";
+
+    /// <summary>New file line, on the right column. Empty when that side is absent or this row continues it.</summary>
+    public string RightNumber { get; init; } = "";
 
     public bool SkipLeftCopy { get; init; }
 

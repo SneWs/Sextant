@@ -322,18 +322,24 @@
                                 <DataTemplate DataType="vm:DiffLineRow" x:DataType="vm:DiffLineRow">
                                     <DockPanel>
                                         <Button Classes="flat" DockPanel.Dock="Right" Content="{Binding ActionLabel}" Command="{Binding ActionCommand}" IsVisible="{Binding ShowAction}" Padding="6,0"/>
+                                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Margin="8,0,0,0">
+                                            <TextBlock Classes="diff" Text="{Binding OldNumber}" MinWidth="48" TextAlignment="Right" Opacity="0.55" Margin="0,0,8,0" IsHitTestVisible="False" VerticalAlignment="Center"/>
+                                            <TextBlock Classes="diff" Text="{Binding NewNumber}" MinWidth="48" TextAlignment="Right" Opacity="0.55" Margin="0,0,8,0" IsHitTestVisible="False" VerticalAlignment="Center"/>
+                                        </StackPanel>
                                         <views:HighlightedText Classes="diff" CopyKey="body" Source="{Binding Text}" Language="{Binding Language}" Background="{Binding Background}" Padding="8,0"/>
                                     </DockPanel>
                                 </DataTemplate>
                                 <DataTemplate DataType="vm:DiffSideRow" x:DataType="vm:DiffSideRow">
-                                    <Grid ColumnDefinitions="*,Auto,*">
-                                        <Border Background="{Binding LeftBackground}">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto,*">
+                                        <TextBlock Classes="diff" Text="{Binding LeftNumber}" MinWidth="48" TextAlignment="Right" Opacity="0.55" Margin="8,0,8,0" IsHitTestVisible="False" VerticalAlignment="Center"/>
+                                        <Border Grid.Column="1" Background="{Binding LeftBackground}">
                                             <views:ClipShift Shift="{Binding $parent[views:RepositoryView].SideShift}">
                                                 <views:HighlightedText Classes="diff" CopyKey="left" Source="{Binding Left}" Language="{Binding Language}" Padding="8,0" HorizontalAlignment="Left"/>
                                             </views:ClipShift>
                                         </Border>
-                                        <Border Grid.Column="1" Width="1" Background="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
-                                        <Border Grid.Column="2" Background="{Binding RightBackground}">
+                                        <Border Grid.Column="2" Width="1" Background="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
+                                        <TextBlock Grid.Column="3" Classes="diff" Text="{Binding RightNumber}" MinWidth="48" TextAlignment="Right" Opacity="0.55" Margin="8,0,8,0" IsHitTestVisible="False" VerticalAlignment="Center"/>
+                                        <Border Grid.Column="4" Background="{Binding RightBackground}">
                                             <views:ClipShift Shift="{Binding $parent[views:RepositoryView].SideShift}">
                                                 <views:HighlightedText Classes="diff" CopyKey="right" Source="{Binding Right}" Language="{Binding Language}" Padding="8,0" HorizontalAlignment="Left"/>
                                             </views:ClipShift>

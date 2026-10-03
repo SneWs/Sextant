@@ -2045,6 +2045,8 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private void AppendInline(DiffHunk hunk, bool parts, string patch, int hunkIndex, string lineLabel)
     {
+        var oldLine = hunk.OldStart;
+        var newLine = hunk.NewStart;
         for (var lineIndex = 0; lineIndex < hunk.Lines.Count; lineIndex++)
         {
             var line = hunk.Lines[lineIndex];
@@ -2059,11 +2061,20 @@ public partial class RepositoryViewModel : ViewModelBase
             var command = show
                 ? new AsyncRelayCommand(() => ApplyShownLineAsync(patch, hunkIndex, captured))
                 : UiCommands.Disabled;
-            AddFoldedLine(prefix + line.Text, _lineLanguage, background, show, lineLabel, command);
+            var number = DiffLineNumbers.For(line.Kind, ref oldLine, ref newLine);
+            AddFoldedLine(prefix + line.Text, _lineLanguage, background, show, lineLabel, command, number.Old, number.New);
         }
     }
 
-    private void AddFoldedLine(string text, string? language, IBrush background, bool showAction, string actionLabel, ICommand command)
+    private void AddFoldedLine(
+        string text,
+        string? language,
+        IBrush background,
+        bool showAction,
+        string actionLabel,
+        ICommand command,
+        string oldNumber = "",
+        string newNumber = "")
     {
         var count = LineFold.Count(text);
         for (var index = 0; index < count; index++)
@@ -2071,6 +2082,8 @@ public partial class RepositoryViewModel : ViewModelBase
             AddRow(new DiffLineRow
             {
                 Text = LineFold.Piece(text, index) ?? "",
+                OldNumber = index == 0 ? oldNumber : "",
+                NewNumber = index == 0 ? newNumber : "",
                 Language = language,
                 Background = background,
                 Continues = index > 0,
@@ -2083,37 +2096,21 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private void AppendSideBySide(DiffHunk hunk)
     {
-        var removed = new Queue<string>();
-        foreach (var line in hunk.Lines)
+        foreach (var line in DiffLineNumbers.SideBySide(hunk))
         {
-            switch (line.Kind)
-            {
-                case DiffLineKind.Removed:
-                    removed.Enqueue(line.Text);
-                    break;
-                case DiffLineKind.Added:
-                    if (removed.Count > 0)
-                        AddSide("- " + removed.Dequeue(), DiffColors.Removed, "+ " + line.Text, DiffColors.Added);
-                    else
-                        AddSide("", DiffColors.Clear, "+ " + line.Text, DiffColors.Added);
-                    break;
-                case DiffLineKind.Context:
-                    FlushRemoved();
-                    AddSide("  " + line.Text, DiffColors.Clear, "  " + line.Text, DiffColors.Clear);
-                    break;
-            }
-        }
-
-        FlushRemoved();
-
-        void FlushRemoved()
-        {
-            while (removed.Count > 0)
-                AddSide("- " + removed.Dequeue(), DiffColors.Removed, "", DiffColors.Clear);
+            var left = line.LeftText is null ? "" : (line.LeftRemoved ? "- " : "  ") + line.LeftText;
+            var right = line.RightText is null ? "" : (line.RightAdded ? "+ " : "  ") + line.RightText;
+            AddSide(
+                left,
+                line.LeftRemoved ? DiffColors.Removed : DiffColors.Clear,
+                line.LeftNumber,
+                right,
+                line.RightAdded ? DiffColors.Added : DiffColors.Clear,
+                line.RightNumber);
         }
     }
 
-    private void AddSide(string left, IBrush leftBackground, string right, IBrush rightBackground)
+    private void AddSide(string left, IBrush leftBackground, string leftNumber, string right, IBrush rightBackground, string rightNumber)
     {
         var rows = Math.Max(LineFold.Count(left), LineFold.Count(right));
         for (var index = 0; index < rows; index++)
@@ -2124,6 +2121,8 @@ public partial class RepositoryViewModel : ViewModelBase
             {
                 Left = leftPiece ?? "",
                 Right = rightPiece ?? "",
+                LeftNumber = index == 0 ? leftNumber : "",
+                RightNumber = index == 0 ? rightNumber : "",
                 SkipLeftCopy = leftPiece is null,
                 SkipRightCopy = rightPiece is null,
                 LeftContinues = index > 0 && leftPiece is not null,
