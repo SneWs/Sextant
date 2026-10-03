@@ -15,7 +15,7 @@ public partial class RepositoryViewModel
     private string? _objectBefore;
     private string? _objectAfter;
     private bool _afterIsWorktree;
-    private string? _lineLanguage;
+    private string? _linePath;
     private bool _lfsLocal;
     private string? _lfsRevision;
     private string? _lfsPointer;
@@ -599,7 +599,6 @@ public partial class RepositoryViewModel
 
         ClearSections();
         DiffRows.Clear();
-        var language = DiffSyntax.Language(path);
         DiffRows.Add(new DiffFileRow
         {
             Path = path,
@@ -607,10 +606,20 @@ public partial class RepositoryViewModel
             FileMenu = FileMenuFor(path),
         });
         var endsWithNewline = text.EndsWith('\n');
+        var editorLines = new List<EditorLine>();
         for (var index = 0; index < lines.Length; index++)
         {
             var number = DiffLineNumbers.FileLine(index, lines.Length, endsWithNewline);
-            AddFoldedLine("  " + lines[index], language, DiffColors.Clear, false, "", UiCommands.Disabled, number, "");
+            editorLines.AddRange(FoldEditorLines(lines[index], number, "", "", EditorLineKind.Context, false, "", UiCommands.Disabled));
+        }
+
+        if (editorLines.Count > 0)
+        {
+            DiffRows.Add(new DiffEditorRow
+            {
+                Path = path,
+                Lines = editorLines,
+            });
         }
 
         ShowLfsDownload = false;

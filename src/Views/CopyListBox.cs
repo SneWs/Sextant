@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Specialized;
 using Avalonia;
 using Avalonia.Controls;
+using AvaloniaEdit;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
@@ -329,7 +330,9 @@ public class CopyListBoxItem : ListBoxItem
     {
         // The text marks the press handled on the way up. Skipping the list selection
         // keeps the diff color and leaves the pointer with the text.
-        if (e.Source is Visual source && source.FindAncestorOfType<CopyableText>(includeSelf: true) is not null)
+        if (e.Source is Visual source
+            && (source.FindAncestorOfType<CopyableText>(includeSelf: true) is not null
+                || source.FindAncestorOfType<TextEditor>(includeSelf: true) is not null))
             return;
         base.OnPointerPressed(e);
     }

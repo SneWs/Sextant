@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Media;
+using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sextant.Git;
@@ -228,6 +229,89 @@ public sealed class DiffHunkRow : DiffRow
     public bool ShowAction { get; init; }
 
     public ICommand ActionCommand { get; init; } = UiCommands.Disabled;
+}
+
+public enum EditorLineKind
+{
+    Context,
+    Added,
+    Removed,
+    Empty,
+}
+
+/// <summary>One visual line inside a text diff or blame editor.</summary>
+public sealed class EditorLine
+{
+    public string Text { get; init; } = "";
+
+    public string OldNumber { get; init; } = "";
+
+    public string NewNumber { get; init; } = "";
+
+    public string Meta { get; init; } = "";
+
+    public EditorLineKind Kind { get; init; }
+
+    /// <summary>This line is the rest of the previous logical line. Copy does not insert a break.</summary>
+    public bool Continues { get; init; }
+
+    public bool ShowAction { get; init; }
+
+    public string ActionLabel { get; init; } = "";
+
+    public ICommand ActionCommand { get; init; } = UiCommands.Disabled;
+
+    /// <summary>This side has no line. Copy leaves it out.</summary>
+    public bool SkipCopy { get; init; }
+}
+
+/// <summary>
+/// A read-only AvaloniaEdit document for one hunk, a loaded file, or a blame.
+/// Images and FBX stay as their own rows in the same list.
+/// </summary>
+public sealed class DiffEditorRow : DiffRow
+{
+    public string? Path { get; init; }
+
+    public bool SideBySide { get; init; }
+
+    public bool Blame { get; init; }
+
+    public IReadOnlyList<EditorLine> Lines { get; init; } = [];
+
+    public IReadOnlyList<EditorLine> RightLines { get; init; } = [];
+
+    public int LineCount => Math.Max(Lines.Count, RightLines.Count);
+
+    public static string Document(IReadOnlyList<EditorLine> lines)
+    {
+        var builder = new StringBuilder();
+        for (var index = 0; index < lines.Count; index++)
+        {
+            if (index > 0)
+                builder.Append('\n');
+            builder.Append(lines[index].Text);
+        }
+
+        return builder.ToString();
+    }
+
+    public static string? Copy(IReadOnlyList<EditorLine> lines)
+    {
+        var builder = new StringBuilder();
+        var any = false;
+        foreach (var line in lines)
+        {
+            if (line.SkipCopy)
+                continue;
+            if (any && !line.Continues)
+                builder.Append('\n');
+            any = true;
+            builder.Append(line.Text);
+        }
+
+        return any ? builder.ToString() : null;
+    }
 }
 
 public sealed class DiffLineRow : DiffRow

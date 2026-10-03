@@ -429,12 +429,28 @@ public partial class RepositoryView : UserControl
         var columns = 0;
         foreach (var row in rows)
         {
-            if (row is not DiffSideRow side)
+            if (row is DiffSideRow side)
+            {
+                if (side.Left.Length > columns)
+                    columns = side.Left.Length;
+                if (side.Right.Length > columns)
+                    columns = side.Right.Length;
                 continue;
-            if (side.Left.Length > columns)
-                columns = side.Left.Length;
-            if (side.Right.Length > columns)
-                columns = side.Right.Length;
+            }
+
+            if (row is not DiffEditorRow editor || !editor.SideBySide)
+                continue;
+            foreach (var line in editor.Lines)
+            {
+                if (line.Text.Length > columns)
+                    columns = line.Text.Length;
+            }
+
+            foreach (var line in editor.RightLines)
+            {
+                if (line.Text.Length > columns)
+                    columns = line.Text.Length;
+            }
         }
 
         return columns;

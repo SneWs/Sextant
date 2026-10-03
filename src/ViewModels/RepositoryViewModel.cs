@@ -1986,7 +1986,7 @@ public partial class RepositoryViewModel : ViewModelBase
         string? path = null,
         IReadOnlyList<LfsFileNote>? notes = null)
     {
-        _lineLanguage = DiffSyntax.Language(path);
+        _linePath = path;
         if (document.IsBinary)
         {
             if (notes is not null && notes.Any(note => note.Path == (path ?? "")))
@@ -2050,14 +2050,15 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         var oldLine = hunk.OldStart;
         var newLine = hunk.NewStart;
+        var lines = new List<EditorLine>(hunk.Lines.Count);
         for (var lineIndex = 0; lineIndex < hunk.Lines.Count; lineIndex++)
         {
             var line = hunk.Lines[lineIndex];
-            var (prefix, background) = line.Kind switch
+            var kind = line.Kind switch
             {
-                DiffLineKind.Added => ("+ ", DiffColors.Added),
-                DiffLineKind.Removed => ("- ", DiffColors.Removed),
-                _ => ("  ", DiffColors.Clear),
+                DiffLineKind.Added => EditorLineKind.Added,
+                DiffLineKind.Removed => EditorLineKind.Removed,
+                _ => EditorLineKind.Context,
             };
             var show = parts && line.Kind is DiffLineKind.Added or DiffLineKind.Removed;
             var captured = lineIndex;
@@ -2065,76 +2066,88 @@ public partial class RepositoryViewModel : ViewModelBase
                 ? new AsyncRelayCommand(() => ApplyShownLineAsync(patch, hunkIndex, captured))
                 : UiCommands.Disabled;
             var number = DiffLineNumbers.For(line.Kind, ref oldLine, ref newLine);
-            AddFoldedLine(prefix + line.Text, _lineLanguage, background, show, lineLabel, command, number.Old, number.New);
+            lines.AddRange(FoldEditorLines(line.Text, number.Old, number.New, "", kind, show, lineLabel, command));
         }
+
+        AddEditor(_linePath, lines, []);
     }
 
-    private void AddFoldedLine(
-        string text,
-        string? language,
-        IBrush background,
+    private void AppendSideBySide(DiffHunk hunk)
+    {
+        var left = new List<EditorLine>();
+        var right = new List<EditorLine>();
+        foreach (var line in DiffLineNumbers.SideBySide(hunk))
+        {
+            var leftKind = line.LeftText is null
+                ? EditorLineKind.Empty
+                : line.LeftRemoved ? EditorLineKind.Removed : EditorLineKind.Context;
+            var rightKind = line.RightText is null
+                ? EditorLineKind.Empty
+                : line.RightAdded ? EditorLineKind.Added : EditorLineKind.Context;
+            var leftLines = FoldEditorLines(line.LeftText, line.LeftNumber, "", "", leftKind, false, "", UiCommands.Disabled, line.LeftText is null);
+            var rightLines = FoldEditorLines(line.RightText, "", line.RightNumber, "", rightKind, false, "", UiCommands.Disabled, line.RightText is null);
+            var count = Math.Max(leftLines.Count, rightLines.Count);
+            PadEditorLines(leftLines, count);
+            PadEditorLines(rightLines, count);
+            left.AddRange(leftLines);
+            right.AddRange(rightLines);
+        }
+
+        AddEditor(_linePath, left, right);
+    }
+
+    private void AddEditor(string? path, List<EditorLine> lines, List<EditorLine> right)
+    {
+        if (lines.Count == 0 && right.Count == 0)
+            return;
+        AddRow(new DiffEditorRow
+        {
+            Path = path,
+            SideBySide = right.Count > 0,
+            Lines = lines,
+            RightLines = right,
+        });
+    }
+
+    private static List<EditorLine> FoldEditorLines(
+        string? text,
+        string oldNumber,
+        string newNumber,
+        string meta,
+        EditorLineKind kind,
         bool showAction,
         string actionLabel,
         ICommand command,
-        string oldNumber = "",
-        string newNumber = "")
+        bool skip = false)
     {
+        if (text is null || skip)
+            return [new EditorLine { Kind = EditorLineKind.Empty, SkipCopy = true }];
+
         var count = LineFold.Count(text);
+        var lines = new List<EditorLine>(count);
         for (var index = 0; index < count; index++)
         {
-            AddRow(new DiffLineRow
+            lines.Add(new EditorLine
             {
                 Text = LineFold.Piece(text, index) ?? "",
                 OldNumber = index == 0 ? oldNumber : "",
                 NewNumber = index == 0 ? newNumber : "",
-                Language = language,
-                Background = background,
+                Meta = index == 0 ? meta : "",
+                Kind = kind,
                 Continues = index > 0,
                 ShowAction = index == 0 && showAction,
                 ActionLabel = index == 0 ? actionLabel : "",
                 ActionCommand = index == 0 ? command : UiCommands.Disabled,
             });
         }
+
+        return lines;
     }
 
-    private void AppendSideBySide(DiffHunk hunk)
+    private static void PadEditorLines(List<EditorLine> lines, int count)
     {
-        foreach (var line in DiffLineNumbers.SideBySide(hunk))
-        {
-            var left = line.LeftText is null ? "" : (line.LeftRemoved ? "- " : "  ") + line.LeftText;
-            var right = line.RightText is null ? "" : (line.RightAdded ? "+ " : "  ") + line.RightText;
-            AddSide(
-                left,
-                line.LeftRemoved ? DiffColors.Removed : DiffColors.Clear,
-                line.LeftNumber,
-                right,
-                line.RightAdded ? DiffColors.Added : DiffColors.Clear,
-                line.RightNumber);
-        }
-    }
-
-    private void AddSide(string left, IBrush leftBackground, string leftNumber, string right, IBrush rightBackground, string rightNumber)
-    {
-        var rows = Math.Max(LineFold.Count(left), LineFold.Count(right));
-        for (var index = 0; index < rows; index++)
-        {
-            var leftPiece = LineFold.Piece(left, index);
-            var rightPiece = LineFold.Piece(right, index);
-            AddRow(new DiffSideRow
-            {
-                Left = leftPiece ?? "",
-                Right = rightPiece ?? "",
-                LeftNumber = index == 0 ? leftNumber : "",
-                RightNumber = index == 0 ? rightNumber : "",
-                SkipLeftCopy = leftPiece is null,
-                SkipRightCopy = rightPiece is null,
-                LeftContinues = index > 0 && leftPiece is not null,
-                RightContinues = index > 0 && rightPiece is not null,
-                Language = _lineLanguage,
-                LeftBackground = leftPiece is null ? DiffColors.Clear : leftBackground,
-                RightBackground = rightPiece is null ? DiffColors.Clear : rightBackground,
-            });
-        }
+        while (lines.Count < count)
+            lines.Add(new EditorLine { Kind = EditorLineKind.Empty, SkipCopy = true, Continues = true });
     }
 
     private static bool CanStageParts(bool workingCopy, ChangeKind kind, DiffDocument document) =>

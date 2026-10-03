@@ -582,29 +582,24 @@ public partial class RepositoryViewModel
         if (document.Lines.Count == 0)
             return [new DiffLineRow { Text = "This file has no lines.", Background = DiffColors.Clear }];
 
-        var language = DiffSyntax.Language(path);
-        var rows = new List<DiffRow>();
+        var lines = new List<EditorLine>(document.Lines.Count);
         foreach (var line in document.Lines)
         {
             var who = line.Uncommitted ? "Not committed" : line.Author;
             var id = line.Sha.Length <= 7 ? line.Sha : line.Sha[..7];
             var number = line.Number.ToString(CultureInfo.InvariantCulture);
-            var meta = id + "  " + who;
-            var count = LineFold.Count(line.Text);
-            for (var index = 0; index < count; index++)
-            {
-                rows.Add(new BlameRow
-                {
-                    Number = index == 0 ? number : "",
-                    Meta = index == 0 ? meta : "",
-                    Text = LineFold.Piece(line.Text, index) ?? "",
-                    Continues = index > 0,
-                    Language = language,
-                });
-            }
+            lines.AddRange(FoldEditorLines(line.Text, "", number, id + "  " + who, EditorLineKind.Context, false, "", UiCommands.Disabled));
         }
 
-        return rows;
+        return
+        [
+            new DiffEditorRow
+            {
+                Path = path,
+                Blame = true,
+                Lines = lines,
+            },
+        ];
     }
 
     private void InsertBlameLoading(DiffSection section)

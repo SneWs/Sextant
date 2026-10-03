@@ -168,6 +168,10 @@ public static class CopyText
     public static string? Of(object? item, string key) => item switch
     {
         DiffLineRow row when key == "body" => row.Text,
+        DiffEditorRow row when key == "body" && !row.SideBySide && !row.Blame => DiffEditorRow.Copy(row.Lines),
+        DiffEditorRow row when key == "left" && row.SideBySide => DiffEditorRow.Copy(row.Lines),
+        DiffEditorRow row when key == "right" && row.SideBySide => DiffEditorRow.Copy(row.RightLines),
+        DiffEditorRow row when key == "blame" && row.Blame => DiffEditorRow.Copy(row.Lines),
         DiffHunkRow row when key is "body" or "left" or "right" or "span" => row.Header,
         DiffFileRow row when key is "body" or "left" or "right" or "span" => row.Label,
         DiffSideRow row when key == "left" => row.SkipLeftCopy ? null : row.Left,

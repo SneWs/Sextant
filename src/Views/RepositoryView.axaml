@@ -357,6 +357,9 @@
                                         </DockPanel>
                                     </Border>
                                 </DataTemplate>
+                                <DataTemplate DataType="vm:DiffEditorRow" x:DataType="vm:DiffEditorRow">
+                                    <views:DiffTextHost Editor="{Binding}" Shift="{Binding $parent[views:RepositoryView].SideShift}"/>
+                                </DataTemplate>
                                 <DataTemplate DataType="vm:DiffLineRow" x:DataType="vm:DiffLineRow">
                                     <DockPanel>
                                         <Button Classes="flat" DockPanel.Dock="Right" Content="{Binding ActionLabel}" Command="{Binding ActionCommand}" IsVisible="{Binding ShowAction}" Padding="6,0"/>

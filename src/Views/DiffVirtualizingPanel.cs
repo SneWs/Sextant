@@ -25,6 +25,7 @@ public sealed class DiffVirtualizingPanel : VirtualizingPanel
     private double _line = 22;
     private double _block = 44;
     private double _image = 520;
+    private double _editorLine = 18;
     private int _scrollTo = -1;
     private int _scrollPasses;
     private bool _nudgePosted;
@@ -65,10 +66,40 @@ public sealed class DiffVirtualizingPanel : VirtualizingPanel
 
     protected override Size ArrangeOverride(Size finalSize)
     {
+        var (viewTop, viewBottom) = ViewportSpan();
         foreach (var slot in _realized)
         {
+            var rowTop = Prefix(slot.Index);
             var height = HeightOf(slot.Index);
-            slot.Control.Arrange(new Rect(0, Prefix(slot.Index), finalSize.Width, height));
+            if (slot.Index < Items.Count && Items[slot.Index] is DiffEditorRow)
+            {
+                var sliceTop = Math.Max(rowTop, viewTop);
+                var sliceBottom = Math.Min(rowTop + height, viewBottom);
+                if (sliceBottom - sliceTop < 1)
+                {
+                    sliceTop = rowTop;
+                    sliceBottom = rowTop + Math.Min(height, Math.Max(viewBottom - viewTop, 1));
+                }
+
+                var sliceHeight = Math.Max(1, sliceBottom - sliceTop);
+                slot.Control.Arrange(new Rect(0, sliceTop, finalSize.Width, sliceHeight));
+                if (slot.Control.GetVisualDescendants().OfType<DiffTextHost>().FirstOrDefault() is { } host)
+                {
+                    host.WindowOffset = Math.Max(0, sliceTop - rowTop);
+                    var full = host.ContentHeight;
+                    if (full >= 1 && (slot.Index >= _heights.Length || Math.Abs(_heights[slot.Index] - full) > 0.5))
+                    {
+                        EnsureHeights(Items.Count);
+                        if (slot.Index < _heights.Length)
+                            _heights[slot.Index] = full;
+                        InvalidateMeasure();
+                    }
+                }
+
+                continue;
+            }
+
+            slot.Control.Arrange(new Rect(0, rowTop, finalSize.Width, height));
         }
 
         return finalSize;
@@ -138,6 +169,14 @@ public sealed class DiffVirtualizingPanel : VirtualizingPanel
             return null;
         EnsureHeights(items.Count);
         _scrollPasses = 0;
+        if (items[index] is DiffEditorRow)
+        {
+            var existing = FindRealized(index) ?? Create(items, index);
+            RequestScroll(index);
+            InvalidateMeasure();
+            return existing;
+        }
+
         var width = Bounds.Width > 1 ? Bounds.Width : 800.0;
         var control = FindRealized(index) ?? Create(items, index);
         control.Measure(new Size(width, double.PositiveInfinity));
@@ -256,7 +295,17 @@ public sealed class DiffVirtualizingPanel : VirtualizingPanel
         var bottom = top + _scroll.Viewport.Height;
         if (y >= top - 1 && y + height <= bottom + 1)
             return;
-        var target = y < top ? y : y + height - _scroll.Viewport.Height;
+        double target;
+        if (index < Items.Count && Items[index] is DiffEditorRow && height > _scroll.Viewport.Height)
+        {
+            if (y + height > top + 1 && y < bottom - 1)
+                return;
+            target = y;
+        }
+        else
+        {
+            target = y < top ? y : y + height - _scroll.Viewport.Height;
+        }
         var max = Math.Max(0, ExtentHeight(Items) - _scroll.Viewport.Height);
         target = Math.Clamp(target, 0, max);
         if (Math.Abs(_scroll.Offset.Y - target) > 1)
@@ -279,6 +328,17 @@ public sealed class DiffVirtualizingPanel : VirtualizingPanel
         if (Math.Abs(e.OffsetDelta.Y) < 0.5 && Math.Abs(e.ViewportDelta.Y) < 0.5)
             return;
         InvalidateMeasure();
+    }
+
+    private (double Top, double Bottom) ViewportSpan()
+    {
+        if (_scroll is null)
+            _scroll = this.FindAncestorOfType<ScrollViewer>();
+        if (_scroll is { Viewport.Height: > 1 })
+            return (_scroll.Offset.Y, _scroll.Offset.Y + _scroll.Viewport.Height);
+        if (_viewport.Height > 1)
+            return (_viewport.Top, _viewport.Bottom);
+        return (0, 800);
     }
 
     private (double Top, double Bottom) VisibleSpan()
@@ -321,11 +381,20 @@ public sealed class DiffVirtualizingPanel : VirtualizingPanel
             _realized.RemoveAt(i);
         }
 
-        var measure = new Size(width, double.PositiveInfinity);
+        var (viewTop, viewBottom) = ViewportSpan();
         for (var index = start; index < end; index++)
         {
             var control = FindRealized(index) ?? Create(items, index);
-            control.Measure(measure);
+            var measureHeight = double.PositiveInfinity;
+            if (items[index] is DiffEditorRow)
+            {
+                var rowTop = Prefix(index);
+                var rowHeight = HeightOf(index);
+                var slice = Math.Min(rowTop + rowHeight, viewBottom) - Math.Max(rowTop, viewTop);
+                measureHeight = Math.Clamp(slice < 1 ? viewBottom - viewTop : slice, 1, Math.Max(viewBottom - viewTop, 1));
+            }
+
+            control.Measure(new Size(width, measureHeight));
             Remember(index, items[index], control.DesiredSize.Height);
         }
     }
@@ -489,12 +558,20 @@ public sealed class DiffVirtualizingPanel : VirtualizingPanel
 
     private bool Remember(int index, object? item, double measured)
     {
-        if (measured < 1 || index < 0 || index >= _heights.Length)
+        if (item is DiffEditorRow editor)
+        {
+            var host = FindRealized(index)?.GetVisualDescendants().OfType<DiffTextHost>().FirstOrDefault();
+            var line = host?.LineHeight ?? 0;
+            if (line >= 1)
+                _editorLine = line;
+            var full = host?.ContentHeight ?? 0;
+            if (full < 1)
+                full = Math.Max(_editorLine, 1) * Math.Max(1, editor.LineCount);
+            return SetHeight(index, full);
+        }
+
+        if (!SetHeight(index, measured))
             return false;
-        var previous = _heights[index];
-        if (previous >= 1 && Math.Abs(previous - measured) < 0.5)
-            return false;
-        _heights[index] = measured;
         switch (item)
         {
             case DiffImageRow:
@@ -508,6 +585,17 @@ public sealed class DiffVirtualizingPanel : VirtualizingPanel
                 break;
         }
 
+        return true;
+    }
+
+    private bool SetHeight(int index, double measured)
+    {
+        if (measured < 1 || index < 0 || index >= _heights.Length)
+            return false;
+        var previous = _heights[index];
+        if (previous >= 1 && Math.Abs(previous - measured) < 0.5)
+            return false;
+        _heights[index] = measured;
         return true;
     }
 
@@ -525,6 +613,7 @@ public sealed class DiffVirtualizingPanel : VirtualizingPanel
         return Items[index] switch
         {
             DiffImageRow => _image,
+            DiffEditorRow editor => Math.Max(_editorLine, 1) * Math.Max(1, editor.LineCount),
             DiffLineRow or DiffSideRow or BlameRow => _line,
             _ => _block,
         };

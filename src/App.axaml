@@ -69,6 +69,7 @@
                                        ErrorText="#FFF38BA8" RegionColor="#FF1E1E2E"/>
             </FluentTheme.Palettes>
         </FluentTheme>
+        <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml"/>
         <Styles>
             <Styles.Resources>
                 <ControlTheme x:Key="FlatButton" TargetType="Button">
