@@ -595,8 +595,8 @@ public sealed class DiffTextHost : Grid
 
         internal static string? ScopeFor(RegistryOptions options, string? path)
         {
-            var extension = Path.GetExtension(path ?? "");
-            if (extension.Length == 0)
+            var extension = DiffSyntax.GrammarExtension(path);
+            if (string.IsNullOrEmpty(extension))
                 return null;
             var language = options.GetLanguageByExtension(extension);
             var byLanguage = language is null ? null : options.GetScopeByLanguageId(language.Id);

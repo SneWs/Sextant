@@ -42,11 +42,39 @@ public static class DiffSyntax
         "function", "return", "local", "echo", "exit", "set",
     };
 
+    /// <summary>
+    /// Extension the highlighter should use. Unity keeps its own suffix on text it serializes,
+    /// so a material or a prefab is colored as YAML.
+    /// </summary>
+    public static string? GrammarExtension(string? path)
+    {
+        var extension = Path.GetExtension(path ?? "");
+        if (extension.Length == 0)
+            return null;
+        return UnityGrammar(extension) ?? extension;
+    }
+
+    // Unity writes these formats under its own suffixes.
+    private static string? UnityGrammar(string extension) => extension.ToLowerInvariant() switch
+    {
+        ".anim" or ".asset" or ".brush" or ".controller" or ".flare" or ".fontsettings" or ".giparams"
+            or ".guiskin" or ".lighting" or ".mask" or ".mat" or ".meta" or ".mixer" or ".overridecontroller"
+            or ".physicmaterial" or ".physicsmaterial2d" or ".playable" or ".prefab" or ".preset"
+            or ".rendertexture" or ".scenetemplate" or ".shadervariants" or ".signal" or ".spriteatlas"
+            or ".spriteatlasv2" or ".terrainlayer" or ".unity" => ".yaml",
+        ".asmdef" or ".asmref" or ".inputactions" or ".shadergraph" or ".shadersubgraph" => ".json",
+        ".uxml" => ".xml",
+        ".uss" or ".tss" => ".css",
+        ".raytrace" => ".hlsl",
+        _ => null,
+    };
+
     public static string? Language(string? path)
     {
-        if (string.IsNullOrEmpty(path))
+        var extension = GrammarExtension(path);
+        if (string.IsNullOrEmpty(extension))
             return null;
-        return Path.GetExtension(path).TrimStart('.').ToLowerInvariant() switch
+        return extension.TrimStart('.').ToLowerInvariant() switch
         {
             "cs" or "java" or "js" or "ts" or "tsx" or "jsx" or "c" or "h" or "cc" or "cpp" or "hpp"
                 or "go" or "rs" or "swift" or "kt" or "kts" or "scala" or "php" or "css" or "sql" => "c",
