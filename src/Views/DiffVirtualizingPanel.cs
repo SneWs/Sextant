@@ -500,7 +500,7 @@ public sealed class DiffVirtualizingPanel : VirtualizingPanel
             case DiffImageRow:
                 _image = measured;
                 break;
-            case DiffLineRow or DiffSideRow:
+            case DiffLineRow or DiffSideRow or BlameRow:
                 _line = measured;
                 break;
             case DiffFileRow or DiffHunkRow:
@@ -525,7 +525,7 @@ public sealed class DiffVirtualizingPanel : VirtualizingPanel
         return Items[index] switch
         {
             DiffImageRow => _image,
-            DiffLineRow or DiffSideRow => _line,
+            DiffLineRow or DiffSideRow or BlameRow => _line,
             _ => _block,
         };
     }

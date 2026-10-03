@@ -44,6 +44,32 @@ public static class BlameParser
         return lines;
     }
 
+    /// <summary>A short line for a blame git refused. The raw stderr stays out of the row.</summary>
+    public static string Notice(string stderr)
+    {
+        var line = "";
+        foreach (var raw in stderr.Split('\n'))
+        {
+            var trimmed = raw.Trim();
+            if (trimmed.Length == 0)
+                continue;
+            line = trimmed;
+            break;
+        }
+
+        const string fatal = "fatal: ";
+        if (line.StartsWith(fatal, StringComparison.OrdinalIgnoreCase))
+            line = line[fatal.Length..].Trim();
+        if (line.Contains("binary", StringComparison.OrdinalIgnoreCase))
+            return "Binary file.";
+        if (line.Contains("no such path", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("exists on disk, but not in", StringComparison.OrdinalIgnoreCase))
+            return "This file is not in this revision.";
+        if (line.Length == 0)
+            return "Git could not blame this file.";
+        return line;
+    }
+
     private static bool TryHeader(string line, out string sha, out int finalLine)
     {
         sha = "";

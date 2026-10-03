@@ -115,7 +115,7 @@ public enum SequencerKind
 
 public sealed record BlameLine(int Number, string Sha, string Author, string Summary, string Text, bool Uncommitted);
 
-public sealed record BlameDocument(bool IsTooLarge, IReadOnlyList<BlameLine> Lines)
+public sealed record BlameDocument(bool IsTooLarge, IReadOnlyList<BlameLine> Lines, string? Error = null)
 {
     public static BlameDocument TooLarge { get; } = new(true, []);
 }

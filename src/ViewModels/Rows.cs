@@ -331,7 +331,7 @@ public sealed class WorktreeFileMenu
     public ICommand OpenEditorCommand { get; init; } = UiCommands.Disabled;
 }
 
-public sealed class BlameRow
+public sealed class BlameRow : DiffRow
 {
     public required string Number { get; init; }
 
@@ -341,6 +341,9 @@ public sealed class BlameRow
 
     /// <summary>This row is the rest of the previous logical line. Copy does not insert a break.</summary>
     public bool Continues { get; init; }
+
+    /// <summary>Syntax of this file. Empty when the path has no highlighter.</summary>
+    public string? Language { get; init; }
 }
 
 public partial class MergeRegionRow : ObservableObject

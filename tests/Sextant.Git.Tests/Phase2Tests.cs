@@ -61,6 +61,9 @@ public class Phase2Tests
         Assert.False(lines[0].Uncommitted);
         Assert.Equal("world", lines[1].Text);
         Assert.True(lines[1].Uncommitted);
+        Assert.Equal("Binary file.", BlameParser.Notice("fatal: file a.png is binary\n"));
+        Assert.Equal("This file is not in this revision.", BlameParser.Notice("fatal: no such path 'c.txt' in HEAD\n"));
+        Assert.Equal("Git could not blame this file.", BlameParser.Notice("  \n"));
     }
 
     [Fact]
@@ -151,6 +154,20 @@ public class Phase2Tests
         Assert.NotNull(blame);
         Assert.False(blame.IsTooLarge);
         Assert.Contains(blame.Lines, line => line.Text == "one" && line.Sha.StartsWith(sha[..7], StringComparison.Ordinal));
+
+        repo.WriteFile("b.txt", "bee\n");
+        repo.CommitAll("second");
+        var again = repo.RunCapture("rev-parse", "HEAD").Trim();
+        var left = session.ReadBlameAsync(again, "a.txt", allowLarge: true, CancellationToken.None);
+        var right = session.ReadBlameAsync(again, "b.txt", allowLarge: true, CancellationToken.None);
+        await Task.WhenAll(left, right);
+        Assert.Contains((await left).Lines, line => line.Text == "one");
+        Assert.Contains((await right).Lines, line => line.Text == "bee");
+
+        repo.WriteFile("c.txt", "new\n");
+        var missing = await session.ReadBlameAsync(again, "c.txt", allowLarge: true, CancellationToken.None);
+        Assert.Equal("This file is not in this revision.", missing.Error);
+        Assert.Empty(missing.Lines);
     }
 
     [Fact]

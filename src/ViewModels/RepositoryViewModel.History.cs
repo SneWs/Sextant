@@ -3,7 +3,6 @@ using CommunityToolkit.Mvvm.Input;
 using Sextant;
 using Sextant.Git;
 using Sextant.Git.Parsing;
-using System.Collections.ObjectModel;
 using System.Globalization;
 
 namespace Sextant.ViewModels;
@@ -14,8 +13,6 @@ public partial class RepositoryViewModel
     private string? _rangeNewer;
     private string _rangeOlderSubject = "";
     private string _rangeNewerSubject = "";
-
-    public ObservableCollection<BlameRow> BlameRows { get; } = [];
 
     [ObservableProperty]
     public partial string HistoryText { get; set; } = "";
@@ -58,6 +55,8 @@ public partial class RepositoryViewModel
 
     public bool ShowingDiff => !ShowingBlame && !ShowingMerge;
 
+    public bool ShowingRows => !ShowingMerge;
+
     public string SideBySideLabel => SideBySide ? "Inline" : "Side by side";
 
     public string MergeBaseLabel => ShowMergeBase ? "Hide base" : "Show base";
@@ -88,6 +87,7 @@ public partial class RepositoryViewModel
     partial void OnShowingMergeChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowingDiff));
+        OnPropertyChanged(nameof(ShowingRows));
         OnPropertyChanged(nameof(ShowSectionFolds));
     }
 
@@ -366,65 +366,252 @@ public partial class RepositoryViewModel
         }
     }
 
-    private async Task LoadBlameAsync()
+    private Task LoadBlameAsync(bool armJump, string? jumpPath, string? jumpOriginal)
     {
         if (_lifetime.IsCancellationRequested)
-            return;
+            return Task.CompletedTask;
         ClearMerge();
-        var file = SelectedFile;
-        if (file is null || file.IsHeader || _session is null)
+        if (_session is null)
         {
-            BlameRows.Clear();
-            ClearDiff("Select a file to blame.");
-            return;
+            ClearDiff(AllFiles ? "No files to blame." : "Select a file to blame.");
+            return Task.CompletedTask;
         }
 
+        var files = BlameFiles();
+        if (files.Count == 0)
+        {
+            ClearDiff(AllFiles ? "No files to blame." : "Select a file to blame.");
+            _allFilesShown = false;
+            _diffReady = true;
+            return Task.CompletedTask;
+        }
+
+        ResetBlameQueue();
         ReplaceDetails();
-        var token = _details!.Token;
-        var revision = _rangeNewer ?? (SelectedGraphRow is { IsWorkingCopy: false, Sha: { } sha } ? sha : null);
+        _blameRevision = _rangeNewer ?? (SelectedGraphRow is { IsWorkingCopy: false, Sha: { } sha } ? sha : null);
+        ClearSections();
+        ClearPreview();
+        DiffRows.Clear();
+        _rawPatch = null;
+        ShowLoadDiff = false;
+        HasDiffNotice = false;
+        DiffNotice = "";
+        if (AllFiles)
+            NoteChangelist();
+
+        foreach (var file in files)
+        {
+            var key = file.Path;
+            var header = new DiffFileRow
+            {
+                Path = file.Path,
+                Label = file.Path,
+                CanFold = true,
+                Expanded = AllFiles ? IsFoldOpen(key) : true,
+                FileMenu = FileMenuFor(file.Path),
+            };
+            var section = new DiffSection(key, header);
+            header.ToggleCommand = new RelayCommand(() => SetExpanded(section, !header.Expanded));
+            _sections.Add(section);
+            DiffRows.Add(header);
+        }
+
+        _allFilesShown = AllFiles;
+        _diffReady = true;
+        OnPropertyChanged(nameof(ShowSectionFolds));
+        foreach (var section in _sections)
+        {
+            if (section.Header.Expanded)
+                RequestBlame(section);
+        }
+
+        if (AllFiles && !armJump && SelectedFile is { IsHeader: false, Path.Length: > 0 } selected)
+        {
+            armJump = true;
+            jumpPath = selected.Path;
+            jumpOriginal = selected.OriginalPath;
+        }
+
+        if (armJump && AllFiles && jumpPath is { Length: > 0 })
+        {
+            OpenForJump(jumpPath, jumpOriginal);
+            JumpToFile?.Invoke(jumpPath, jumpOriginal);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private List<FileRowViewModel> BlameFiles()
+    {
+        if (!AllFiles)
+            return SelectedFile is { IsHeader: false, Path.Length: > 0 } file ? [file] : [];
+
+        var files = new List<FileRowViewModel>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var file in Files)
+        {
+            if (file.IsHeader || file.Path.Length == 0 || !seen.Add(file.Path))
+                continue;
+            files.Add(file);
+        }
+
+        return files;
+    }
+
+    private void ResetBlameQueue()
+    {
+        _blameGeneration++;
+        _blameQueue.Clear();
+    }
+
+    private void RequestBlame(DiffSection section, bool showLoading = true)
+    {
+        if (!ShowingBlame || !section.Header.Expanded || section.BlameReady || section.BlamePending)
+            return;
+        section.BlamePending = true;
+        if (showLoading)
+            InsertBlameLoading(section);
+        _blameQueue.Enqueue(section);
+        if (!_blamePump)
+            _ = PumpBlameAsync(_blameGeneration);
+    }
+
+    private async Task PumpBlameAsync(int generation)
+    {
+        if (_blamePump)
+            return;
+        _blamePump = true;
         try
         {
-            var document = await _session.BlameAsync(revision, file.Path, _allowLarge, token);
-            if (document is null || token.IsCancellationRequested)
-                return;
-            BlameRows.Clear();
-            ClearSections();
-            DiffRows.Clear();
-            ShowLoadDiff = document.IsTooLarge;
-            if (document.IsTooLarge)
+            while (generation == _blameGeneration && _blameQueue.Count > 0)
             {
-                HasDiffNotice = true;
-                DiffNotice = "This blame is large. Load it only if you need the whole file.";
-                return;
-            }
-
-            HasDiffNotice = false;
-            DiffNotice = "";
-            foreach (var line in document.Lines)
-            {
-                var who = line.Uncommitted ? "Not committed" : line.Author;
-                var id = line.Sha.Length <= 7 ? line.Sha : line.Sha[..7];
-                var number = line.Number.ToString(CultureInfo.InvariantCulture);
-                var meta = id + "  " + who;
-                var count = LineFold.Count(line.Text);
-                for (var index = 0; index < count; index++)
+                var section = _blameQueue.Dequeue();
+                if (generation != _blameGeneration || !_sections.Contains(section) || !section.Header.Expanded)
                 {
-                    BlameRows.Add(new BlameRow
-                    {
-                        Number = index == 0 ? number : "",
-                        Meta = index == 0 ? meta : "",
-                        Text = LineFold.Piece(line.Text, index) ?? "",
-                        Continues = index > 0,
-                    });
+                    section.BlamePending = false;
+                    section.Body.Clear();
+                    continue;
+                }
+
+                if (section.Body.Count == 0)
+                    InsertBlameLoading(section);
+                var token = _details?.Token ?? CancellationToken.None;
+                try
+                {
+                    await FillBlameSectionAsync(section, generation, token);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                catch (Exception exception)
+                {
+                    if (generation != _blameGeneration || !_sections.Contains(section))
+                        continue;
+                    section.BlamePending = false;
+                    section.BlameReady = true;
+                    ReplaceBlameBody(section, [new DiffLineRow { Text = exception.Message, Background = DiffColors.Clear }]);
                 }
             }
         }
+        finally
+        {
+            _blamePump = false;
+            if (_blameQueue.Count > 0)
+                _ = PumpBlameAsync(_blameGeneration);
+        }
+    }
+
+    private async Task FillBlameSectionAsync(DiffSection section, int generation, CancellationToken token)
+    {
+        if (_session is null)
+            return;
+        BlameDocument document;
+        try
+        {
+            document = await _session.ReadBlameAsync(_blameRevision, section.Key, _allowLarge, token);
+        }
         catch (OperationCanceledException)
         {
+            return;
         }
-        catch (GitCommandFailedException exception)
+
+        if (generation != _blameGeneration || token.IsCancellationRequested || !_sections.Contains(section))
+            return;
+        if (!section.Header.Expanded)
         {
-            Fail(exception.Message);
+            section.BlamePending = false;
+            section.Body.Clear();
+            return;
         }
+
+        ReplaceBlameBody(section, BlameBody(section.Key, document));
+        section.BlameReady = true;
+        section.BlamePending = false;
+        if (!document.IsTooLarge)
+            return;
+        ShowLoadDiff = true;
+        HasDiffNotice = true;
+        DiffNotice = "This blame is large. Load it only if you need the whole file.";
+    }
+
+    private static List<DiffRow> BlameBody(string path, BlameDocument document)
+    {
+        if (!string.IsNullOrEmpty(document.Error))
+            return [new DiffLineRow { Text = document.Error, Background = DiffColors.Clear }];
+        if (document.IsTooLarge)
+            return [new DiffLineRow { Text = "This blame is large.", Background = DiffColors.Clear }];
+        if (document.Lines.Count == 0)
+            return [new DiffLineRow { Text = "This file has no lines.", Background = DiffColors.Clear }];
+
+        var language = DiffSyntax.Language(path);
+        var rows = new List<DiffRow>();
+        foreach (var line in document.Lines)
+        {
+            var who = line.Uncommitted ? "Not committed" : line.Author;
+            var id = line.Sha.Length <= 7 ? line.Sha : line.Sha[..7];
+            var number = line.Number.ToString(CultureInfo.InvariantCulture);
+            var meta = id + "  " + who;
+            var count = LineFold.Count(line.Text);
+            for (var index = 0; index < count; index++)
+            {
+                rows.Add(new BlameRow
+                {
+                    Number = index == 0 ? number : "",
+                    Meta = index == 0 ? meta : "",
+                    Text = LineFold.Piece(line.Text, index) ?? "",
+                    Continues = index > 0,
+                    Language = language,
+                });
+            }
+        }
+
+        return rows;
+    }
+
+    private void InsertBlameLoading(DiffSection section)
+    {
+        if (section.Body.Count > 0)
+            return;
+        var line = new BlameRow { Number = "", Meta = "", Text = "Loading…", Language = null };
+        section.Body.Add(line);
+        if (!section.Header.Expanded)
+            return;
+        var index = DiffRows.IndexOf(section.Header);
+        if (index >= 0)
+            DiffRows.Insert(index + 1, line);
+    }
+
+    private void ReplaceBlameBody(DiffSection section, IReadOnlyList<DiffRow> rows)
+    {
+        var old = section.Body.Count;
+        var index = section.Header.Expanded ? DiffRows.IndexOf(section.Header) : -1;
+        section.Body.Clear();
+        section.Body.AddRange(rows);
+        if (index < 0)
+            return;
+        for (var i = 0; i < old && index + 1 < DiffRows.Count; i++)
+            DiffRows.RemoveAt(index + 1);
+        for (var i = 0; i < section.Body.Count; i++)
+            DiffRows.Insert(index + 1 + i, section.Body[i]);
     }
 }

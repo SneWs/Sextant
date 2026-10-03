@@ -42,13 +42,17 @@ public partial class RepositoryViewModel : ViewModelBase
     private string? _jumpPath;
     private string? _jumpOriginal;
     private readonly List<DiffSection> _sections = [];
+    private readonly Queue<DiffSection> _blameQueue = [];
+    private bool _blamePump;
+    private int _blameGeneration;
+    private string? _blameRevision;
     // A loaded changelist starts collapsed. Exceptions are the files the user opened, or closed after Expand all.
     private readonly HashSet<string> _foldExceptions = new(StringComparer.Ordinal);
     private bool _foldsOpen;
     private string? _foldScope;
     private List<DiffRow>? _rowSink;
 
-    public bool ShowSectionFolds => AllFiles && ShowingDiff && _sections.Count > 0;
+    public bool ShowSectionFolds => AllFiles && !ShowingMerge && _sections.Count > 0;
 
     /// <summary>The all-files diff should move this file's header to the top of the diff.</summary>
     public event Action<string, string?>? JumpToFile;
@@ -534,7 +538,7 @@ public partial class RepositoryViewModel : ViewModelBase
         if (TryRevealOpenFile(value))
             return;
         _allowLarge = false;
-        if (AllFiles && !ShowingBlame && value is not null)
+        if (AllFiles && value is not null)
         {
             _armJump = true;
             _jumpPath = value.Path;
@@ -553,7 +557,7 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private bool TryRevealOpenFile(FileRowViewModel? value)
     {
-        if (!AllFiles || ShowingBlame || !_diffReady || !_allFilesShown || value is not { IsHeader: false } file)
+        if (!AllFiles || !_diffReady || !_allFilesShown || value is not { IsHeader: false } file)
             return false;
         if (!SameOpenDiff(file))
             return false;
@@ -566,6 +570,8 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private bool SameOpenDiff(FileRowViewModel file)
     {
+        if (ShowingBlame)
+            return true;
         var range = _rangeOlder is not null && _rangeNewer is not null;
         var workingCopy = !range && (SelectedGraphRow is null || SelectedGraphRow.IsWorkingCopy);
         return !workingCopy || file.FromStagedList == _viewingStaged;
@@ -1758,8 +1764,7 @@ public partial class RepositoryViewModel : ViewModelBase
         _armJump = false;
         if (ShowingBlame)
         {
-            _allFilesShown = false;
-            await LoadBlameAsync();
+            await LoadBlameAsync(armJump, jumpPath, jumpOriginal);
             return;
         }
 
@@ -1880,7 +1885,6 @@ public partial class RepositoryViewModel : ViewModelBase
         MergeRegions.Reset(rows);
         _mergePath = file.Path;
         DiffRows.Clear();
-        BlameRows.Clear();
         _rawPatch = null;
         ShowLoadDiff = false;
         HasDiffNotice = false;
@@ -1904,7 +1908,6 @@ public partial class RepositoryViewModel : ViewModelBase
         ClearMerge();
         ClearPreview();
         DiffRows.Clear();
-        BlameRows.Clear();
         _rawPatch = document.RawPatch;
         NoteLfs(document, !AllFiles);
         ShowLoadDiff = document.IsTooLarge;
@@ -2203,6 +2206,8 @@ public partial class RepositoryViewModel : ViewModelBase
         }
 
         ApplyImageFolds();
+        if (expanded)
+            RequestBlame(section);
     }
 
     private void ToggleFileSection(string path)
@@ -2249,6 +2254,10 @@ public partial class RepositoryViewModel : ViewModelBase
             section.Header.Expanded = true;
         PublishSections();
         ApplyImageFolds();
+        if (!ShowingBlame)
+            return;
+        foreach (var section in _sections)
+            RequestBlame(section, showLoading: false);
     }
 
     [RelayCommand]
@@ -2372,8 +2381,8 @@ public partial class RepositoryViewModel : ViewModelBase
         ClearSections();
         ClearMerge();
         ClearPreview();
+        ResetBlameQueue();
         DiffRows.Clear();
-        BlameRows.Clear();
         _rawPatch = null;
         ShowLoadDiff = false;
         DiffNotice = notice;
@@ -2653,5 +2662,9 @@ public partial class RepositoryViewModel : ViewModelBase
         public DiffFileRow Header { get; }
 
         public List<DiffRow> Body { get; } = [];
+
+        public bool BlamePending { get; set; }
+
+        public bool BlameReady { get; set; }
     }
 }

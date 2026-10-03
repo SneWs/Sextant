@@ -247,19 +247,43 @@ public sealed partial class RepositorySession : IAsyncDisposable
         var token = _diffGate.Next();
         return RunAsync(async ct =>
         {
-            var document = await _scheduler.ReadAsync(async inner =>
-            {
-                var output = await ExecuteAsync(GitCommands.Blame(_toplevel, revision, path), null, inner).ConfigureAwait(false);
-                Checked(output);
-                if (!allowLarge && output.Stdout.Length > HistoryLimits.MaxDiffBytes)
-                    return BlameDocument.TooLarge;
-                var lines = BlameParser.Parse(_encoding.GetString(output.Stdout));
-                if (!allowLarge && lines.Count > HistoryLimits.MaxDiffLines)
-                    return BlameDocument.TooLarge;
-                return new BlameDocument(false, lines);
-            }, ct).ConfigureAwait(false);
+            var document = await _scheduler.ReadAsync(
+                inner => LoadBlameAsync(revision, path, allowLarge, throwOnFailure: true, inner),
+                ct).ConfigureAwait(false);
             return _diffGate.IsCurrent(token) ? document : null;
         }, cancellationToken);
+    }
+
+    /// <summary>Blame one file without cancelling another file's blame. A refusal is <see cref="BlameDocument.Error"/>.</summary>
+    public Task<BlameDocument> ReadBlameAsync(string? revision, string path, bool allowLarge, CancellationToken cancellationToken) =>
+        RunAsync(
+            ct => _scheduler.ReadAsync(
+                inner => LoadBlameAsync(revision, path, allowLarge, throwOnFailure: false, inner),
+                ct),
+            cancellationToken);
+
+    private async Task<BlameDocument> LoadBlameAsync(
+        string? revision,
+        string path,
+        bool allowLarge,
+        bool throwOnFailure,
+        CancellationToken cancellationToken)
+    {
+        var output = await ExecuteAsync(GitCommands.Blame(_toplevel, revision, path), null, cancellationToken).ConfigureAwait(false);
+        Track(output);
+        if (output.ExitCode != 0)
+        {
+            if (throwOnFailure)
+                throw new GitCommandFailedException(output);
+            return new BlameDocument(false, [], BlameParser.Notice(output.StandardError));
+        }
+
+        if (!allowLarge && output.Stdout.Length > HistoryLimits.MaxDiffBytes)
+            return BlameDocument.TooLarge;
+        var lines = BlameParser.Parse(_encoding.GetString(output.Stdout));
+        if (!allowLarge && lines.Count > HistoryLimits.MaxDiffLines)
+            return BlameDocument.TooLarge;
+        return new BlameDocument(false, lines);
     }
 
     public Task<ConflictDocument?> ConflictAsync(string path, bool allowLarge, CancellationToken cancellationToken)

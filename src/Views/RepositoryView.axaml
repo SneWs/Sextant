@@ -292,7 +292,7 @@
                         <TextBlock Grid.Column="4" Text="Theirs" FontWeight="SemiBold" Opacity="0.75"/>
                     </Grid>
                     <Grid RowDefinitions="*,Auto">
-                        <views:CopyListBox x:Name="DiffList" ItemsSource="{Binding DiffRows}" Background="Transparent" IsVisible="{Binding ShowingDiff}"
+                        <views:CopyListBox x:Name="DiffList" ItemsSource="{Binding DiffRows}" Background="Transparent" IsVisible="{Binding ShowingRows}"
                                            ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                             <views:CopyListBox.Styles>
                                 <Style Selector="ListBoxItem">
@@ -411,23 +411,14 @@
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
-                            </views:CopyListBox.DataTemplates>
-                        </views:CopyListBox>
-                        <views:CopyListBox ItemsSource="{Binding BlameRows}" Background="Transparent" IsVisible="{Binding ShowingBlame}">
-                            <views:CopyListBox.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <VirtualizingStackPanel/>
-                                </ItemsPanelTemplate>
-                            </views:CopyListBox.ItemsPanel>
-                            <views:CopyListBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:BlameRow">
+                                <DataTemplate DataType="vm:BlameRow" x:DataType="vm:BlameRow">
                                     <Grid ColumnDefinitions="48,180,*">
                                         <views:CopyableText Classes="diff" CopyKey="number" Text="{Binding Number}" Opacity="0.55"/>
                                         <views:CopyableText Grid.Column="1" Classes="diff" CopyKey="meta" Text="{Binding Meta}" Opacity="0.75" TextTrimming="CharacterEllipsis" Margin="0,0,8,0"/>
-                                        <views:CopyableText Grid.Column="2" Classes="diff" CopyKey="blame" Text="{Binding Text}"/>
+                                        <views:HighlightedText Grid.Column="2" Classes="diff" CopyKey="blame" Source="{Binding Text}" Language="{Binding Language}"/>
                                     </Grid>
                                 </DataTemplate>
-                            </views:CopyListBox.ItemTemplate>
+                            </views:CopyListBox.DataTemplates>
                         </views:CopyListBox>
                         <views:CopyListBox ItemsSource="{Binding MergeRegions}" Background="Transparent" IsVisible="{Binding ShowingMerge}">
                             <views:CopyListBox.ItemTemplate>
