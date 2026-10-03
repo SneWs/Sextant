@@ -23,6 +23,30 @@ public class Phase2Tests
         Assert.True(sha.ShaLookup);
         Assert.Equal("abc1234", sha.Revision);
         Assert.True(HistoryQueryParser.Parse("   ").IsEmpty);
+
+        var fbx = HistoryQueryParser.Parse("file:*.fbx");
+        Assert.Equal("*.fbx", fbx.Path);
+        Assert.True(fbx.FilePattern);
+        Assert.Equal(":(glob,icase)**/*.fbx", fbx.LogPath);
+        Assert.Equal("file:*.fbx", fbx.Describe());
+
+        Assert.Equal(":(glob,icase)**/CodeFile*Asset.cs", HistoryQueryParser.Parse("file:CodeFile*Asset.cs").LogPath);
+        Assert.Equal(":(glob,icase)**/SomeFile.md", HistoryQueryParser.Parse("file:SomeFile.md").LogPath);
+        Assert.Equal(":(icase)docs/SomeFile.md", HistoryQueryParser.Parse("file:docs/SomeFile.md").LogPath);
+        Assert.Equal(":(glob,icase)Assets/Models/*.fbx", HistoryQueryParser.Parse("file:Assets\\Models\\*.fbx").LogPath);
+        Assert.Equal("My File.md", HistoryQueryParser.Parse("file:\"My File.md\"").Path);
+
+        var mixed = HistoryQueryParser.Parse("branch:main file:*.fbx author:Ada fix");
+        Assert.Equal("main", mixed.Revision);
+        Assert.Equal("Ada", mixed.Author);
+        Assert.Equal("fix", mixed.Grep);
+        Assert.Equal("*.fbx", mixed.Path);
+        Assert.False(mixed.MatchSubjectOrAuthor);
+
+        var history = HistoryQuery.ForPath("a.txt");
+        Assert.False(history.FilePattern);
+        Assert.Equal("a.txt", history.LogPath);
+        Assert.Equal("File a.txt", history.Describe());
     }
 
     [Fact]
@@ -140,6 +164,41 @@ public class Phase2Tests
         Assert.Contains(state.Commits, row => row.Commit.Subject == "touch a");
         Assert.Contains(state.Commits, row => row.Commit.Subject == "touch a again");
         Assert.Equal("File a.txt", state.HistoryLabel);
+    }
+
+    [Fact]
+    public async Task File_pattern_limits_history_to_matching_paths()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("Assets/Models/hero.fbx", "mesh\n");
+        repo.CommitAll("hero");
+        repo.WriteFile("src/Code/CodeFilePlayerAsset.cs", "player\n");
+        repo.CommitAll("player");
+        repo.WriteFile("src/Code/Other.cs", "other\n");
+        repo.CommitAll("other");
+        repo.WriteFile("docs/SomeFile.md", "notes\n");
+        repo.CommitAll("notes");
+        repo.WriteFile("docs/SomeFile.md.bak", "bak\n");
+        repo.CommitAll("decoy");
+        repo.WriteFile("readme.txt", "read\n");
+        repo.CommitAll("readme");
+
+        await using var session = await Open(repo);
+
+        async Task<string[]> Subjects(string text)
+        {
+            await session.SetHistoryAsync(HistoryQueryParser.Parse(text), CancellationToken.None);
+            return session.Snapshot().Commits.Select(row => row.Commit.Subject).ToArray();
+        }
+
+        Assert.Equal(["hero"], await Subjects("file:*.fbx"));
+        Assert.Equal("file:*.fbx", session.Snapshot().HistoryLabel);
+        Assert.Equal(["hero"], await Subjects("file:*.FBX"));
+        Assert.Equal(["player"], await Subjects("file:CodeFile*Asset.cs"));
+        Assert.Equal(["notes"], await Subjects("file:SomeFile.md"));
+        Assert.Equal(["notes"], await Subjects("file:somefile.md"));
+        Assert.Equal(["notes"], await Subjects("file:docs/SomeFile.md"));
+        Assert.Equal(["notes"], await Subjects("file:docs/*.md"));
     }
 
     [Fact]

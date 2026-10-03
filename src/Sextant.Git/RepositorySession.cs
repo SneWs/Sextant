@@ -982,6 +982,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
             includeStash = _includeStash && query?.Revision is null && query?.ShaLookup != true;
         }
 
+        var path = query?.LogPath;
         return await _scheduler.ReadAsync(async token =>
         {
             if (query is { ShaLookup: true, Revision: { } revision })
@@ -995,15 +996,15 @@ public sealed partial class RepositorySession : IAsyncDisposable
 
                 var sha = _encoding.GetString(resolved.Stdout).Trim();
                 Track(resolved);
-                var found = await ReadLogAsync(token, 0, 1, includeHead: false, includeStash: false, sha, null, null, query.Path).ConfigureAwait(false);
+                var found = await ReadLogAsync(token, 0, 1, includeHead: false, includeStash: false, sha, null, null, path).ConfigureAwait(false);
                 return new LogLoad(found.Commits, true);
             }
 
             if (query is { MatchSubjectOrAuthor: true })
             {
                 var take = skip + count;
-                var bySubject = await ReadLogAsync(token, 0, take, query.Revision is null, includeStash, query.Revision, query.Grep, null, query.Path).ConfigureAwait(false);
-                var byAuthor = await ReadLogAsync(token, 0, take, query.Revision is null, includeStash, query.Revision, null, query.Author, query.Path).ConfigureAwait(false);
+                var bySubject = await ReadLogAsync(token, 0, take, query.Revision is null, includeStash, query.Revision, query.Grep, null, path).ConfigureAwait(false);
+                var byAuthor = await ReadLogAsync(token, 0, take, query.Revision is null, includeStash, query.Revision, null, query.Author, path).ConfigureAwait(false);
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var merged = new List<CommitRecord>();
                 foreach (var commit in bySubject.Commits.Concat(byAuthor.Commits).OrderByDescending(commit => commit.AuthorUnixSeconds))
@@ -1027,7 +1028,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
                 query?.Revision,
                 query is { MatchSubjectOrAuthor: false } ? query.Grep : null,
                 query is { MatchSubjectOrAuthor: false } ? query.Author : null,
-                query?.Path).ConfigureAwait(false);
+                path).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
     }
 

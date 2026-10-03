@@ -22,7 +22,7 @@ Status, history, and the file list ask git for a slice and paint what is on scre
 ## The daily loop
 
 - Open, clone, or init. Each repository is a tab, and open tabs come back the next time you launch.
-- Branches, remotes, tags, and stashes live in one tree. The graph is the history. Search by subject, author, sha, or `branch:name`.
+- Branches, remotes, tags, and stashes live in one tree. The graph is the history. Search by subject, author, sha, `branch:name`, or `file:*.cs`.
 - Stage files, hunks, and lines. Commit, or commit without hooks.
 - Fetch, pull with rebase, and push. Push can skip the pre-push hook for that one push.
 - Blame, file history, and a diff you can read side by side.
@@ -94,7 +94,7 @@ Checked items are in the app. The rest are still ahead. [PLAN.md](PLAN.md) is th
 
 ### History and local repair
 
-- [x] Search history by subject, author, a pasted sha, or `branch:name`.
+- [x] Search history by subject, author, a pasted sha, `branch:name`, or `file:*.cs`.
 - [x] File history from a path in the file list.
 - [x] Blame for the selected file at the selected commit.
 - [x] Stash: list, push, pop, apply, and drop.
