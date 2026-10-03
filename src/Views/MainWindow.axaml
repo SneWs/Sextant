@@ -23,6 +23,11 @@
                     <NativeMenuItem Header="_Init repository…" Command="{Binding InitCommand}"/>
                 </NativeMenu>
             </NativeMenuItem>
+            <NativeMenuItem Header="_View" IsEnabled="{Binding HasActiveTab}">
+                <NativeMenu>
+                    <NativeMenuItem Header="Toggle _branch view" Command="{Binding ToggleBranchViewCommand}"/>
+                </NativeMenu>
+            </NativeMenuItem>
             <NativeMenuItem Header="_Settings" IsVisible="{Binding ShowWindowSettingsMenu}">
                 <NativeMenu>
                     <NativeMenuItem Header="_Settings…" Command="{Binding OpenSettingsCommand}"/>

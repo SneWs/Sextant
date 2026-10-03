@@ -275,6 +275,7 @@ public class CoreTests
             Assert.Equal(220, migrated.LocationsWidth);
             Assert.Equal(520, migrated.GraphWidth);
             Assert.Equal(180, migrated.FilesHeight);
+            Assert.True(migrated.ShowLocations);
         }
         finally
         {
@@ -300,8 +301,9 @@ public class CoreTests
             Assert.Equal(200, untouched.LocationsWidth);
             Assert.Equal(480, untouched.GraphWidth);
             Assert.Equal(160, untouched.FilesHeight);
+            Assert.True(untouched.ShowLocations);
 
-            RepoLayouts.Remember(state, @"C:\repos\sextant", 310, 430, 190);
+            RepoLayouts.Remember(state, @"C:\repos\sextant", 310, 430, 190, showLocations: false);
             RepoLayouts.Remember(state, @"C:\repos\other", 180, 640, 220);
             store.SaveWorkspace(state);
             var loaded = store.LoadWorkspace();
@@ -311,12 +313,26 @@ public class CoreTests
             Assert.Equal(310, sextant.LocationsWidth);
             Assert.Equal(430, sextant.GraphWidth);
             Assert.Equal(190, sextant.FilesHeight);
+            Assert.False(sextant.ShowLocations);
             Assert.Equal(180, other.LocationsWidth);
+            Assert.True(other.ShowLocations);
             Assert.Equal(640, other.GraphWidth);
             Assert.Equal(220, other.FilesHeight);
             Assert.Equal(200, third.LocationsWidth);
             Assert.Equal(480, third.GraphWidth);
             Assert.Equal(160, third.FilesHeight);
+            Assert.True(third.ShowLocations);
+
+            File.WriteAllText(Path.Combine(directory, "workspace.json"), """
+                {
+                  "repoLayouts": {
+                    "C:\\repos\\old": { "locationsWidth": 250, "graphWidth": 400, "filesHeight": 100 }
+                  }
+                }
+                """);
+            var older = RepoLayouts.Resolve(store.LoadWorkspace(), @"C:\repos\old");
+            Assert.Equal(250, older.LocationsWidth);
+            Assert.True(older.ShowLocations);
             if (OperatingSystem.IsWindows())
                 Assert.Equal(310, RepoLayouts.Resolve(loaded, @"c:\repos\sextant").LocationsWidth);
         }

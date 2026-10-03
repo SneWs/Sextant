@@ -310,7 +310,7 @@ public partial class RepositoryView : UserControl
             ApplyCommandLog(vm.CommandLog);
         else if (e.PropertyName == nameof(RepositoryViewModel.CommandsOpen) && vm.CommandsOpen)
             Dispatcher.UIThread.Post(ScrollCommandLogToEnd, DispatcherPriority.Loaded);
-        else if (_widthsApplied && e.PropertyName is nameof(RepositoryViewModel.LocationsWidth) or nameof(RepositoryViewModel.GraphWidth) or nameof(RepositoryViewModel.FilesHeight))
+        else if (_widthsApplied && e.PropertyName is nameof(RepositoryViewModel.LocationsWidth) or nameof(RepositoryViewModel.GraphWidth) or nameof(RepositoryViewModel.FilesHeight) or nameof(RepositoryViewModel.ShowLocations))
             ApplyWidths(vm);
         else if (e.PropertyName is nameof(RepositoryViewModel.SideBySide) or nameof(RepositoryViewModel.ShowingDiff))
             QueueSideScroll();
@@ -458,6 +458,8 @@ public partial class RepositoryView : UserControl
 
     private ColumnDefinition LocationsColumn => Columns.ColumnDefinitions[0];
 
+    private ColumnDefinition LocationsSplitter => Columns.ColumnDefinitions[1];
+
     private ColumnDefinition GraphColumn => Columns.ColumnDefinitions[2];
 
     private RowDefinition FilesRow => Details.RowDefinitions[2];
@@ -496,8 +498,20 @@ public partial class RepositoryView : UserControl
         _applyingWidths = true;
         try
         {
-            if (vm.LocationsWidth >= 140)
-                LocationsColumn.Width = new GridLength(vm.LocationsWidth);
+            if (vm.ShowLocations)
+            {
+                LocationsColumn.MinWidth = 140;
+                if (vm.LocationsWidth >= 140)
+                    LocationsColumn.Width = new GridLength(vm.LocationsWidth);
+                LocationsSplitter.Width = new GridLength(4);
+            }
+            else
+            {
+                LocationsColumn.MinWidth = 0;
+                LocationsColumn.Width = new GridLength(0);
+                LocationsSplitter.Width = new GridLength(0);
+            }
+
             if (vm.GraphWidth >= 240)
                 GraphColumn.Width = new GridLength(vm.GraphWidth);
             if (vm.FilesHeight >= 80)

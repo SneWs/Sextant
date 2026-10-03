@@ -35,6 +35,9 @@ public sealed class RepoLayout
     public double GraphWidth { get; set; } = 520;
 
     public double FilesHeight { get; set; } = 180;
+
+    /// <summary>False hides the locations column. Missing values in older files stay visible.</summary>
+    public bool ShowLocations { get; set; } = true;
 }
 
 public static class RepoLayouts
@@ -58,13 +61,14 @@ public static class RepoLayouts
                 LocationsWidth = pair.Value.LocationsWidth,
                 GraphWidth = pair.Value.GraphWidth,
                 FilesHeight = pair.Value.FilesHeight,
+                ShowLocations = pair.Value.ShowLocations,
             };
         }
 
         return null;
     }
 
-    public static void Remember(WorkspaceState state, string path, double locations, double graph, double files)
+    public static void Remember(WorkspaceState state, string path, double locations, double graph, double files, bool showLocations = true)
     {
         var match = FindKey(state, path);
         if (match is not null && !string.Equals(match, path, StringComparison.Ordinal))
@@ -74,6 +78,7 @@ public static class RepoLayouts
             LocationsWidth = locations,
             GraphWidth = graph,
             FilesHeight = files,
+            ShowLocations = showLocations,
         };
     }
 

@@ -167,6 +167,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
                 tab.LocationsWidth = saved.LocationsWidth;
                 tab.GraphWidth = saved.GraphWidth;
                 tab.FilesHeight = saved.FilesHeight;
+                tab.ShowLocations = saved.ShowLocations;
             }
         }
 
@@ -184,7 +185,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             var path = tab.Toplevel ?? tab.RequestedPath;
             if (string.IsNullOrWhiteSpace(path))
                 continue;
-            RepoLayouts.Remember(_workspace, path, tab.LocationsWidth, tab.GraphWidth, tab.FilesHeight);
+            RepoLayouts.Remember(_workspace, path, tab.LocationsWidth, tab.GraphWidth, tab.FilesHeight, tab.ShowLocations);
             if (tab.Toplevel is { Length: > 0 } top && !RepoPath.Same(tab.RequestedPath, top))
                 RepoLayouts.Forget(_workspace, tab.RequestedPath);
         }
@@ -245,6 +246,9 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
     private void ToggleHistorySearch() => ActiveTab?.ToggleHistorySearchCommand.Execute(null);
+
+    [RelayCommand(CanExecute = nameof(HasActiveTab))]
+    private void ToggleBranchView() => ActiveTab?.ToggleLocationsCommand.Execute(null);
 
     [RelayCommand]
     public Task LocateGit() => LocateGitAsync();
@@ -360,6 +364,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         AddWorktreeCommand.NotifyCanExecuteChanged();
         ToggleCommandsCommand.NotifyCanExecuteChanged();
         ToggleHistorySearchCommand.NotifyCanExecuteChanged();
+        ToggleBranchViewCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnPaletteQueryChanged(string value) => FilterPalette();
@@ -629,6 +634,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         tab.LocationsWidth = layout.LocationsWidth;
         tab.GraphWidth = layout.GraphWidth;
         tab.FilesHeight = layout.FilesHeight;
+        tab.ShowLocations = layout.ShowLocations;
         tab.SideBySide = _settings.SideBySide;
         tab.IgnoreWhitespace = _settings.IgnoreWhitespace;
         return tab;
@@ -678,6 +684,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _palette.Add(new PaletteItem { Title = "Stash", Run = () => tab.StashCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Add remote", Run = () => tab.AddRemoteCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Add worktree", Run = () => tab.AddWorktreeCommand.ExecuteAsync(null) });
+            _palette.Add(new PaletteItem { Title = "Toggle branch view", Run = () => { tab.ToggleLocationsCommand.Execute(null); return Task.CompletedTask; } });
             _palette.Add(new PaletteItem { Title = "Toggle side-by-side diff", Run = ToggleSavedSideBySide });
             _palette.Add(new PaletteItem { Title = "Toggle ignore whitespace", Run = ToggleSavedWhitespace });
             _palette.Add(new PaletteItem { Title = "Toggle all files", Run = () => tab.ToggleAllFilesCommand.ExecuteAsync(null) });

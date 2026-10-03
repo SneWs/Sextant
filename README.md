@@ -80,6 +80,7 @@ Checked items are in the app. The rest are still ahead. [PLAN.md](PLAN.md) is th
 - [x] Fetch and push follow your git config, including `fetch.prune`, and do not force a prune.
 - [x] Continue, Abort, and Cancel sit on the toolbar while they apply.
 - [x] Branch, Stash, Add remote, and Command log are in the Repository menu.
+- [x] View → Toggle branch view hides and shows the branches, remotes, tags, and stashes column. The same command is in the command palette.
 - [x] History search stays hidden until Repository → Search or Ctrl/Cmd+F.
 - [x] Command palette on Ctrl/Cmd+P, plus Open, next tab, close tab, and Refresh.
 - [x] The running command, a failure banner you can copy, and a full-width command log with secrets stripped out.

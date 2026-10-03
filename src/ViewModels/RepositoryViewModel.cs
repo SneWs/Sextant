@@ -116,6 +116,18 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public void NotePaneEdit() => PanesEdited = true;
 
+    /// <summary>The locations column: branches, remotes, tags, and stashes.</summary>
+    [ObservableProperty]
+    public partial bool ShowLocations { get; set; } = true;
+
+    [RelayCommand]
+    private void ToggleLocations()
+    {
+        ShowLocations = !ShowLocations;
+        NotePaneEdit();
+        _host.Save();
+    }
+
     public ObservableCollection<GraphRowViewModel> Rows { get; } = [];
 
     public ResetCollection<LocationItem> Locations { get; } = [];

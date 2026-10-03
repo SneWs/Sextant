@@ -119,7 +119,7 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <ListBox Grid.Column="0" ItemsSource="{Binding Locations}" SelectedItem="{Binding SelectedLocation}"
+            <ListBox Grid.Column="0" IsVisible="{Binding ShowLocations}" ItemsSource="{Binding Locations}" SelectedItem="{Binding SelectedLocation}"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      DoubleTapped="OnLocationDoubleTapped">
                 <ListBox.ItemsPanel>
@@ -171,7 +171,7 @@
                 </ListBox.ItemTemplate>
             </ListBox>
 
-            <GridSplitter Grid.Column="1" ResizeDirection="Columns"/>
+            <GridSplitter Grid.Column="1" ResizeDirection="Columns" IsVisible="{Binding ShowLocations}"/>
 
             <DockPanel Grid.Column="2">
                 <StackPanel DockPanel.Dock="Top" Margin="0,0,0,4" Spacing="4" IsVisible="{Binding ShowHistoryChrome}">
