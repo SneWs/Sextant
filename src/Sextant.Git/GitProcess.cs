@@ -108,6 +108,7 @@ public sealed class GitProcessRunner
         var merged = new List<string>();
         void Add(string directory)
         {
+            directory = ToDirectorySeparator(directory);
             if (directory.Length == 0 || !seen.Add(directory))
                 return;
             merged.Add(directory);
@@ -122,6 +123,19 @@ public sealed class GitProcessRunner
         }
 
         return string.Join(Path.PathSeparator, merged);
+    }
+
+    /// <summary>
+    /// PATH entries are compared as text. A rooted directory is stored with
+    /// <see cref="Path.DirectorySeparatorChar"/> so <c>/</c> and <c>\</c> name the same entry.
+    /// </summary>
+    internal static string ToDirectorySeparator(string directory)
+    {
+        var separator = Path.DirectorySeparatorChar;
+        var alternate = Path.AltDirectorySeparatorChar;
+        if (separator == alternate || directory.IndexOf(alternate) < 0)
+            return directory;
+        return directory.Replace(alternate, separator);
     }
 
     private static void TryKill(Process process)

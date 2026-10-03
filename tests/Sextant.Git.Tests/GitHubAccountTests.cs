@@ -48,11 +48,21 @@ public class ToolPathTests
     public void Git_directory_is_first_and_is_not_repeated()
     {
         var separator = Path.PathSeparator;
-        var path = GitProcessRunner.ToolPath("/usr/bin" + separator + "/bin", "/opt/custom/bin/git");
-        Assert.StartsWith("/opt/custom/bin" + separator, path);
+        var gitDirectory = Rooted("opt", "custom", "bin");
+        var usrBin = Rooted("usr", "bin");
+        var bin = Rooted("bin");
+        var executable = Path.Combine(gitDirectory, "git");
 
-        var again = GitProcessRunner.ToolPath("/opt/custom/bin" + separator + "/usr/bin", "/opt/custom/bin/git");
-        Assert.Equal(1, again.Split(separator).Count(entry => entry == "/opt/custom/bin"));
-        Assert.Contains("/usr/bin", again.Split(separator));
+        var path = GitProcessRunner.ToolPath(string.Join(separator, usrBin, bin), executable);
+        Assert.StartsWith(gitDirectory + separator, path);
+
+        var alternate = gitDirectory.Replace(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var again = GitProcessRunner.ToolPath(string.Join(separator, alternate, usrBin), executable);
+        var entries = again.Split(separator);
+        Assert.Equal(1, entries.Count(entry => entry == gitDirectory));
+        Assert.Contains(usrBin, entries);
     }
+
+    private static string Rooted(params string[] parts) =>
+        Path.DirectorySeparatorChar + Path.Combine(parts);
 }
