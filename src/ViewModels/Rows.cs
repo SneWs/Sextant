@@ -213,6 +213,12 @@ public partial class FileRowViewModel : ObservableObject
 
 public abstract class DiffRow;
 
+/// <summary>An image or FBX preview in the diff, in the same list and file order as the text.</summary>
+public sealed class DiffImageRow : DiffRow
+{
+    public required ImageCompareRow Image { get; init; }
+}
+
 public sealed class DiffHunkRow : DiffRow
 {
     public required string Header { get; init; }

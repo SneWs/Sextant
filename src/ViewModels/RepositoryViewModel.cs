@@ -1988,6 +1988,9 @@ public partial class RepositoryViewModel : ViewModelBase
         {
             if (notes is not null && notes.Any(note => note.Path == (path ?? "")))
                 return;
+            // The preview is a row in this file, in order with the text around it.
+            if (PreviewPath(path))
+                return;
             NoteFile(notice, "Binary file.");
             return;
         }

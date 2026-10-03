@@ -25,11 +25,9 @@ public partial class RepositoryView : UserControl
     private bool _scrollHooked;
     private RepositoryViewModel? _scrollVm;
     private RepositoryViewModel? _watched;
-    private ResetCollection<ImageCompareRow>? _images;
     private ObservableCollection<DiffRow>? _diffRows;
     private string? _jumpPath;
     private string? _jumpOriginal;
-    private bool _followImages;
     private string _appliedCommandLog = "";
     private bool _sideScrollHooked;
     private bool _sideScrollQueued;
@@ -100,8 +98,6 @@ public partial class RepositoryView : UserControl
             return;
         _watched.PropertyChanged += OnViewModelPropertyChanged;
         _watched.JumpToFile += OnJumpToFile;
-        _images = _watched.ImageCompares;
-        _images.CollectionChanged += OnImagesChanged;
         _diffRows = _watched.DiffRows;
         _diffRows.CollectionChanged += OnDiffRowsChanged;
         ApplyCommandLog(_watched.CommandLog);
@@ -116,12 +112,6 @@ public partial class RepositoryView : UserControl
             _watched.PropertyChanged -= OnViewModelPropertyChanged;
             _watched.JumpToFile -= OnJumpToFile;
             _watched = null;
-        }
-
-        if (_images is not null)
-        {
-            _images.CollectionChanged -= OnImagesChanged;
-            _images = null;
         }
 
         if (_diffRows is not null)
@@ -140,7 +130,6 @@ public partial class RepositoryView : UserControl
         ICommand? command = border.DataContext switch
         {
             DiffFileRow { CanFold: true } row => row.ToggleCommand,
-            ImageCompareRow image => image.ToggleCommand,
             _ => null,
         };
         if (command is null || !command.CanExecute(null))
@@ -167,22 +156,11 @@ public partial class RepositoryView : UserControl
     {
         _jumpPath = path;
         _jumpOriginal = original;
-        _followImages = true;
         ScrollDiffTo(path, original);
-        ScrollImageTo(path, original);
-    }
-
-    private void OnImagesChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        if (!_followImages || _jumpPath is not { } path)
-            return;
-        var original = _jumpOriginal;
-        Dispatcher.UIThread.Post(() => ScrollImageTo(path, original), DispatcherPriority.Loaded);
     }
 
     private void OnDiffRowsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        _followImages = false;
         if (e.Action == NotifyCollectionChangedAction.Reset)
             _resetSideScroll = true;
         QueueSideScroll();
@@ -226,39 +204,6 @@ public partial class RepositoryView : UserControl
         }
 
         return null;
-    }
-
-    private void ScrollImageTo(string path, string? original, int pass = 0)
-    {
-        if (!_followImages || !string.Equals(_jumpPath, path, StringComparison.Ordinal))
-            return;
-        if (DataContext is not RepositoryViewModel vm)
-            return;
-        var index = -1;
-        for (var i = 0; i < vm.ImageCompares.Count; i++)
-        {
-            if (MatchesFile(vm.ImageCompares[i].Path, path, original))
-            {
-                index = i;
-                break;
-            }
-        }
-
-        if (index < 0)
-            return;
-        if (ImageRows.ContainerFromIndex(index) is not Control container)
-        {
-            if (pass < 8)
-                Dispatcher.UIThread.Post(() => ScrollImageTo(path, original, pass + 1), DispatcherPriority.Loaded);
-            return;
-        }
-
-        var point = container.TranslatePoint(default, ImageStrip);
-        if (point is null)
-            return;
-        var y = Math.Max(0, ImageStrip.Offset.Y + point.Value.Y);
-        if (Math.Abs(ImageStrip.Offset.Y - y) > 0.5)
-            ImageStrip.Offset = new Vector(ImageStrip.Offset.X, y);
     }
 
     private static bool MatchesFile(string candidate, string path, string? original) =>
@@ -796,7 +741,7 @@ public partial class RepositoryView : UserControl
         menu.DataContext = target.DataContext;
         if (target.DataContext is LocationItem item && !HasLocationMenu(item))
             e.Cancel = true;
-        if (target.DataContext is DiffFileRow { FileMenu: null } || target.DataContext is ImageCompareRow { FileMenu: null })
+        if (target.DataContext is DiffFileRow { FileMenu: null })
             e.Cancel = true;
     }
 }

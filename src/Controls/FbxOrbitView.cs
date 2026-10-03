@@ -19,6 +19,13 @@ public sealed class FbxOrbitView : Control
     public static readonly StyledProperty<FbxPreview.Orbit?> OrbitProperty =
         AvaloniaProperty.Register<FbxOrbitView, FbxPreview.Orbit?>(nameof(Orbit));
 
+    static FbxOrbitView()
+    {
+        // A picture that arrives after the first measure has to grow the row. Orbit frames
+        // stay the same pixel size, so turning the model does not measure again.
+        AffectsMeasure<FbxOrbitView>(SourceProperty);
+    }
+
     private Bitmap? _frame;
     private Point _last;
     private float _yaw = FbxPreview.DefaultYaw;

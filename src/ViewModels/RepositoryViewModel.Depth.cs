@@ -370,14 +370,12 @@ public partial class RepositoryViewModel
     {
         if (load != _imageLoad || published)
             return published;
-        var show = new List<ImageCompareRow>();
         foreach (var row in rows)
         {
             if (row.IsLoading || visible.Contains(row))
-                show.Add(row);
+                AttachImageRow(row);
         }
 
-        ReplaceImages(show);
         return true;
     }
 
@@ -447,8 +445,10 @@ public partial class RepositoryViewModel
     private void RemoveImageRow(ImageCompareRow row)
     {
         row.Release();
+        DetachImageRow(row);
         ImageCompares.Remove(row);
         ShowingImages = ImageCompares.Count > 0;
+        NoteMissingPreview(row.Path);
     }
 
     private async Task OnUi(Action action)
@@ -629,11 +629,139 @@ public partial class RepositoryViewModel
 
     private void ReplaceImages(IReadOnlyList<ImageCompareRow> rows)
     {
-        foreach (var old in ImageCompares)
+        foreach (var old in ImageCompares.ToArray())
+        {
+            if (rows.Contains(old))
+                continue;
             old.Release();
-        ImageCompares.Reset(rows);
+            DetachImageRow(old);
+            ImageCompares.Remove(old);
+        }
+
+        foreach (var row in rows)
+            AttachImageRow(row);
         ShowingImages = ImageCompares.Count > 0;
-        ApplyImageFolds();
+    }
+
+    private void AttachImageRow(ImageCompareRow row)
+    {
+        if (!ImageCompares.Contains(row))
+            ImageCompares.Add(row);
+        ShowingImages = true;
+        if (ImageIsAttached(row))
+            return;
+
+        var wrapped = new DiffImageRow { Image = row };
+        if (!AllFiles)
+        {
+            DiffRows.Add(wrapped);
+            return;
+        }
+
+        var section = FindImageSection(row.Path) ?? CreateImageSection(row.Path);
+        section.Body.Insert(0, wrapped);
+        if (!section.Header.Expanded)
+            return;
+        var index = DiffRows.IndexOf(section.Header);
+        if (index >= 0)
+            DiffRows.Insert(index + 1, wrapped);
+        if (HasDiffNotice && DiffNotice == "No textual changes.")
+        {
+            HasDiffNotice = false;
+            DiffNotice = "";
+        }
+    }
+
+    private void DetachImageRow(ImageCompareRow row)
+    {
+        foreach (var section in _sections)
+        {
+            for (var i = section.Body.Count - 1; i >= 0; i--)
+            {
+                if (section.Body[i] is DiffImageRow image && ReferenceEquals(image.Image, row))
+                    section.Body.RemoveAt(i);
+            }
+        }
+
+        for (var i = DiffRows.Count - 1; i >= 0; i--)
+        {
+            if (DiffRows[i] is DiffImageRow image && ReferenceEquals(image.Image, row))
+                DiffRows.RemoveAt(i);
+        }
+    }
+
+    private bool ImageIsAttached(ImageCompareRow row)
+    {
+        foreach (var section in _sections)
+        {
+            foreach (var item in section.Body)
+            {
+                if (item is DiffImageRow image && ReferenceEquals(image.Image, row))
+                    return true;
+            }
+        }
+
+        foreach (var item in DiffRows)
+        {
+            if (item is DiffImageRow image && ReferenceEquals(image.Image, row))
+                return true;
+        }
+
+        return false;
+    }
+
+    private DiffSection? FindImageSection(string path)
+    {
+        foreach (var section in _sections)
+        {
+            if (SectionMatches(section, path, null))
+                return section;
+        }
+
+        return null;
+    }
+
+    private DiffSection CreateImageSection(string path)
+    {
+        var header = new DiffFileRow
+        {
+            Path = path,
+            Label = path,
+            CanFold = true,
+            Expanded = IsFoldOpen(path),
+            FileMenu = FileMenuFor(path),
+        };
+        var section = new DiffSection(path, header);
+        header.ToggleCommand = new RelayCommand(() => SetExpanded(section, !header.Expanded));
+        _sections.Add(section);
+        DiffRows.Add(header);
+        OnPropertyChanged(nameof(ShowSectionFolds));
+        return section;
+    }
+
+    private void NoteMissingPreview(string path)
+    {
+        if (!AllFiles)
+        {
+            if (!HasDiffNotice)
+            {
+                HasDiffNotice = true;
+                DiffNotice = "Binary file.";
+            }
+
+            return;
+        }
+
+        var section = FindImageSection(path);
+        if (section is null || section.Body.Count > 0)
+            return;
+        var line = new DiffLineRow { Text = "Binary file.", Background = DiffColors.Clear };
+        section.Body.Add(line);
+        if (!section.Header.Expanded)
+            return;
+        var index = DiffRows.IndexOf(section.Header);
+        if (index >= 0)
+            DiffRows.Insert(index + 1, line);
     }
 
     private ImageCompareRow CreateImageRow(string path, string beforeNotice = "", string afterNotice = "") =>
@@ -649,8 +777,7 @@ public partial class RepositoryViewModel
         if (row is null)
         {
             row = CreateImageRow(path);
-            ImageCompares.Add(row);
-            ShowingImages = true;
+            AttachImageRow(row);
         }
 
         if (_lfsAfter)
@@ -673,9 +800,7 @@ public partial class RepositoryViewModel
         if (row is null)
         {
             row = CreateImageRow(path, _lfsAfter ? "" : notice, _lfsAfter ? notice : "");
-            ImageCompares.Add(row);
-            ShowingImages = true;
-            ApplyImageFolds();
+            AttachImageRow(row);
             return;
         }
 
