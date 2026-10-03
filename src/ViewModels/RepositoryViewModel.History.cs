@@ -57,6 +57,9 @@ public partial class RepositoryViewModel
 
     public bool ShowingRows => !ShowingMerge;
 
+    /// <summary>The Diff tab stays selected while a merge is open. Blame is the other tab.</summary>
+    public bool DiffTabOn => !ShowingBlame;
+
     public string SideBySideLabel => SideBySide ? "Inline" : "Side by side";
 
     public string MergeBaseLabel => ShowMergeBase ? "Hide base" : "Show base";
@@ -64,8 +67,6 @@ public partial class RepositoryViewModel
     public string WhitespaceLabel => IgnoreWhitespace ? "Show whitespace" : "Ignore whitespace";
 
     public string FilesModeLabel => AllFiles ? "Selected file" : "All files";
-
-    public string BlameLabel => ShowingBlame ? "Diff" : "Blame";
 
     partial void OnSideBySideChanged(bool value) => OnPropertyChanged(nameof(SideBySideLabel));
 
@@ -80,7 +81,7 @@ public partial class RepositoryViewModel
     partial void OnShowingBlameChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowingDiff));
-        OnPropertyChanged(nameof(BlameLabel));
+        OnPropertyChanged(nameof(DiffTabOn));
         OnPropertyChanged(nameof(ShowSectionFolds));
     }
 
@@ -206,6 +207,24 @@ public partial class RepositoryViewModel
     {
         AllFiles = !AllFiles;
         return ReloadDiffViewAsync();
+    }
+
+    [RelayCommand]
+    private Task ShowDiff()
+    {
+        if (!ShowingBlame)
+            return Task.CompletedTask;
+        ShowingBlame = false;
+        return LoadDiffAsync();
+    }
+
+    [RelayCommand]
+    private Task ShowBlame()
+    {
+        if (ShowingBlame)
+            return Task.CompletedTask;
+        ShowingBlame = true;
+        return LoadDiffAsync();
     }
 
     [RelayCommand]

@@ -52,7 +52,7 @@ public partial class RepositoryViewModel : ViewModelBase
     private string? _foldScope;
     private List<DiffRow>? _rowSink;
 
-    public bool ShowSectionFolds => AllFiles && !ShowingMerge && _sections.Count > 0;
+    public bool ShowSectionFolds => AllFiles && ShowingDiff && _sections.Count > 0;
 
     /// <summary>The all-files diff should move this file's header to the top of the diff.</summary>
     public event Action<string, string?>? JumpToFile;
