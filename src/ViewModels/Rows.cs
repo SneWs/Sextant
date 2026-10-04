@@ -199,6 +199,10 @@ public partial class FileRowViewModel : ObservableObject
 
     public bool ShowMergetool { get; init; }
 
+    public string MergetoolLabel { get; init; } = "";
+
+    public string MergetoolMenu { get; init; } = "";
+
     public bool ShowHistory { get; init; }
 
     public ICommand StageCommand { get; init; } = UiCommands.Disabled;

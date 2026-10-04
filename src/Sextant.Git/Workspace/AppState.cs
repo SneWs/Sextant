@@ -142,7 +142,7 @@ public sealed class AppSettings
     /// <summary><see cref="ThemePreference.System"/>, <see cref="ThemePreference.Light"/>, or <see cref="ThemePreference.Dark"/>.</summary>
     public string Theme { get; set; } = ThemePreference.System;
 
-    /// <summary>Command git mergetool runs for a conflict. Empty uses the tool configured in git.</summary>
+    /// <summary>Command git mergetool runs for a conflict. Empty uses the in-app editor unless git has merge.tool.</summary>
     public string? MergeTool { get; set; }
 }
 

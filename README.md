@@ -113,7 +113,7 @@ Checked items are in the app. The rest are still ahead. [PLAN.md](PLAN.md) is th
 ### Rewriting and conflicts
 
 - [x] Three-way editor for an unmerged text file: ours, an editable result, and theirs, with the merge base on demand. Take ours and Take theirs fill the selected conflict. Previous and Next move between conflicts.
-- [x] Settings → Merging sets the external merge command. An empty command uses the merge tool configured in git, and the command is not written into git config.
+- [x] Settings → Merging sets the external merge command. An empty command resolves a text conflict in the in-app editor, unless git already has `merge.tool`. The command is not written into git config.
 - [x] Save and stage when the conflict markers are gone. Markers that remain stay on disk and the path stays unmerged.
 - [x] A binary conflict stays on the external merge tool.
 - [x] Continue and abort for a merge, rebase, cherry-pick, and revert.

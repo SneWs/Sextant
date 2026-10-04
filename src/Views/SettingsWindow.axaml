@@ -54,13 +54,13 @@
                     <TextBlock Text="Merging" FontSize="18" FontWeight="SemiBold"/>
                     <TextBlock Text="External merge command" Opacity="0.75"/>
                     <TextBox x:Name="MergeCommand" AcceptsReturn="False" TextWrapping="Wrap" MinHeight="64"
-                             PlaceholderText="Leave empty to use the merge tool configured in git"/>
+                             PlaceholderText="Leave empty to resolve conflicts in Sextant"/>
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Content="Browse…" Click="OnBrowseMerge"/>
-                        <Button Content="Use git's merge tool" Click="OnClearMerge"/>
+                        <Button Content="Use built-in editor" Click="OnClearMerge"/>
                     </StackPanel>
                     <TextBlock TextWrapping="Wrap" Opacity="0.75"
-                               Text="git mergetool runs this command. $LOCAL is the current side, $REMOTE is the other side, $BASE is the common ancestor, and $MERGED is the file to save. An empty command uses the merge tool already configured for git. Sextant does not write the command into git config."/>
+                               Text="An empty command resolves a text conflict in Sextant. If git already has merge.tool, that tool is used instead. A command here is passed to git mergetool for that run. $LOCAL is the current side, $REMOTE is the other side, $BASE is the common ancestor, and $MERGED is the file to save. Sextant does not write the command into git config."/>
                     <TextBlock TextWrapping="Wrap" Opacity="0.75"
                                Text="Example: meld &quot;$LOCAL&quot; &quot;$MERGED&quot; &quot;$REMOTE&quot;"/>
                 </StackPanel>

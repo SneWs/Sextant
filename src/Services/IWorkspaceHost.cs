@@ -40,7 +40,7 @@ public interface IWorkspaceHost
 
     string? GitExecutable { get; }
 
-    /// <summary>Shell command for git mergetool. Null uses the tool configured in git.</summary>
+    /// <summary>Shell command for git mergetool. Null uses the in-app editor unless git has merge.tool.</summary>
     string? MergeTool { get; }
 
     bool GitReady { get; }

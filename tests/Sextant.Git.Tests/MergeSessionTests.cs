@@ -78,6 +78,10 @@ public class MergeSessionTests
         Assert.Contains("sextant", custom);
         Assert.Null(MergeToolCommand.Normalize("meld\n"));
         Assert.Null(MergeToolCommand.Normalize(null));
+        Assert.True(MergeToolCommand.UseInAppEditor(null, new Dictionary<string, string>()));
+        Assert.True(MergeToolCommand.UseInAppEditor("  ", new Dictionary<string, string> { ["merge.tool"] = "  " }));
+        Assert.False(MergeToolCommand.UseInAppEditor(null, new Dictionary<string, string> { ["merge.tool"] = "meld" }));
+        Assert.False(MergeToolCommand.UseInAppEditor("meld \"$LOCAL\" \"$MERGED\" \"$REMOTE\"", new Dictionary<string, string>()));
     }
 
     private const string Sample =

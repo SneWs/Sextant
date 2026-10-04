@@ -565,6 +565,10 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         var previous = string.IsNullOrWhiteSpace(_settings.GitExecutable) ? null : _settings.GitExecutable;
         var gitChanged = !string.Equals(path, previous, StringComparison.Ordinal);
         var diffChanged = edit.SideBySide != _settings.SideBySide || edit.IgnoreWhitespace != _settings.IgnoreWhitespace;
+        var mergeChanged = !string.Equals(
+            MergeToolCommand.Normalize(edit.MergeTool),
+            MergeToolCommand.Normalize(_settings.MergeTool),
+            StringComparison.Ordinal);
         _settings.GitExecutable = path;
         _settings.SideBySide = edit.SideBySide;
         _settings.IgnoreWhitespace = edit.IgnoreWhitespace;
@@ -574,6 +578,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         AppTheme.Apply(_settings.Theme);
         if (diffChanged)
             ApplyDiffPreferences();
+        if (mergeChanged)
+            ApplyMergePreference();
         if (gitChanged)
             await ProbeAsync();
     }
@@ -582,6 +588,12 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     {
         foreach (var tab in Tabs)
             tab.ApplyDiffPreferences(_settings.SideBySide, _settings.IgnoreWhitespace);
+    }
+
+    private void ApplyMergePreference()
+    {
+        foreach (var tab in Tabs)
+            tab.ApplyMergePreference();
     }
 
     private Task ToggleSavedSideBySide()

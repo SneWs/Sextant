@@ -30,6 +30,7 @@ public partial class RepositoryViewModel : ViewModelBase
     private int _historyGeneration;
     private int _seenCommits;
     private string _entrySignature = "";
+    private bool _inAppMerge = true;
     private readonly List<FileRowViewModel> _workingFiles = [];
     private bool _showingCommitFiles;
     private string _refSignature = "";
@@ -900,7 +901,8 @@ public partial class RepositoryViewModel : ViewModelBase
         _rangeOlder = null;
         _rangeNewer = null;
         var wantWork = SelectedGraphRow is null || SelectedGraphRow.IsWorkingCopy;
-        if (state.Sequencer != SequencerKind.None && !_wasMerge)
+        var enteringOperation = state.Sequencer != SequencerKind.None && !_wasMerge;
+        if (enteringOperation)
             wantWork = true;
         var wantSha = SelectedGraphRow?.Sha;
         var wantPath = SelectedFile is { IsHeader: false } file ? file.Path : null;
@@ -948,9 +950,11 @@ public partial class RepositoryViewModel : ViewModelBase
             LoadMoreText = state.HistoryCapped ? "Load more (past 50,000)" : "Load more";
 
             var entrySignature = EntrySignature(state.Entries);
-            if (entrySignature != _entrySignature)
+            var inApp = MergeToolCommand.UseInAppEditor(_host.MergeTool, state.Config);
+            if (entrySignature != _entrySignature || inApp != _inAppMerge)
             {
                 _entrySignature = entrySignature;
+                _inAppMerge = inApp;
                 RebuildFiles(state);
             }
 
@@ -979,6 +983,12 @@ public partial class RepositoryViewModel : ViewModelBase
             }
 
             UpdateCommands(state);
+            if (enteringOperation && unmerged && _inAppMerge)
+            {
+                wantPath = state.Entries.First(entry => entry.Kind == ChangeKind.Unmerged).Path;
+                wantStaged = false;
+            }
+
             RememberSelection(wantWork, wantSha, wantPath, wantStaged);
         }
         finally
@@ -1112,13 +1122,82 @@ public partial class RepositoryViewModel : ViewModelBase
             ShowUnstage = stagedList && !conflict,
             ShowDiscard = !conflict,
             ShowMergetool = conflict,
+            MergetoolLabel = _inAppMerge ? "Resolve" : "Merge tool",
+            MergetoolMenu = _inAppMerge ? "Resolve in editor" : "Open in merge tool",
             ShowHistory = true,
             StageCommand = new AsyncRelayCommand(() => RunAsync(conflict ? "Staging resolution…" : "Staging…", ct => Session.StageFileAsync(path, ct))),
             UnstageCommand = new AsyncRelayCommand(() => RunAsync("Unstaging…", ct => Session.UnstageFileAsync(path, ct))),
             DiscardCommand = new AsyncRelayCommand(() => DiscardAsync(path, untracked)),
-            MergetoolCommand = new AsyncRelayCommand(() => RunAsync("Opening merge tool…", ct => Session.MergetoolAsync(path, _host.MergeTool, ct))),
+            MergetoolCommand = new AsyncRelayCommand(() => OpenMergeToolAsync(path)),
             HistoryCommand = new AsyncRelayCommand(() => ShowFileHistoryAsync(path)),
         };
+    }
+
+    private bool UseInAppMerge() =>
+        MergeToolCommand.UseInAppEditor(_host.MergeTool, _session?.Snapshot().Config);
+
+    private Task OpenMergeToolAsync(string path)
+    {
+        if (_session is null)
+            return Task.CompletedTask;
+        if (UseInAppMerge())
+        {
+            OpenInAppMerge(path);
+            return Task.CompletedTask;
+        }
+
+        return RunAsync("Opening merge tool…", ct => _session.MergetoolAsync(path, _host.MergeTool, ct));
+    }
+
+    private void OpenInAppMerge(string path)
+    {
+        var working = Rows.FirstOrDefault(row => row.IsWorkingCopy);
+        if (working is not null && !ReferenceEquals(SelectedGraphRow, working))
+            SelectedGraphRow = working;
+        var file = Files.FirstOrDefault(candidate =>
+            !candidate.IsHeader && candidate.Kind == ChangeKind.Unmerged && candidate.Path == path);
+        if (file is null)
+            return;
+        if (ReferenceEquals(SelectedFile, file))
+        {
+            _allowLarge = false;
+            _ = LoadDiffAsync();
+            return;
+        }
+
+        SelectedFile = file;
+    }
+
+    public void ApplyMergePreference()
+    {
+        if (_session is null)
+            return;
+        var state = _session.Snapshot();
+        var inApp = MergeToolCommand.UseInAppEditor(_host.MergeTool, state.Config);
+        if (inApp == _inAppMerge)
+            return;
+
+        _inAppMerge = inApp;
+        var path = SelectedFile is { IsHeader: false } selected ? selected.Path : null;
+        var staged = SelectedFile?.FromStagedList ?? false;
+        RebuildFiles(state);
+        if (_showingCommitFiles)
+            return;
+
+        _applying = true;
+        try
+        {
+            SelectedFile = Files.FirstOrDefault(candidate => !candidate.IsHeader && candidate.Path == path && candidate.FromStagedList == staged)
+                ?? Files.FirstOrDefault(candidate => !candidate.IsHeader && candidate.Path == path)
+                ?? Files.FirstOrDefault(candidate => !candidate.IsHeader);
+        }
+        finally
+        {
+            _applying = false;
+        }
+
+        if (ShowingWorkingCopy)
+            _ = LoadDiffAsync();
     }
 
     private Task DiscardAsync(string path, bool untracked)
@@ -1792,7 +1871,9 @@ public partial class RepositoryViewModel : ViewModelBase
             return;
         }
 
-        var merge = workingCopy && !AllFiles && file!.Kind == ChangeKind.Unmerged;
+        var merge = workingCopy
+            && file is { Kind: ChangeKind.Unmerged }
+            && (!AllFiles || UseInAppMerge());
         if (!merge)
             ClearMerge();
 
@@ -1873,7 +1954,9 @@ public partial class RepositoryViewModel : ViewModelBase
 
         if (document.IsBinary)
         {
-            ClearDiff("This conflict is binary. Open it in the external merge tool.");
+            ClearDiff(UseInAppMerge()
+                ? "This conflict is binary, so the editor cannot open it."
+                : "This conflict is binary. Open it in the external merge tool.");
             return;
         }
 

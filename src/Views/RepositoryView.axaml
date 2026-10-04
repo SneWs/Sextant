@@ -282,7 +282,7 @@
                                         <MenuItem Header="Stage" Command="{Binding StageCommand}" IsVisible="{Binding ShowStage}"/>
                                         <MenuItem Header="Unstage" Command="{Binding UnstageCommand}" IsVisible="{Binding ShowUnstage}"/>
                                         <MenuItem Header="Discard" Command="{Binding DiscardCommand}" IsVisible="{Binding ShowDiscard}"/>
-                                        <MenuItem Header="Open in merge tool" Command="{Binding MergetoolCommand}" IsVisible="{Binding ShowMergetool}"/>
+                                        <MenuItem Header="{Binding MergetoolMenu}" Command="{Binding MergetoolCommand}" IsVisible="{Binding ShowMergetool}"/>
                                         <MenuItem Header="File history" Command="{Binding HistoryCommand}" IsVisible="{Binding ShowHistory}"/>
                                     </ContextMenu>
                                 </Grid.ContextMenu>
@@ -293,7 +293,7 @@
                                     <Button Classes="flat" Content="Stage" Command="{Binding StageCommand}" IsVisible="{Binding ShowStage}" Padding="6,0"/>
                                     <Button Classes="flat" Content="Unstage" Command="{Binding UnstageCommand}" IsVisible="{Binding ShowUnstage}" Padding="6,0"/>
                                     <Button Classes="flat" Content="Discard" Command="{Binding DiscardCommand}" IsVisible="{Binding ShowDiscard}" Padding="6,0"/>
-                                    <Button Classes="flat" Content="Merge tool" Command="{Binding MergetoolCommand}" IsVisible="{Binding ShowMergetool}" Padding="6,0"/>
+                                    <Button Classes="flat" Content="{Binding MergetoolLabel}" Command="{Binding MergetoolCommand}" IsVisible="{Binding ShowMergetool}" Padding="6,0"/>
                                     <Button Classes="flat" Content="History" Command="{Binding HistoryCommand}" IsVisible="{Binding ShowHistory}" Padding="6,0"/>
                                 </StackPanel>
                             </Grid>
