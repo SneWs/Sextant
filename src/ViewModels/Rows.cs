@@ -58,6 +58,10 @@ public partial class GraphRowViewModel : ObservableObject
 
     public ICommand CreateBranchCommand { get; init; } = UiCommands.Disabled;
 
+    public ICommand CreateBranchAtCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand PatchCommand { get; init; } = UiCommands.Disabled;
+
     public ICommand CopyShaCommand { get; init; } = UiCommands.Disabled;
 
     public ICommand ResetSoftCommand { get; init; } = UiCommands.Disabled;

@@ -1091,8 +1091,9 @@ public partial class RepositoryViewModel : ViewModelBase
             CheckoutCommand = checkout
                 ? new AsyncRelayCommand(() => RunAsync("Checking out…", ct => Session.SwitchAsync(name, ct)))
                 : UiCommands.Disabled,
-            CreateBranchCommand = CreateBranchCommand,
+            CreateBranchAtCommand = new AsyncRelayCommand(() => CreateBranchAtAsync(commit.Commit)),
             CopyShaCommand = new AsyncRelayCommand(() => CopyText(commit.Commit.Sha)),
+            PatchCommand = new AsyncRelayCommand(() => SavePatchAsync(commit.Commit)),
             ResetSoftCommand = new AsyncRelayCommand(() => ResetAsync(commit.Commit, "--soft")),
             ResetMixedCommand = new AsyncRelayCommand(() => ResetAsync(commit.Commit, "--mixed")),
             ResetHardCommand = new AsyncRelayCommand(() => ResetAsync(commit.Commit, "--hard")),

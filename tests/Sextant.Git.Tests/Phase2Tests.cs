@@ -1,3 +1,4 @@
+using System.Text;
 using Sextant.Git;
 using Sextant.Git.Parsing;
 
@@ -297,6 +298,27 @@ public class Phase2Tests
         await session.AbortSequencerAsync(CancellationToken.None);
         Assert.Equal(SequencerKind.None, session.Snapshot().Sequencer);
         Assert.DoesNotContain(session.Snapshot().Entries, entry => entry.Kind == ChangeKind.Unmerged);
+    }
+
+    [Fact]
+    public async Task Branch_at_a_commit_stays_put_and_a_patch_is_that_commit()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("first");
+        var first = repo.RunCapture("rev-parse", "HEAD").Trim();
+        repo.WriteFile("a.txt", "two\n");
+        repo.CommitAll("second");
+        var second = repo.RunCapture("rev-parse", "HEAD").Trim();
+        await using var session = await Open(repo);
+        await session.CreateBranchAtAsync("older", first, CancellationToken.None);
+        var state = session.Snapshot();
+        Assert.Equal(second, state.Branch.Oid);
+        Assert.Contains(state.Refs, reference => reference.Name == "refs/heads/older" && string.Equals(reference.Oid, first, StringComparison.OrdinalIgnoreCase));
+        var patch = Encoding.UTF8.GetString(await session.FormatPatchAsync(first, CancellationToken.None));
+        Assert.Contains("first", patch, StringComparison.Ordinal);
+        Assert.Contains("one", patch, StringComparison.Ordinal);
+        Assert.DoesNotContain("two", patch, StringComparison.Ordinal);
     }
 
     [Fact]

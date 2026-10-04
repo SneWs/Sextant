@@ -13,6 +13,8 @@ public interface IDialogService
 
     Task<string?> PromptAsync(string title, string message, string initial = "", bool allowEmpty = false);
 
+    Task<string?> SaveFileAsync(string title, string suggestedName);
+
     Task<CloneRequest?> PromptCloneAsync();
 
     Task<string?> PickAsync(string title, string message, IReadOnlyList<string> options);

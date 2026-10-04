@@ -396,6 +396,12 @@ public static class GitCommands
     public static IReadOnlyList<string> CreateBranch(string toplevel, string name) =>
         ["-C", toplevel, "switch", "-c", name];
 
+    public static IReadOnlyList<string> CreateBranchAt(string toplevel, string name, string sha) =>
+        ["-C", toplevel, "branch", name, sha];
+
+    public static IReadOnlyList<string> FormatPatch(string toplevel, string sha) =>
+        ["-C", toplevel, "--no-optional-locks", "format-patch", "-1", "--stdout", sha];
+
     public static IReadOnlyList<string> DeleteBranch(string toplevel, string name) =>
         ["-C", toplevel, "branch", "-d", name];
 

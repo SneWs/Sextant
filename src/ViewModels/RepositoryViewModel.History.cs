@@ -4,6 +4,7 @@ using Sextant;
 using Sextant.Git;
 using Sextant.Git.Parsing;
 using System.Globalization;
+using System.Text;
 
 namespace Sextant.ViewModels;
 
@@ -364,6 +365,56 @@ public partial class RepositoryViewModel
 
     private Task RevertAsync(CommitRecord commit) =>
         RunAsync("Reverting…", ct => _session!.RevertAsync(commit.Sha, ct));
+
+    private Task CreateBranchAtAsync(CommitRecord commit)
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)
+            return Task.CompletedTask;
+        return HoldFocus(async () =>
+        {
+            var name = await dialogs.PromptAsync("Create branch", $"Branch name at {Short(commit.Sha)}");
+            if (string.IsNullOrWhiteSpace(name) || _session is null)
+                return;
+            await RunAsync("Creating branch…", ct => _session.CreateBranchAtAsync(name, commit.Sha, ct));
+        });
+    }
+
+    private Task SavePatchAsync(CommitRecord commit)
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)
+            return Task.CompletedTask;
+        return HoldFocus(async () =>
+        {
+            var path = await dialogs.SaveFileAsync("Patch", PatchFileName(commit));
+            if (string.IsNullOrWhiteSpace(path) || _session is null)
+                return;
+            await RunAsync("Saving patch…", async ct =>
+            {
+                var bytes = await _session.FormatPatchAsync(commit.Sha, ct);
+                try
+                {
+                    await File.WriteAllBytesAsync(path, bytes, ct);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    throw new RepositoryActionException(exception.Message);
+                }
+            });
+        });
+    }
+
+    private static string PatchFileName(CommitRecord commit)
+    {
+        var cleaned = new StringBuilder(commit.Subject.Length);
+        foreach (var character in commit.Subject.Trim())
+            cleaned.Append(character is '<' or '>' or ':' or '"' or '/' or '\\' or '|' or '?' or '*' or '\0' ? '-' : character);
+        var name = cleaned.ToString().Trim();
+        if (name.Length > 60)
+            name = name[..60].Trim();
+        if (name.Length == 0)
+            name = commit.Sha.Length <= 10 ? commit.Sha : commit.Sha[..10];
+        return name + ".patch";
+    }
 
     private Task TagAsync(CommitRecord commit)
     {

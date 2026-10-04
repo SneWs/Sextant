@@ -81,6 +81,21 @@ public sealed class AvaloniaDialogService : IDialogService
         return value;
     }
 
+    public async Task<string?> SaveFileAsync(string title, string suggestedName)
+    {
+        var patch = new FilePickerFileType("Patch") { Patterns = ["*.patch"] };
+        var file = await _owner.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = title,
+            SuggestedFileName = suggestedName,
+            DefaultExtension = "patch",
+            FileTypeChoices = [patch, FilePickerFileTypes.All],
+            SuggestedFileType = patch,
+            ShowOverwritePrompt = true,
+        });
+        return file?.Path.LocalPath;
+    }
+
     public async Task<CloneRequest?> PromptCloneAsync()
     {
         var window = Create("Clone repository");

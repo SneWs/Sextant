@@ -693,6 +693,21 @@ public sealed partial class RepositorySession : IAsyncDisposable
     public Task CreateBranchAsync(string name, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.CreateBranch(_toplevel, name), null, cancellationToken);
 
+    public Task CreateBranchAtAsync(string name, string sha, CancellationToken cancellationToken) =>
+        MutateAsync(GitCommands.CreateBranchAt(_toplevel, name, sha), null, cancellationToken);
+
+    public Task<byte[]> FormatPatchAsync(string sha, CancellationToken cancellationToken) =>
+        RunAsync(async ct =>
+        {
+            var output = await _scheduler.ReadAsync(
+                inner => ExecuteAsync(GitCommands.FormatPatch(_toplevel, sha), null, inner),
+                ct).ConfigureAwait(false);
+            Track(output);
+            if (output.ExitCode != 0)
+                throw new GitCommandFailedException(output);
+            return output.Stdout;
+        }, cancellationToken);
+
     public Task DeleteBranchAsync(string name, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.DeleteBranch(_toplevel, name), null, cancellationToken);
 
