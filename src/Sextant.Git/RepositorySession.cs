@@ -571,6 +571,65 @@ public sealed partial class RepositorySession : IAsyncDisposable
     public Task DiscardUntrackedAsync(string path, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.DiscardUntracked(_toplevel, path), null, cancellationToken);
 
+    public Task DiscardAllAsync(CancellationToken cancellationToken)
+    {
+        var entries = Snapshot().Entries.Where(entry => entry.Kind != ChangeKind.Unmerged).ToList();
+        if (entries.Count == 0)
+            return Task.CompletedTask;
+
+        return RunAsync(async ct =>
+        {
+            GitCommandFailedException? failure = null;
+            try
+            {
+                await _scheduler.WriteAsync(async token =>
+                {
+                    var tracked = new List<string>();
+                    var untracked = new List<string>();
+                    foreach (var entry in entries)
+                    {
+                        if (entry.Kind == ChangeKind.Untracked)
+                        {
+                            untracked.Add(entry.Path);
+                            continue;
+                        }
+
+                        if (!string.IsNullOrEmpty(entry.OriginalPath))
+                            tracked.Add(entry.OriginalPath);
+                        tracked.Add(entry.Path);
+                    }
+
+                    if (tracked.Count > 0)
+                    {
+                        var command = IsUnborn()
+                            ? GitCommands.DiscardUnbornPaths(_toplevel, tracked)
+                            : GitCommands.DiscardTrackedPaths(_toplevel, tracked);
+                        Checked(await ExecuteAsync(command, null, token).ConfigureAwait(false));
+                    }
+
+                    if (untracked.Count > 0)
+                        Checked(await ExecuteAsync(GitCommands.DiscardUntrackedPaths(_toplevel, untracked), null, token).ConfigureAwait(false));
+                    return 0;
+                }, ct).ConfigureAwait(false);
+            }
+            catch (GitCommandFailedException exception)
+            {
+                failure = exception;
+            }
+
+            try
+            {
+                await LoadRefsAndMaybeHistoryAsync(ct, statusAlreadyApplied: false).ConfigureAwait(false);
+            }
+            catch (GitCommandFailedException) when (failure is not null)
+            {
+            }
+
+            if (failure is not null)
+                throw failure;
+        }, cancellationToken);
+    }
+
     public Task ApplyHunkAsync(string rawPatch, int hunkIndex, bool reverse, CancellationToken cancellationToken) =>
         ApplyPatchTextAsync(HunkPatch.Slice(rawPatch, hunkIndex), reverse, cancellationToken);
 

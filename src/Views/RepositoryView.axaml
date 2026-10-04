@@ -262,10 +262,11 @@
                     </StackPanel>
                 </StackPanel>
 
-                <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="8,0,8,4" IsVisible="{Binding ShowingWorkingCopy}">
+                <Grid Grid.Row="1" Margin="8,0,6,4" ColumnDefinitions="Auto,Auto,*" IsVisible="{Binding ShowingWorkingCopy}">
                     <Button Content="Stage all" Command="{Binding StageAllCommand}" IsEnabled="{Binding CanStageAll}"/>
-                    <Button Content="Unstage all" Command="{Binding UnstageAllCommand}" IsEnabled="{Binding CanUnstageAll}"/>
-                </StackPanel>
+                    <Button Grid.Column="1" Margin="8,0,0,0" Content="Unstage all" Command="{Binding UnstageAllCommand}" IsEnabled="{Binding CanUnstageAll}"/>
+                    <Button Grid.Column="2" HorizontalAlignment="Right" Content="Discard all" Command="{Binding DiscardAllCommand}" IsEnabled="{Binding CanDiscardAll}"/>
+                </Grid>
 
                 <ListBox x:Name="FileList" Grid.Row="2" ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}"
                          PointerReleased="OnFilePointerReleased">

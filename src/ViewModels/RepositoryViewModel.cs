@@ -241,6 +241,8 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public bool CanUnstageAll => !IsBusy && ShowingWorkingCopy && _hasStagedWork;
 
+    public bool CanDiscardAll => !IsBusy && ShowingWorkingCopy && (_hasUnstagedWork || _hasStagedWork);
+
     private bool _hasUnstagedWork;
 
     private bool _hasStagedWork;
@@ -362,6 +364,24 @@ public partial class RepositoryViewModel : ViewModelBase
 
     [RelayCommand]
     private Task UnstageAll() => RunAsync("Unstaging all…", ct => Session.UnstageAllAsync(ct));
+
+    [RelayCommand]
+    private Task DiscardAll()
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || IsBusy || !CanDiscardAll)
+            return Task.CompletedTask;
+        return HoldFocus(async () =>
+        {
+            var conflicts = _session.Snapshot().Entries.Any(entry => entry.Kind == ChangeKind.Unmerged);
+            var message = conflicts
+                ? "Discard every change except conflicted files? Staged and unstaged edits are restored, and untracked files are removed. This cannot be undone."
+                : "Discard all changes? Staged and unstaged edits are restored, and untracked files are removed. This cannot be undone.";
+            var ok = await dialogs.ConfirmAsync("Discard all", message, "Discard all");
+            if (!ok || _session is null)
+                return;
+            await RunAsync("Discarding all…", ct => _session.DiscardAllAsync(ct));
+        });
+    }
 
     [RelayCommand]
     private void Cancel() => _operation?.Cancel();
@@ -888,6 +908,7 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(CanStageAll));
         OnPropertyChanged(nameof(CanUnstageAll));
+        OnPropertyChanged(nameof(CanDiscardAll));
     }
 
     private void Fail(string message)

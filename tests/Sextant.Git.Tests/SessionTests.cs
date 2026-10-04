@@ -336,6 +336,75 @@ public class SessionTests
     }
 
     [Fact]
+    public async Task Discard_all_restores_tracked_files_and_removes_untracked_ones()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.WriteFile("keep.txt", "stay\n");
+        repo.CommitAll("first");
+        repo.WriteFile("a.txt", "changed\n");
+        repo.Run("add", "a.txt");
+        repo.WriteFile("a.txt", "unstaged\n");
+        repo.WriteFile("new.txt", "gone\n");
+        repo.WriteFile("extra/note.txt", "inside\n");
+        await using var session = await Open(repo);
+
+        await session.DiscardAllAsync(CancellationToken.None);
+
+        Assert.Equal("one\n", File.ReadAllText(Path.Combine(repo.Directory, "a.txt")).Replace("\r\n", "\n", StringComparison.Ordinal));
+        Assert.Equal("stay\n", File.ReadAllText(Path.Combine(repo.Directory, "keep.txt")).Replace("\r\n", "\n", StringComparison.Ordinal));
+        Assert.False(File.Exists(Path.Combine(repo.Directory, "new.txt")));
+        Assert.False(Directory.Exists(Path.Combine(repo.Directory, "extra")));
+        Assert.Empty(session.Snapshot().Entries);
+        Assert.DoesNotContain(session.Snapshot().Commands, command => command.ExitCode != 0);
+    }
+
+    [Fact]
+    public async Task Discard_all_before_the_first_commit_removes_the_new_files()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "hello\n");
+        repo.WriteFile("b.txt", "there\n");
+        await using var session = await Open(repo);
+        await session.StageFileAsync("a.txt", CancellationToken.None);
+
+        await session.DiscardAllAsync(CancellationToken.None);
+
+        Assert.False(File.Exists(Path.Combine(repo.Directory, "a.txt")));
+        Assert.False(File.Exists(Path.Combine(repo.Directory, "b.txt")));
+        Assert.Empty(session.Snapshot().Entries);
+        Assert.DoesNotContain(session.Snapshot().Commands, command => command.ExitCode != 0);
+    }
+
+    [Fact]
+    public async Task Discard_all_during_a_conflict_leaves_the_unmerged_path()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "base\n");
+        repo.CommitAll("base");
+        var branch = repo.CurrentBranch();
+        repo.Run("switch", "-c", "other");
+        repo.WriteFile("a.txt", "other\n");
+        repo.CommitAll("other");
+        repo.Run("switch", branch);
+        repo.WriteFile("a.txt", "main\n");
+        repo.CommitAll("main");
+
+        await using var session = await Open(repo);
+        await Assert.ThrowsAsync<GitCommandFailedException>(() => session.MergeAsync("other", CancellationToken.None));
+        repo.WriteFile("b.txt", "side\n");
+        await session.RefreshStatusAsync(CancellationToken.None);
+
+        await session.DiscardAllAsync(CancellationToken.None);
+
+        var state = session.Snapshot();
+        Assert.Contains(state.Entries, entry => entry.Path == "a.txt" && entry.Kind == ChangeKind.Unmerged);
+        Assert.DoesNotContain(state.Entries, entry => entry.Path == "b.txt");
+        Assert.False(File.Exists(Path.Combine(repo.Directory, "b.txt")));
+        Assert.Contains(state.Commands, command => command.Arguments.Contains("clean") && command.ExitCode == 0);
+    }
+
+    [Fact]
     public async Task Stage_all_during_a_conflict_leaves_the_unmerged_path()
     {
         using var repo = new TempRepo();

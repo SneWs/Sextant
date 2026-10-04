@@ -76,6 +76,12 @@ public class CoreTests
         Assert.Equal("-f", GitCommands.DiscardUntracked("repo", "a.txt")[3]);
         Assert.DoesNotContain("-d", GitCommands.DiscardUntracked("repo", "a.txt"));
         Assert.DoesNotContain("-x", GitCommands.DiscardUntracked("repo", "a.txt"));
+        Assert.Equal(
+            ["-C", "repo", "restore", "--source=HEAD", "--worktree", "--staged", "--", "a.txt", "old.txt"],
+            GitCommands.DiscardTrackedPaths("repo", ["a.txt", "old.txt"]));
+        Assert.Equal(["-C", "repo", "rm", "-f", "--", "a.txt"], GitCommands.DiscardUnbornPaths("repo", ["a.txt"]));
+        Assert.Equal(["-C", "repo", "clean", "-fd", "--", "new.txt"], GitCommands.DiscardUntrackedPaths("repo", ["new.txt"]));
+        Assert.DoesNotContain("-x", GitCommands.DiscardUntrackedPaths("repo", ["new.txt"]));
     }
 
     [Fact]

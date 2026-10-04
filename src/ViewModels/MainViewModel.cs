@@ -694,6 +694,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _palette.Add(new PaletteItem { Title = "Amend", Run = () => tab.AmendCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Stage all", Run = () => tab.StageAllCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Unstage all", Run = () => tab.UnstageAllCommand.ExecuteAsync(null) });
+            _palette.Add(new PaletteItem { Title = "Discard all", Run = () => tab.DiscardAllCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Checkout branch", Run = tab.CheckoutFromPalette });
             _palette.Add(new PaletteItem { Title = "Create branch", Run = tab.CreateBranch });
             _palette.Add(new PaletteItem { Title = "Merge branch", Run = tab.MergeFromPalette });

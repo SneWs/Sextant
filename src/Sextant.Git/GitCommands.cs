@@ -346,6 +346,31 @@ public static class GitCommands
     public static IReadOnlyList<string> DiscardUntracked(string toplevel, string path) =>
         ["-C", toplevel, "clean", "-f", "--", path];
 
+    public static IReadOnlyList<string> DiscardTrackedPaths(string toplevel, IReadOnlyList<string> paths)
+    {
+        var arguments = new List<string> { "-C", toplevel, "restore", "--source=HEAD", "--worktree", "--staged", "--" };
+        arguments.AddRange(paths);
+        return arguments;
+    }
+
+    public static IReadOnlyList<string> DiscardUnbornPaths(string toplevel, IReadOnlyList<string> paths)
+    {
+        var arguments = new List<string> { "-C", toplevel, "rm", "-f", "--" };
+        arguments.AddRange(paths);
+        return arguments;
+    }
+
+    /// <summary>
+    /// Removes the listed untracked paths. <c>-d</c> removes an untracked directory.
+    /// Ignored files are left in place.
+    /// </summary>
+    public static IReadOnlyList<string> DiscardUntrackedPaths(string toplevel, IReadOnlyList<string> paths)
+    {
+        var arguments = new List<string> { "-C", toplevel, "clean", "-fd", "--" };
+        arguments.AddRange(paths);
+        return arguments;
+    }
+
     public static IReadOnlyList<string> ApplyCached(string toplevel, string patchFile) =>
         ["-C", toplevel, "apply", "--cached", patchFile];
 
