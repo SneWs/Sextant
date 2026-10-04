@@ -4,6 +4,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Sextant.Git;
+using Sextant.Views;
 
 namespace Sextant.Services;
 
@@ -304,117 +305,9 @@ public sealed class AvaloniaDialogService : IDialogService
 
     public async Task<SettingsDraft?> EditSettingsAsync(SettingsDraft current)
     {
-        var window = Create("Settings");
-        var theme = ThemePreference.Normalize(current.Theme);
-        var followSystem = new RadioButton
-        {
-            Content = "Follow system",
-            GroupName = "Theme",
-            IsChecked = theme == ThemePreference.System,
-        };
-        var light = new RadioButton
-        {
-            Content = "Light",
-            GroupName = "Theme",
-            IsChecked = theme == ThemePreference.Light,
-        };
-        var dark = new RadioButton
-        {
-            Content = "Dark",
-            GroupName = "Theme",
-            IsChecked = theme == ThemePreference.Dark,
-        };
-        var appearance = new StackPanel { Spacing = 4 };
-        appearance.Children.Add(followSystem);
-        appearance.Children.Add(light);
-        appearance.Children.Add(dark);
-        var inline = new RadioButton
-        {
-            Content = "Inline",
-            GroupName = "DiffLayout",
-            IsChecked = !current.SideBySide,
-        };
-        var sideBySide = new RadioButton
-        {
-            Content = "Side by side",
-            GroupName = "DiffLayout",
-            IsChecked = current.SideBySide,
-        };
-        var whitespace = new CheckBox
-        {
-            Content = "Ignore whitespace",
-            IsChecked = current.IgnoreWhitespace,
-        };
-        var git = new TextBox
-        {
-            Text = current.GitExecutable,
-            PlaceholderText = "Leave empty to use git on PATH",
-        };
-        var browse = new Button { Content = "Browse…" };
-        browse.Click += async (_, _) =>
-        {
-            var picked = await window.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = "Git executable",
-                AllowMultiple = false,
-                FileTypeFilter =
-                [
-                    new FilePickerFileType("git") { Patterns = OperatingSystem.IsWindows() ? ["git.exe"] : ["git"] },
-                    FilePickerFileTypes.All,
-                ],
-            });
-            if (picked.Count > 0)
-                git.Text = picked[0].Path.LocalPath;
-        };
-        var useSystem = new Button { Content = "Use system git" };
-        useSystem.Click += (_, _) => git.Text = "";
-        var error = new TextBlock { Foreground = Brushes.IndianRed, TextWrapping = TextWrapping.Wrap };
-        SettingsDraft? result = null;
-        var ok = new Button { Content = "OK", IsDefault = true };
-        var cancel = new Button { Content = "Cancel", IsCancel = true };
-        ok.Click += (_, _) =>
-        {
-            var path = (git.Text ?? "").Trim();
-            if (path.Length > 0 && !File.Exists(path))
-            {
-                error.Text = "That git executable was not found.";
-                return;
-            }
-
-            var chosen = dark.IsChecked == true ? ThemePreference.Dark
-                : light.IsChecked == true ? ThemePreference.Light
-                : ThemePreference.System;
-            result = new SettingsDraft(path, sideBySide.IsChecked == true, whitespace.IsChecked == true, chosen);
-            window.Close();
-        };
-        cancel.Click += (_, _) => window.Close();
-        var gitRow = new Grid
-        {
-            ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto"),
-            ColumnSpacing = 8,
-        };
-        gitRow.Children.Add(git);
-        Grid.SetColumn(browse, 1);
-        gitRow.Children.Add(browse);
-        Grid.SetColumn(useSystem, 2);
-        gitRow.Children.Add(useSystem);
-        var diff = new StackPanel { Spacing = 4 };
-        diff.Children.Add(inline);
-        diff.Children.Add(sideBySide);
-        diff.Children.Add(whitespace);
-        window.Content = Column(
-            Heading("Appearance"),
-            appearance,
-            Message("Light is Catppuccin Latte. Dark is Catppuccin Mocha. Follow system picks the palette that matches the operating system."),
-            Heading("Diff"),
-            diff,
-            Heading("Git"),
-            Labeled("Executable", gitRow),
-            Message("An empty path uses the git executable on PATH."),
-            error,
-            Buttons(cancel, ok));
+        var window = new SettingsWindow(current);
         await window.ShowDialog(_owner);
-        return result;
+        return window.Result;
     }
 
     public async Task CopyAsync(string text)
@@ -433,12 +326,6 @@ public sealed class AvaloniaDialogService : IDialogService
         WindowStartupLocation = WindowStartupLocation.CenterOwner,
         CanResize = false,
         Padding = new Avalonia.Thickness(16),
-    };
-
-    private static TextBlock Heading(string text) => new()
-    {
-        Text = text,
-        FontWeight = FontWeight.SemiBold,
     };
 
     private static TextBlock Message(string text) => new()

@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sextant.Git;
+using Sextant.Git.Parsing;
 using Sextant.Services;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -45,6 +46,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     [ObservableProperty]
     public partial string? GitExecutable { get; set; }
+
+    public string? MergeTool => MergeToolCommand.Normalize(_settings.MergeTool);
 
     [ObservableProperty]
     public partial bool GitReady { get; set; }
@@ -554,7 +557,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _settings.GitExecutable ?? "",
             _settings.SideBySide,
             _settings.IgnoreWhitespace,
-            _settings.Theme));
+            _settings.Theme,
+            _settings.MergeTool ?? ""));
         if (edit is null)
             return;
         var path = string.IsNullOrWhiteSpace(edit.GitExecutable) ? null : edit.GitExecutable.Trim();
@@ -565,6 +569,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         _settings.SideBySide = edit.SideBySide;
         _settings.IgnoreWhitespace = edit.IgnoreWhitespace;
         _settings.Theme = ThemePreference.Normalize(edit.Theme);
+        _settings.MergeTool = MergeToolCommand.Normalize(edit.MergeTool);
         _store.SaveSettings(_settings);
         AppTheme.Apply(_settings.Theme);
         if (diffChanged)

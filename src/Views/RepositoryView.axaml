@@ -325,6 +325,11 @@
                         </CommandBarButton>
                     </CommandBar>
                     <WrapPanel DockPanel.Dock="Top" Margin="8,4,8,0" IsVisible="{Binding ShowingMerge}">
+                        <Button Classes="flat" Content="Previous" Command="{Binding PreviousConflictCommand}" Margin="0,0,4,4"/>
+                        <Button Classes="flat" Content="Next" Command="{Binding NextConflictCommand}" Margin="0,0,4,4"/>
+                        <TextBlock Text="{Binding MergeConflictLabel}" VerticalAlignment="Center" Opacity="0.75" Margin="4,0,8,4"/>
+                        <Button Classes="flat" Content="Take ours" Command="{Binding TakeOursCommand}" Margin="0,0,4,4"/>
+                        <Button Classes="flat" Content="Take theirs" Command="{Binding TakeTheirsCommand}" Margin="0,0,4,4"/>
                         <Button Classes="flat" Content="{Binding MergeBaseLabel}" Command="{Binding ToggleMergeBaseCommand}" Margin="0,0,4,4"/>
                         <Button Classes="flat" Content="Save and stage" Command="{Binding SaveConflictCommand}" Margin="0,0,4,4"/>
                     </WrapPanel>
@@ -334,11 +339,6 @@
                         <TextBlock Text="{Binding LfsNotice}" IsVisible="{Binding HasLfsNotice}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                         <Button Classes="flat" Content="Show the file" Command="{Binding ShowLfsCommand}" IsVisible="{Binding ShowLfsDownload}" HorizontalAlignment="Left" Margin="0,4,0,0"/>
                     </StackPanel>
-                    <Grid DockPanel.Dock="Top" IsVisible="{Binding ShowingMerge}" ColumnDefinitions="*,8,*,8,*" Margin="8,4,8,0">
-                        <TextBlock Text="Ours" FontWeight="SemiBold" Opacity="0.75"/>
-                        <TextBlock Grid.Column="2" Text="Result" FontWeight="SemiBold" Opacity="0.75"/>
-                        <TextBlock Grid.Column="4" Text="Theirs" FontWeight="SemiBold" Opacity="0.75"/>
-                    </Grid>
                     <Grid RowDefinitions="*,Auto">
                         <views:CopyListBox x:Name="DiffList" ItemsSource="{Binding DiffRows}" Background="Transparent" IsVisible="{Binding ShowingRows}"
                                            ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -471,31 +471,11 @@
                                 </DataTemplate>
                             </views:CopyListBox.DataTemplates>
                         </views:CopyListBox>
-                        <views:CopyListBox ItemsSource="{Binding MergeRegions}" Background="Transparent" IsVisible="{Binding ShowingMerge}">
-                            <views:CopyListBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:MergeRegionRow">
-                                    <StackPanel Margin="8,4,8,8">
-                                        <views:CopyableText Classes="diff" CopyKey="context" Text="{Binding Context}" TextWrapping="Wrap" IsVisible="{Binding IsContext}"/>
-                                        <Grid ColumnDefinitions="*,8,*,8,*" IsVisible="{Binding IsConflict}">
-                                            <StackPanel>
-                                                <Button Classes="flat" Content="Take ours" Command="{Binding TakeOursCommand}" HorizontalAlignment="Left" Margin="0,0,0,4"/>
-                                                <views:CopyableText Classes="diff" CopyKey="ours" Text="{Binding OursDisplay}" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                            <TextBox Grid.Column="2" Classes="diff" Text="{Binding Result, Mode=TwoWay}" AcceptsReturn="True" TextWrapping="Wrap"
-                                                     MinHeight="72" MaxHeight="280" VerticalContentAlignment="Top"/>
-                                            <StackPanel Grid.Column="4">
-                                                <Button Classes="flat" Content="Take theirs" Command="{Binding TakeTheirsCommand}" HorizontalAlignment="Left" Margin="0,0,0,4"/>
-                                                <views:CopyableText Classes="diff" CopyKey="theirs" Text="{Binding TheirsDisplay}" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                        </Grid>
-                                        <StackPanel IsVisible="{Binding ShowBaseSection}" Margin="0,6,0,0" Spacing="2">
-                                            <TextBlock Text="Base" Opacity="0.65" FontSize="12"/>
-                                            <views:CopyableText Classes="diff" CopyKey="base" Text="{Binding BaseDisplay}" TextWrapping="Wrap"/>
-                                        </StackPanel>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </views:CopyListBox.ItemTemplate>
-                        </views:CopyListBox>
+                        <views:MergeEditor Grid.Row="0" IsVisible="{Binding ShowingMerge}"
+                                           Session="{Binding MergeEdit}"
+                                           FilePath="{Binding MergePath}"
+                                           ShowBase="{Binding ShowMergeBase}"
+                                           ConflictIndex="{Binding MergeConflictIndex}"/>
                         <ScrollBar x:Name="SideBar" Grid.Row="1" Orientation="Horizontal"
                                    Minimum="0" AllowAutoHide="False" IsVisible="False"/>
                     </Grid>

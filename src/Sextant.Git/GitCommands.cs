@@ -1,4 +1,5 @@
 using System.Globalization;
+using Sextant.Git.Parsing;
 
 namespace Sextant.Git;
 
@@ -431,8 +432,24 @@ public static class GitCommands
         return arguments;
     }
 
-    public static IReadOnlyList<string> Mergetool(string toplevel, string path) =>
-        ["-C", toplevel, "mergetool", "--no-prompt", "--", path];
+    /// <summary>
+    /// An empty command uses the merge tool configured in git.
+    /// A command is passed with <c>-c</c> for this run and is not written into git config.
+    /// </summary>
+    public static IReadOnlyList<string> Mergetool(string toplevel, string path, string? command = null)
+    {
+        var tool = MergeToolCommand.Normalize(command);
+        if (tool is null)
+            return ["-C", toplevel, "mergetool", "--no-prompt", "--", path];
+
+        return
+        [
+            "-C", toplevel,
+            "-c", "mergetool.keepBackup=false",
+            "-c", "mergetool.sextant.cmd=" + tool,
+            "mergetool", "--no-prompt", "-t", "sextant", "--", path,
+        ];
+    }
 
     public static IReadOnlyList<string> Init(string path) =>
         ["init", path];

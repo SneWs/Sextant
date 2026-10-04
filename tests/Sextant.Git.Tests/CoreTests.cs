@@ -224,6 +224,7 @@ public class CoreTests
                 SideBySide = true,
                 IgnoreWhitespace = true,
                 Theme = ThemePreference.Dark,
+                MergeTool = "meld \"$LOCAL\" \"$MERGED\" \"$REMOTE\"",
             });
 
             var loaded = store.LoadWorkspace();
@@ -243,6 +244,7 @@ public class CoreTests
             Assert.True(settings.SideBySide);
             Assert.True(settings.IgnoreWhitespace);
             Assert.Equal(ThemePreference.Dark, settings.Theme);
+            Assert.Equal("meld \"$LOCAL\" \"$MERGED\" \"$REMOTE\"", settings.MergeTool);
             Assert.Equal(ThemePreference.System, ThemePreference.Normalize(null));
             Assert.Equal(ThemePreference.Light, ThemePreference.Normalize(" Light "));
             Assert.Equal(ThemePreference.System, ThemePreference.Normalize("nope"));
@@ -254,6 +256,7 @@ public class CoreTests
             Assert.False(older.SideBySide);
             Assert.False(older.IgnoreWhitespace);
             Assert.Equal(ThemePreference.System, older.Theme);
+            Assert.Null(older.MergeTool);
 
             File.WriteAllText(Path.Combine(directory, "workspace.json"), """
                 {

@@ -85,7 +85,7 @@ Checked items are in the app. The rest are still ahead. [PLAN.md](PLAN.md) is th
 - [x] Command palette on Ctrl/Cmd+P, plus Open, next tab, close tab, and Refresh.
 - [x] The running command, a failure banner you can copy, and a full-width command log with secrets stripped out.
 - [x] Progress while cloning, fetching, pulling, and pushing.
-- [x] Fluent compact theme. Light is Catppuccin Latte and dark is Catppuccin Mocha. Settings chooses light, dark, or follow the system.
+- [x] Fluent compact theme. Light is Catppuccin Latte and dark is Catppuccin Mocha. Settings is split into Appearance, Diff, Git, and Merging. Appearance chooses light, dark, or follow the system.
 - [x] Watch the git directory, refresh when the window is focused, and refresh with F5.
 - [x] After a slow status, offer `feature.manyFiles` and `core.fsmonitor`, and write them only after you apply them.
 - [x] Ask before trusting a repository that git reports as dubious ownership.
@@ -112,7 +112,8 @@ Checked items are in the app. The rest are still ahead. [PLAN.md](PLAN.md) is th
 
 ### Rewriting and conflicts
 
-- [x] Three-way editor for an unmerged text file: ours, an editable result, and theirs, with the merge base on demand. Take ours and Take theirs fill the result.
+- [x] Three-way editor for an unmerged text file: ours, an editable result, and theirs, with the merge base on demand. Take ours and Take theirs fill the selected conflict. Previous and Next move between conflicts.
+- [x] Settings → Merging sets the external merge command. An empty command uses the merge tool configured in git, and the command is not written into git config.
 - [x] Save and stage when the conflict markers are gone. Markers that remain stay on disk and the path stays unmerged.
 - [x] A binary conflict stays on the external merge tool.
 - [x] Continue and abort for a merge, rebase, cherry-pick, and revert.
@@ -122,11 +123,11 @@ Checked items are in the app. The rest are still ahead. [PLAN.md](PLAN.md) is th
 
 ### Scale and depth
 
-- [ ] List submodules on the parent and open one as a tab.
-- [ ] List worktrees, add one, and open it as a tab.
-- [ ] When sparse checkout is on, say so, and do not try to materialize excluded paths.
-- [ ] Show Git LFS pointers as pointers, and download a blob only when you ask.
-- [ ] Highlight syntax in the visible diff only.
+- [x] List submodules on the parent and open one as a tab.
+- [x] List worktrees, add one, and open it as a tab.
+- [x] When sparse checkout is on, say so, and do not try to materialize excluded paths.
+- [x] Show Git LFS pointers as pointers, and download a blob only when you ask.
+- [x] Highlight syntax in the visible diff only.
 - [x] Diff images and FBX models, up to 8 MB. PNG, JPG, JPEG, GIF, BMP, WebP, ICO, SVG, and TIFF show before and after. An FBX file shows a clay view you can turn while holding Ctrl or Cmd, with the mesh summary underneath.
 
 ## Run

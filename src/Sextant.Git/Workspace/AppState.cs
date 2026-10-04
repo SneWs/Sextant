@@ -141,6 +141,9 @@ public sealed class AppSettings
 
     /// <summary><see cref="ThemePreference.System"/>, <see cref="ThemePreference.Light"/>, or <see cref="ThemePreference.Dark"/>.</summary>
     public string Theme { get; set; } = ThemePreference.System;
+
+    /// <summary>Command git mergetool runs for a conflict. Empty uses the tool configured in git.</summary>
+    public string? MergeTool { get; set; }
 }
 
 public static class AppPaths

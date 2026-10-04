@@ -179,10 +179,6 @@ public static class CopyText
         BlameRow row when key == "blame" => row.Text,
         BlameRow row when key == "meta" => row.Continues ? null : row.Meta,
         BlameRow row when key == "number" => row.Continues ? null : row.Number,
-        MergeRegionRow row when key == "context" && row.IsContext => row.Context,
-        MergeRegionRow row when key == "ours" && row.IsConflict => row.OursDisplay,
-        MergeRegionRow row when key == "theirs" && row.IsConflict => row.TheirsDisplay,
-        MergeRegionRow row when key == "base" && row.ShowBaseSection => row.BaseDisplay,
         _ => null,
     };
 

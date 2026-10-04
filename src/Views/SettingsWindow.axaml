@@ -1,0 +1,81 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Sextant.Views.SettingsWindow"
+        Title="Settings"
+        Width="720" Height="520"
+        MinWidth="640" MinHeight="420"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+    <Grid ColumnDefinitions="180,*" RowDefinitions="*,Auto">
+        <Border Grid.RowSpan="1" BorderThickness="0,0,1,0"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+            <ListBox x:Name="Sections" SelectedIndex="0" SelectionChanged="OnSection">
+                <ListBoxItem>Appearance</ListBoxItem>
+                <ListBoxItem>Diff</ListBoxItem>
+                <ListBoxItem>Git</ListBoxItem>
+                <ListBoxItem>Merging</ListBoxItem>
+            </ListBox>
+        </Border>
+
+        <ScrollViewer Grid.Column="1" Padding="20,16">
+            <Grid>
+                <StackPanel x:Name="AppearancePage" Spacing="8">
+                    <TextBlock Text="Appearance" FontSize="18" FontWeight="SemiBold"/>
+                    <RadioButton x:Name="FollowSystem" Content="Follow system" GroupName="SextantTheme"/>
+                    <RadioButton x:Name="Light" Content="Light" GroupName="SextantTheme"/>
+                    <RadioButton x:Name="Dark" Content="Dark" GroupName="SextantTheme"/>
+                    <TextBlock TextWrapping="Wrap" Opacity="0.75"
+                               Text="Light is Catppuccin Latte. Dark is Catppuccin Mocha. Follow system uses the operating system's palette."/>
+                </StackPanel>
+
+                <StackPanel x:Name="DiffPage" Spacing="8" IsVisible="False">
+                    <TextBlock Text="Diff" FontSize="18" FontWeight="SemiBold"/>
+                    <RadioButton x:Name="Inline" Content="Inline" GroupName="SextantDiff"/>
+                    <RadioButton x:Name="SideBySide" Content="Side by side" GroupName="SextantDiff"/>
+                    <CheckBox x:Name="IgnoreWhitespace" Content="Ignore whitespace"/>
+                    <TextBlock TextWrapping="Wrap" Opacity="0.75"
+                               Text="Inline or side by side applies to every repository. Ignore whitespace passes -w for that diff only."/>
+                </StackPanel>
+
+                <StackPanel x:Name="GitPage" Spacing="8" IsVisible="False">
+                    <TextBlock Text="Git" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock Text="Executable" Opacity="0.75"/>
+                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <TextBox x:Name="GitPath" PlaceholderText="Leave empty to use git on PATH"/>
+                        <Button Grid.Column="1" Content="Browse…" Click="OnBrowseGit"/>
+                        <Button Grid.Column="2" Content="Use system git" Click="OnUseSystemGit"/>
+                    </Grid>
+                    <TextBlock TextWrapping="Wrap" Opacity="0.75"
+                               Text="An empty path uses the git executable on PATH."/>
+                </StackPanel>
+
+                <StackPanel x:Name="MergePage" Spacing="8" IsVisible="False">
+                    <TextBlock Text="Merging" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock Text="External merge command" Opacity="0.75"/>
+                    <TextBox x:Name="MergeCommand" AcceptsReturn="False" TextWrapping="Wrap" MinHeight="64"
+                             PlaceholderText="Leave empty to use the merge tool configured in git"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Browse…" Click="OnBrowseMerge"/>
+                        <Button Content="Use git's merge tool" Click="OnClearMerge"/>
+                    </StackPanel>
+                    <TextBlock TextWrapping="Wrap" Opacity="0.75"
+                               Text="git mergetool runs this command. $LOCAL is the current side, $REMOTE is the other side, $BASE is the common ancestor, and $MERGED is the file to save. An empty command uses the merge tool already configured for git. Sextant does not write the command into git config."/>
+                    <TextBlock TextWrapping="Wrap" Opacity="0.75"
+                               Text="Example: meld &quot;$LOCAL&quot; &quot;$MERGED&quot; &quot;$REMOTE&quot;"/>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+
+        <Border Grid.Row="1" Grid.ColumnSpan="2" BorderThickness="0,1,0,0" Padding="16"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock x:Name="ErrorText" Foreground="IndianRed" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button Content="Cancel" IsCancel="True" Click="OnCancel"/>
+                    <Button Content="OK" IsDefault="True" Click="OnOk"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

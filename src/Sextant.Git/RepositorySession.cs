@@ -696,8 +696,8 @@ public sealed partial class RepositorySession : IAsyncDisposable
     public Task PushUpstreamAsync(string remote, string branch, IProgress<string>? progress, CancellationToken cancellationToken, bool noVerify = false) =>
         MutateAsync(GitCommands.PushUpstream(_toplevel, remote, branch, noVerify), progress, cancellationToken);
 
-    public Task MergetoolAsync(string path, CancellationToken cancellationToken) =>
-        MutateAsync(GitCommands.Mergetool(_toplevel, path), null, cancellationToken);
+    public Task MergetoolAsync(string path, string? command, CancellationToken cancellationToken) =>
+        MutateAsync(GitCommands.Mergetool(_toplevel, path, command), null, cancellationToken);
 
     public Task SaveResolutionAsync(string path, string text, CancellationToken cancellationToken)
     {

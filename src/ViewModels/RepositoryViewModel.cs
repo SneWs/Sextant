@@ -1116,7 +1116,7 @@ public partial class RepositoryViewModel : ViewModelBase
             StageCommand = new AsyncRelayCommand(() => RunAsync(conflict ? "Staging resolution…" : "Staging…", ct => Session.StageFileAsync(path, ct))),
             UnstageCommand = new AsyncRelayCommand(() => RunAsync("Unstaging…", ct => Session.UnstageFileAsync(path, ct))),
             DiscardCommand = new AsyncRelayCommand(() => DiscardAsync(path, untracked)),
-            MergetoolCommand = new AsyncRelayCommand(() => RunAsync("Opening merge tool…", ct => Session.MergetoolAsync(path, ct))),
+            MergetoolCommand = new AsyncRelayCommand(() => RunAsync("Opening merge tool…", ct => Session.MergetoolAsync(path, _host.MergeTool, ct))),
             HistoryCommand = new AsyncRelayCommand(() => ShowFileHistoryAsync(path)),
         };
     }
@@ -1877,25 +1877,9 @@ public partial class RepositoryViewModel : ViewModelBase
             return;
         }
 
-        var rows = new List<MergeRegionRow>(document.Pieces.Count);
-        foreach (var piece in document.Pieces)
-        {
-            rows.Add(new MergeRegionRow
-            {
-                IsConflict = piece.IsConflict,
-                Context = piece.Context,
-                Ours = piece.Ours,
-                Theirs = piece.Theirs,
-                BaseText = piece.Base ?? "",
-                HasBase = piece.Base is not null,
-                Result = piece.Result,
-                ShowBase = ShowMergeBase,
-            });
-        }
-
         ClearPreview();
-        MergeRegions.Reset(rows);
-        _mergePath = file.Path;
+        MergePath = file.Path;
+        MergeEdit = MergeSession.FromPieces(document.Pieces);
         DiffRows.Clear();
         _rawPatch = null;
         ShowLoadDiff = false;
@@ -1909,9 +1893,8 @@ public partial class RepositoryViewModel : ViewModelBase
     private void ClearMerge()
     {
         ShowingMerge = false;
-        _mergePath = null;
-        if (MergeRegions.Count > 0)
-            MergeRegions.Reset([]);
+        MergeEdit = null;
+        MergePath = "";
     }
 
     private void RenderDiff(DiffDocument document, FileRowViewModel? file, bool workingCopy)

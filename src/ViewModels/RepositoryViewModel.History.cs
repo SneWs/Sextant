@@ -49,9 +49,14 @@ public partial class RepositoryViewModel
     [ObservableProperty]
     public partial bool ShowMergeBase { get; set; }
 
-    public ResetCollection<MergeRegionRow> MergeRegions { get; } = [];
+    [ObservableProperty]
+    public partial MergeSession? MergeEdit { get; set; }
 
-    private string? _mergePath;
+    [ObservableProperty]
+    public partial string MergePath { get; set; } = "";
+
+    [ObservableProperty]
+    public partial int MergeConflictIndex { get; set; }
 
     public bool ShowingDiff => !ShowingBlame && !ShowingMerge;
 
@@ -63,6 +68,10 @@ public partial class RepositoryViewModel
     public string SideBySideLabel => SideBySide ? "Inline" : "Side by side";
 
     public string MergeBaseLabel => ShowMergeBase ? "Hide base" : "Show base";
+
+    public string MergeConflictLabel => MergeEdit is { ConflictCount: > 0 } edit
+        ? $"Conflict {MergeConflictIndex + 1} of {edit.ConflictCount}"
+        : "No conflicts in this file";
 
     public string WhitespaceLabel => IgnoreWhitespace ? "Show whitespace" : "Ignore whitespace";
 
@@ -99,31 +108,65 @@ public partial class RepositoryViewModel
     [RelayCommand]
     private void ToggleHistorySearch() => ShowHistorySearch = !ShowHistorySearch;
 
-    partial void OnShowMergeBaseChanged(bool value)
+    partial void OnShowMergeBaseChanged(bool value) => OnPropertyChanged(nameof(MergeBaseLabel));
+
+    partial void OnMergeEditChanged(MergeSession? oldValue, MergeSession? newValue)
     {
-        OnPropertyChanged(nameof(MergeBaseLabel));
-        foreach (var row in MergeRegions)
-            row.ShowBase = value;
+        if (oldValue is not null)
+            oldValue.Changed -= OnMergeEdited;
+        if (newValue is not null)
+            newValue.Changed += OnMergeEdited;
+        MergeConflictIndex = 0;
+        RefreshMergeCommands();
     }
+
+    partial void OnMergeConflictIndexChanged(int value) => RefreshMergeCommands();
+
+    private void OnMergeEdited()
+    {
+        if (MergeEdit is { } edit && (MergeConflictIndex < 0 || MergeConflictIndex >= edit.ConflictCount))
+            MergeConflictIndex = edit.ConflictCount == 0 ? 0 : edit.ConflictCount - 1;
+        RefreshMergeCommands();
+    }
+
+    private void RefreshMergeCommands()
+    {
+        OnPropertyChanged(nameof(MergeConflictLabel));
+        PreviousConflictCommand.NotifyCanExecuteChanged();
+        NextConflictCommand.NotifyCanExecuteChanged();
+        TakeOursCommand.NotifyCanExecuteChanged();
+        TakeTheirsCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool CanTakeConflict() => MergeEdit is { ConflictCount: > 0 } edit
+        && (uint)MergeConflictIndex < (uint)edit.ConflictCount;
+
+    private bool CanPreviousConflict() => CanTakeConflict() && MergeConflictIndex > 0;
+
+    private bool CanNextConflict() => MergeEdit is { } edit && MergeConflictIndex < edit.ConflictCount - 1;
 
     [RelayCommand]
     private void ToggleMergeBase() => ShowMergeBase = !ShowMergeBase;
 
+    [RelayCommand(CanExecute = nameof(CanPreviousConflict))]
+    private void PreviousConflict() => MergeConflictIndex--;
+
+    [RelayCommand(CanExecute = nameof(CanNextConflict))]
+    private void NextConflict() => MergeConflictIndex++;
+
+    [RelayCommand(CanExecute = nameof(CanTakeConflict))]
+    private void TakeOurs() => MergeEdit?.TakeOurs(MergeConflictIndex);
+
+    [RelayCommand(CanExecute = nameof(CanTakeConflict))]
+    private void TakeTheirs() => MergeEdit?.TakeTheirs(MergeConflictIndex);
+
     [RelayCommand]
     public async Task SaveConflict()
     {
-        if (_session is null || !ShowingMerge || string.IsNullOrEmpty(_mergePath))
+        if (_session is null || !ShowingMerge || string.IsNullOrEmpty(MergePath) || MergeEdit is null)
             return;
-        var pieces = new List<ConflictPiece>(MergeRegions.Count);
-        foreach (var row in MergeRegions)
-        {
-            pieces.Add(row.IsConflict
-                ? new ConflictPiece(true, "", row.Ours, row.Theirs, row.HasBase ? row.BaseText : null, row.Result)
-                : ConflictPiece.FromContext(row.Context));
-        }
-
-        var text = ConflictParser.Compose(pieces);
-        var path = _mergePath;
+        var text = MergeEdit.TextForDisk();
+        var path = MergePath;
         await RunAsync("Saving resolution…", ct => _session.SaveResolutionAsync(path, text, ct));
     }
 

@@ -26,7 +26,7 @@ public interface IDialogService
     Task CopyAsync(string text);
 }
 
-public sealed record SettingsDraft(string GitExecutable, bool SideBySide, bool IgnoreWhitespace, string Theme);
+public sealed record SettingsDraft(string GitExecutable, bool SideBySide, bool IgnoreWhitespace, string Theme, string MergeTool);
 
 public sealed record CloneRequest(string Url, string Destination);
 
@@ -39,6 +39,9 @@ public interface IWorkspaceHost
     GitProcessRunner Runner { get; }
 
     string? GitExecutable { get; }
+
+    /// <summary>Shell command for git mergetool. Null uses the tool configured in git.</summary>
+    string? MergeTool { get; }
 
     bool GitReady { get; }
 
