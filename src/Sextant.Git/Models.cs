@@ -221,6 +221,9 @@ public sealed class SessionState
     public required IReadOnlyList<WorktreeEntry> Worktrees { get; init; }
 
     public required bool SparseCheckout { get; init; }
+
+    /// <summary>Worktree paths whose filter attribute is lfs. Empty when nothing in the status list is tracked.</summary>
+    public required IReadOnlySet<string> LfsPaths { get; init; }
 }
 
 public static class HistoryLimits

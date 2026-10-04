@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using Sextant.Git.Parsing;
 
 namespace Sextant.Git;
@@ -585,6 +586,67 @@ public static class GitCommands
 
     public static IReadOnlyList<string> LfsSmudge(string toplevel) =>
         ["-C", toplevel, "lfs", "smudge"];
+
+    public static IReadOnlyList<string> CheckLfsAttr(string toplevel, string? source)
+    {
+        var arguments = new List<string> { "-C", toplevel, "--no-optional-locks", "check-attr", "--stdin", "-z" };
+        if (!string.IsNullOrEmpty(source))
+        {
+            arguments.Add("--source");
+            arguments.Add(source);
+        }
+
+        arguments.Add("filter");
+        return arguments;
+    }
+
+    public static IReadOnlyList<string> LfsTrack(string toplevel, string path) =>
+        ["-C", toplevel, "lfs", "track", "--filename", "--", path];
+
+    public static IReadOnlyList<string> LfsUntrack(string toplevel, string path) =>
+        ["-C", toplevel, "lfs", "untrack", "--", path];
+
+    public static IReadOnlyList<string> LfsFetch(string toplevel) =>
+        ["-C", toplevel, "lfs", "fetch"];
+
+    public static IReadOnlyList<string> LfsPull(string toplevel) =>
+        ["-C", toplevel, "lfs", "pull"];
+
+    public static IReadOnlyList<string> LfsPullFile(string toplevel, string path) =>
+        ["-C", toplevel, "lfs", "pull", "--include=" + LfsInclude(path)];
+
+    public static IReadOnlyList<string> LfsCheckout(string toplevel, string path) =>
+        ["-C", toplevel, "lfs", "checkout", "--", LfsInclude(path)];
+
+    public static IReadOnlyList<string> StageAttributes(string toplevel) =>
+        ["-C", toplevel, "add", "--", ".gitattributes"];
+
+    public static IReadOnlyList<string> StageLfsTrack(string toplevel, string path) =>
+        ["-C", toplevel, "add", "--", ".gitattributes", path];
+
+    /// <summary>
+    /// True when <paramref name="path"/> cannot be one <c>--include</c> entry.
+    /// Git LFS splits that list on commas and has no escape.
+    /// </summary>
+    public static bool LfsNameHasComma(string path) => path.Contains(',');
+
+    /// <summary>
+    /// One gitignore pattern for a single path. <c>*</c>, <c>?</c>, and <c>[</c> are escaped.
+    /// A comma is left as it is. <see cref="LfsPullFile"/> cannot name a path that contains one.
+    /// </summary>
+    public static string LfsInclude(string path)
+    {
+        var gitPath = path.Replace('\\', '/');
+        var builder = new StringBuilder(gitPath.Length);
+        foreach (var character in gitPath)
+        {
+            if (character is '*' or '?' or '[')
+                builder.Append('\\');
+            builder.Append(character);
+        }
+
+        return builder.ToString();
+    }
 
     /// <summary>
     /// Diff and show stay on the pointer. Clearing the LFS smudge and process filters keeps a normal diff from downloading the blob.

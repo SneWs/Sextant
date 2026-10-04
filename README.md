@@ -128,6 +128,7 @@ Checked items are in the app. The rest are still ahead. [PLAN.md](PLAN.md) is th
 - [x] List worktrees, add one, and open it as a tab.
 - [x] When sparse checkout is on, say so, and do not try to materialize excluded paths.
 - [x] Show Git LFS pointers as pointers, and download a blob only when you ask.
+- [x] Mark a file Git LFS tracks in the file list and the diff. Fetch LFS objects, pull LFS files, and track, stop tracking, or download a working-copy file.
 - [x] Highlight syntax in the visible diff only.
 - [x] Diff images and FBX models, up to 8 MB. PNG, JPG, JPEG, GIF, BMP, WebP, ICO, SVG, and TIFF show before and after. An FBX file shows a clay view you can turn while holding Ctrl or Cmd, with the mesh summary underneath.
 

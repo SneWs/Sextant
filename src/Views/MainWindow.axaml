@@ -40,6 +40,8 @@
                     <NativeMenuItem Header="Add _remote…" Command="{Binding AddRemoteCommand}"/>
                     <NativeMenuItem Header="Add _worktree…" Command="{Binding AddWorktreeCommand}"/>
                     <NativeMenuItem Header="Apply _patch…" Command="{Binding ApplyPatchCommand}"/>
+                    <NativeMenuItem Header="_Fetch LFS objects" Command="{Binding FetchLfsCommand}"/>
+                    <NativeMenuItem Header="_Pull LFS files" Command="{Binding PullLfsCommand}"/>
                     <NativeMenuItem Header="Command _log" Command="{Binding ToggleCommandsCommand}"/>
                     <NativeMenuItemSeparator/>
                     <NativeMenuItem Header="_Search" Command="{Binding ToggleHistorySearchCommand}" Gesture="{app:CommandGesture Key=F}"/>

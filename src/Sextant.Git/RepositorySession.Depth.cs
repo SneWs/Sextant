@@ -24,6 +24,110 @@ public sealed partial class RepositorySession
         }
     }
 
+    public Task<IReadOnlySet<string>> LfsTrackedAsync(IReadOnlyList<string> paths, string? source, CancellationToken cancellationToken)
+    {
+        if (paths.Count == 0)
+            return Task.FromResult<IReadOnlySet<string>>(new HashSet<string>(StringComparer.Ordinal));
+        return RunAsync(
+            ct => _scheduler.ReadAsync(token => ReadLfsAsync(paths, source, token), ct),
+            cancellationToken);
+    }
+
+    public Task TrackWithLfsAsync(string path, CancellationToken cancellationToken) =>
+        ChangeLfsAsync(async token =>
+        {
+            Checked(await ExecuteAsync(GitCommands.LfsTrack(_toplevel, path), null, token).ConfigureAwait(false));
+            Checked(await ExecuteAsync(GitCommands.StageLfsTrack(_toplevel, path), null, token).ConfigureAwait(false));
+        }, cancellationToken);
+
+    public Task UntrackLfsAsync(string path, CancellationToken cancellationToken) =>
+        ChangeLfsAsync(async token =>
+        {
+            Checked(await ExecuteAsync(GitCommands.LfsUntrack(_toplevel, path), null, token).ConfigureAwait(false));
+            Checked(await ExecuteAsync(GitCommands.StageAttributes(_toplevel), null, token).ConfigureAwait(false));
+        }, cancellationToken);
+
+    public Task LfsFetchAsync(IProgress<string>? progress, CancellationToken cancellationToken) =>
+        MutateAsync(GitCommands.LfsFetch(_toplevel), progress, cancellationToken);
+
+    public Task LfsPullAsync(IProgress<string>? progress, CancellationToken cancellationToken) =>
+        MutateAsync(GitCommands.LfsPull(_toplevel), progress, cancellationToken);
+
+    public Task LfsPullFileAsync(string path, CancellationToken cancellationToken)
+    {
+        if (!GitCommands.LfsNameHasComma(path))
+            return MutateAsync(GitCommands.LfsPullFile(_toplevel, path), null, cancellationToken);
+        // --include splits on commas and cannot name this file. Fetch the commit, then check out only this path.
+        return ChangeLfsAsync(async token =>
+        {
+            Checked(await ExecuteAsync(GitCommands.LfsFetch(_toplevel), null, token).ConfigureAwait(false));
+            Checked(await ExecuteAsync(GitCommands.LfsCheckout(_toplevel, path), null, token).ConfigureAwait(false));
+        }, cancellationToken);
+    }
+
+    private async Task<IReadOnlySet<string>> ReadLfsAsync(IReadOnlyList<string> paths, string? source, CancellationToken cancellationToken)
+    {
+        var unique = new List<string>(paths.Count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var path in paths)
+        {
+            if (path.Length > 0 && seen.Add(path))
+                unique.Add(path);
+        }
+
+        if (unique.Count == 0)
+            return new HashSet<string>(StringComparer.Ordinal);
+        var output = Checked(await ExecuteAsync(
+            GitCommands.CheckLfsAttr(_toplevel, source),
+            null,
+            cancellationToken,
+            standardInput: CheckAttrParser.Input(unique)).ConfigureAwait(false));
+        return CheckAttrParser.LfsTracked(output.Stdout);
+    }
+
+    private static List<string> AttributePaths(IReadOnlyList<StatusEntry> entries)
+    {
+        var paths = new List<string>(entries.Count);
+        foreach (var entry in entries)
+        {
+            if (entry.Path.Length > 0)
+                paths.Add(entry.Path);
+            if (entry.OriginalPath is { Length: > 0 } original)
+                paths.Add(original);
+        }
+
+        return paths;
+    }
+
+    private Task ChangeLfsAsync(Func<CancellationToken, Task> write, CancellationToken cancellationToken) =>
+        RunAsync(async ct =>
+        {
+            GitCommandFailedException? failure = null;
+            try
+            {
+                await _scheduler.WriteAsync(async token =>
+                {
+                    await write(token).ConfigureAwait(false);
+                    return 0;
+                }, ct).ConfigureAwait(false);
+            }
+            catch (GitCommandFailedException exception)
+            {
+                failure = exception;
+            }
+
+            try
+            {
+                await LoadRefsAndMaybeHistoryAsync(ct, statusAlreadyApplied: false).ConfigureAwait(false);
+            }
+            catch (GitCommandFailedException) when (failure is not null)
+            {
+            }
+
+            if (failure is not null)
+                throw failure;
+        }, cancellationToken);
+
     public Task AddWorktreeAsync(string path, string? newBranch, string? startPoint, CancellationToken cancellationToken) =>
         RunAsync(async ct =>
         {

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using Sextant;
 using Sextant.Git.Parsing;
@@ -58,6 +59,20 @@ public class Phase4Tests
         Assert.True(entries[1].Locked);
         Assert.Equal("busy", entries[1].LockReason);
         Assert.Equal(["keep", "skip"], WorktreeParser.Patterns("keep\n\n skip \n"));
+    }
+
+    [Fact]
+    public void Check_attr_keeps_only_lfs_filters()
+    {
+        var output = "keep.txt\0filter\0unspecified\0dir/a.bin\0filter\0lfs\0"u8;
+        var tracked = CheckAttrParser.LfsTracked(output);
+        Assert.Equal(["dir/a.bin"], tracked);
+        Assert.True(CheckAttrParser.IsTracked(tracked, "dir/a.bin", null));
+        Assert.True(CheckAttrParser.IsTracked(tracked, "c.txt", "dir/a.bin"));
+        Assert.False(CheckAttrParser.IsTracked(tracked, "keep.txt", null));
+        Assert.Empty(CheckAttrParser.LfsTracked("keep.txt\0filter\0unspecified"u8));
+        Assert.Empty(CheckAttrParser.LfsTracked("dir/a.bin\0filter"u8));
+        Assert.Equal(["dir/a.bin"], CheckAttrParser.LfsTracked("dir/a.bin\0filter\0lfs\0trailing"u8));
     }
 
     [Fact]
@@ -572,6 +587,110 @@ public class Phase4Tests
         Assert.DoesNotContain(added, command => command.Arguments.Contains("--filters"));
         Assert.DoesNotContain(added, command => command.Arguments.Contains("lfs"));
         Assert.Equal(onDisk, File.ReadAllBytes(file));
+    }
+
+    [Fact]
+    public async Task Lfs_attribute_marks_the_worktree_and_a_commit()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile(".gitattributes", "*.bin filter=lfs diff=lfs merge=lfs -text\n");
+        repo.WriteFile("a.txt", "one\n");
+        repo.WriteFile("b.bin", "two\n");
+        repo.CommitAll("base");
+        var sha = repo.RunCapture("rev-parse", "HEAD").Trim();
+        repo.WriteFile("a.txt", "one!\n");
+        repo.WriteFile("b.bin", "two!\n");
+        await using var session = await Open(repo);
+        var work = session.Snapshot().LfsPaths;
+        Assert.Contains("b.bin", work);
+        Assert.DoesNotContain("a.txt", work);
+        var tracked = await session.LfsTrackedAsync(["a.txt", "b.bin"], sha, CancellationToken.None);
+        Assert.Contains("b.bin", tracked);
+        Assert.DoesNotContain("a.txt", tracked);
+        Assert.Contains(session.Snapshot().Commands, command => command.Arguments.Contains("check-attr"));
+    }
+
+    [Fact]
+    public async Task Track_with_lfs_stores_a_pointer_and_download_restores_the_file()
+    {
+        if (!GitLfsInstalled())
+            return;
+        using var repo = new TempRepo();
+        repo.WriteFile("a.bin", "hello-lfs\n");
+        await using var session = await Open(repo);
+        await session.TrackWithLfsAsync("a.bin", CancellationToken.None);
+        var staged = repo.RunCapture(
+            "-c", "filter.lfs.smudge=",
+            "-c", "filter.lfs.process=",
+            "-c", "filter.lfs.required=false",
+            "show", ":a.bin");
+        Assert.Contains("git-lfs.github.com", staged, StringComparison.Ordinal);
+        Assert.Contains("a.bin", session.Snapshot().LfsPaths);
+        repo.CommitAll("tracked");
+        var pointer = repo.RunCapture(
+            "-c", "filter.lfs.smudge=",
+            "-c", "filter.lfs.process=",
+            "-c", "filter.lfs.required=false",
+            "show", "HEAD:a.bin");
+        File.WriteAllText(Path.Combine(repo.Directory, "a.bin"), pointer);
+        await session.LfsPullFileAsync("a.bin", CancellationToken.None);
+        Assert.Equal("hello-lfs\n", File.ReadAllText(Path.Combine(repo.Directory, "a.bin")).Replace("\r\n", "\n", StringComparison.Ordinal));
+        await session.UntrackLfsAsync("a.bin", CancellationToken.None);
+        var after = await session.LfsTrackedAsync(["a.bin"], null, CancellationToken.None);
+        Assert.DoesNotContain("a.bin", after);
+    }
+
+    [Fact]
+    public async Task Download_of_a_comma_name_restores_that_file_only()
+    {
+        if (!GitLfsInstalled())
+            return;
+        using var repo = new TempRepo();
+        repo.WriteFile("a,b.bin", "hello-comma\n");
+        repo.WriteFile("c.bin", "hello-other\n");
+        await using var session = await Open(repo);
+        await session.TrackWithLfsAsync("a,b.bin", CancellationToken.None);
+        await session.TrackWithLfsAsync("c.bin", CancellationToken.None);
+        repo.CommitAll("tracked");
+        WritePointer(repo, "a,b.bin");
+        WritePointer(repo, "c.bin");
+        await session.LfsPullFileAsync("a,b.bin", CancellationToken.None);
+        Assert.Equal("hello-comma\n", ReadText(repo, "a,b.bin"));
+        Assert.Contains("git-lfs.github.com", ReadText(repo, "c.bin"), StringComparison.Ordinal);
+    }
+
+    private static void WritePointer(TempRepo repo, string path)
+    {
+        var pointer = repo.RunCapture(
+            "-c", "filter.lfs.smudge=",
+            "-c", "filter.lfs.process=",
+            "-c", "filter.lfs.required=false",
+            "show", "HEAD:" + path);
+        File.WriteAllText(Path.Combine(repo.Directory, path), pointer);
+    }
+
+    private static string ReadText(TempRepo repo, string path) =>
+        File.ReadAllText(Path.Combine(repo.Directory, path)).Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    private static bool GitLfsInstalled()
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo("git", "lfs version")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            });
+            if (process is null)
+                return false;
+            process.WaitForExit(5000);
+            return process.ExitCode == 0;
+        }
+        catch (Exception exception) when (exception is IOException or System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
     }
 
     private static string Pointer(char oid, long size) =>

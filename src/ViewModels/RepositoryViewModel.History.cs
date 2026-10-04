@@ -519,7 +519,10 @@ public partial class RepositoryViewModel
             var files = await _session.RangeFilesAsync(_rangeOlder, _rangeNewer, token);
             if (files is null || token.IsCancellationRequested)
                 return;
-            ShowCommitFiles(files);
+            var tracked = await LfsMarksAsync(files, _rangeNewer, token);
+            if (token.IsCancellationRequested)
+                return;
+            ShowCommitFiles(files, tracked);
             await LoadDiffAsync();
         }
         catch (OperationCanceledException)
@@ -571,9 +574,10 @@ public partial class RepositoryViewModel
             {
                 Path = file.Path,
                 Label = file.Path,
+                LfsTracked = file.LfsTracked,
                 CanFold = true,
                 Expanded = AllFiles ? IsFoldOpen(key) : true,
-                FileMenu = FileMenuFor(file.Path),
+                FileMenu = FileMenuFor(file.Path, file.LfsTracked),
             };
             var section = new DiffSection(key, header);
             header.ToggleCommand = new RelayCommand(() => SetExpanded(section, !header.Expanded));

@@ -32,6 +32,8 @@ public partial class RepositoryViewModel : ViewModelBase
     private string _entrySignature = "";
     private bool _inAppMerge = true;
     private readonly List<FileRowViewModel> _workingFiles = [];
+    private readonly HashSet<string> _worktreeLfs = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _viewLfs = new(StringComparer.Ordinal);
     private bool _showingCommitFiles;
     private string _refSignature = "";
     private string _commandSignature = "";
@@ -1107,6 +1109,11 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private void RebuildFiles(SessionState state)
     {
+        _worktreeLfs.Clear();
+        foreach (var path in state.LfsPaths)
+            _worktreeLfs.Add(path);
+        if (!_showingCommitFiles)
+            UseViewLfs(_worktreeLfs);
         _workingFiles.Clear();
         var conflicts = state.Entries.Where(entry => entry.Kind == ChangeKind.Unmerged).ToList();
         var staged = state.Entries.Where(entry => entry.Staged && entry.Kind != ChangeKind.Unmerged).ToList();
@@ -1131,6 +1138,7 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         var path = entry.Path;
         var untracked = entry.Kind == ChangeKind.Untracked;
+        var lfs = CheckAttrParser.IsTracked(_worktreeLfs, path, entry.OriginalPath);
         return new FileRowViewModel
         {
             Path = path,
@@ -1140,6 +1148,7 @@ public partial class RepositoryViewModel : ViewModelBase
             Kind = entry.Kind,
             FromStagedList = stagedList,
             Untracked = untracked,
+            LfsTracked = lfs,
             ShowStage = conflict || !stagedList,
             ShowUnstage = stagedList && !conflict,
             ShowDiscard = !conflict,
@@ -1147,11 +1156,17 @@ public partial class RepositoryViewModel : ViewModelBase
             MergetoolLabel = _inAppMerge ? "Resolve" : "Merge tool",
             MergetoolMenu = _inAppMerge ? "Resolve in editor" : "Open in merge tool",
             ShowHistory = true,
+            ShowLfsTrack = !conflict && !lfs,
+            ShowLfsUntrack = !conflict && lfs,
+            ShowLfsDownload = !conflict && lfs && !untracked,
             StageCommand = new AsyncRelayCommand(() => RunAsync(conflict ? "Staging resolution…" : "Staging…", ct => Session.StageFileAsync(path, ct))),
             UnstageCommand = new AsyncRelayCommand(() => RunAsync("Unstaging…", ct => Session.UnstageFileAsync(path, ct))),
             DiscardCommand = new AsyncRelayCommand(() => DiscardAsync(path, untracked)),
             MergetoolCommand = new AsyncRelayCommand(() => OpenMergeToolAsync(path)),
             HistoryCommand = new AsyncRelayCommand(() => ShowFileHistoryAsync(path)),
+            LfsTrackCommand = new AsyncRelayCommand(() => TrackWithLfs(path)),
+            LfsUntrackCommand = new AsyncRelayCommand(() => UntrackLfs(path)),
+            LfsDownloadCommand = new AsyncRelayCommand(() => DownloadLfs(path)),
         };
     }
 
@@ -1782,7 +1797,10 @@ public partial class RepositoryViewModel : ViewModelBase
             var files = await _session.CommitFilesAsync(sha, parent, token);
             if (files is null || token.IsCancellationRequested)
                 return;
-            ShowCommitFiles(files);
+            var tracked = await LfsMarksAsync(files, sha, token);
+            if (token.IsCancellationRequested)
+                return;
+            ShowCommitFiles(files, tracked);
             _shownSha = sha;
             _diffParent = parent;
             await LoadDiffAsync();
@@ -1802,6 +1820,7 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         var previous = SelectedFile;
         _showingCommitFiles = false;
+        UseViewLfs(_worktreeLfs);
         _applying = true;
         try
         {
@@ -1836,10 +1855,11 @@ public partial class RepositoryViewModel : ViewModelBase
             preserve(Apply);
     }
 
-    private void ShowCommitFiles(IReadOnlyList<CommitFileChange> files)
+    private void ShowCommitFiles(IReadOnlyList<CommitFileChange> files, IReadOnlySet<string> tracked)
     {
         var previous = SelectedFile?.Path;
         _showingCommitFiles = true;
+        UseViewLfs(tracked);
         _applying = true;
         try
         {
@@ -1855,6 +1875,7 @@ public partial class RepositoryViewModel : ViewModelBase
                     Label = change.OriginalPath is { Length: > 0 } original ? original + " → " + change.Path : change.Path,
                     StatusText = Letter(change.Kind),
                     Kind = change.Kind,
+                    LfsTracked = CheckAttrParser.IsTracked(tracked, change.Path, change.OriginalPath),
                     ShowHistory = true,
                     HistoryCommand = new AsyncRelayCommand(() => ShowFileHistoryAsync(change.Path)),
                 });
@@ -2042,13 +2063,15 @@ public partial class RepositoryViewModel : ViewModelBase
             {
                 var label = string.IsNullOrEmpty(entry.Path) ? "Diff" : entry.Path;
                 var key = entry.Path.Length > 0 ? entry.Path : label;
+                var trackedFile = MarkedLfs(entry.Path);
                 var header = new DiffFileRow
                 {
                     Path = entry.Path,
                     Label = label,
+                    LfsTracked = trackedFile,
                     CanFold = true,
                     Expanded = IsFoldOpen(key),
-                    FileMenu = FileMenuFor(entry.Path),
+                    FileMenu = FileMenuFor(entry.Path, trackedFile),
                 };
                 var section = new DiffSection(key, header);
                 header.ToggleCommand = new RelayCommand(() => SetExpanded(section, !header.Expanded));
@@ -2713,12 +2736,14 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private Task CopyText(string text) => _host.Dialogs is null ? Task.CompletedTask : _host.Dialogs.CopyAsync(text);
 
-    private WorktreeFileMenu? FileMenuFor(string relative)
+    private WorktreeFileMenu? FileMenuFor(string relative, bool? lfsTracked = null)
     {
         var name = DesktopOpen.FileName(relative);
         if (name is null)
             return null;
         var full = string.IsNullOrEmpty(Toplevel) ? null : DesktopOpen.FullPath(Toplevel, relative);
+        var tracked = lfsTracked ?? MarkedLfs(relative);
+        var actions = ViewingWorktree();
         return new WorktreeFileMenu
         {
             OpenFolderLabel = DesktopOpen.FolderLabel(DesktopOpen.Current),
@@ -2727,7 +2752,62 @@ public partial class RepositoryViewModel : ViewModelBase
             CopyFullPathCommand = full is null ? UiCommands.Disabled : new RelayCommand(() => _ = CopyText(full)),
             OpenFolderCommand = full is null ? UiCommands.Disabled : new RelayCommand(() => OpenFolder(full)),
             OpenEditorCommand = full is null ? UiCommands.Disabled : new RelayCommand(() => OpenEditor(full)),
+            ShowLfsTrack = actions && !tracked,
+            ShowLfsUntrack = actions && tracked,
+            ShowLfsDownload = actions && tracked,
+            LfsTrackCommand = new AsyncRelayCommand(() => TrackWithLfs(relative)),
+            LfsUntrackCommand = new AsyncRelayCommand(() => UntrackLfs(relative)),
+            LfsDownloadCommand = new AsyncRelayCommand(() => DownloadLfs(relative)),
         };
+    }
+
+    private void UseViewLfs(IEnumerable<string> paths)
+    {
+        _viewLfs.Clear();
+        foreach (var path in paths)
+            _viewLfs.Add(path);
+    }
+
+    private bool PathIsLfs(string? path) => path is { Length: > 0 } && _viewLfs.Contains(path);
+
+    private bool MarkedLfs(string path)
+    {
+        if (PathIsLfs(path))
+            return true;
+        foreach (var row in Files)
+        {
+            if (!row.IsHeader && row.LfsTracked && (row.Path == path || row.OriginalPath == path))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool ViewingWorktree() =>
+        _rangeOlder is null && (SelectedGraphRow is null || SelectedGraphRow.IsWorkingCopy);
+
+    private async Task<IReadOnlySet<string>> LfsMarksAsync(IReadOnlyList<CommitFileChange> files, string? source, CancellationToken token)
+    {
+        if (_session is null || files.Count == 0)
+            return new HashSet<string>(StringComparer.Ordinal);
+        var paths = new List<string>(files.Count);
+        foreach (var change in files)
+        {
+            if (change.Path.Length > 0)
+                paths.Add(change.Path);
+            if (change.OriginalPath is { Length: > 0 } original)
+                paths.Add(original);
+        }
+
+        try
+        {
+            return await _session.LfsTrackedAsync(paths, source, token);
+        }
+        catch (GitCommandFailedException exception)
+        {
+            Fail(exception.Message);
+            return new HashSet<string>(StringComparer.Ordinal);
+        }
     }
 
     private void OpenFolder(string fullPath)

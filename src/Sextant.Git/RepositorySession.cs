@@ -32,6 +32,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
     private HistoryQuery? _historyQuery;
     private bool _includeStash;
     private List<StashEntry> _stashes = [];
+    private HashSet<string> _lfsPaths = new(StringComparer.Ordinal);
     private List<SubmoduleEntry> _submodules = [];
     private List<WorktreeEntry> _worktrees = [];
     private TimeSpan _statusDuration;
@@ -94,6 +95,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
                 Submodules = _submodules.ToArray(),
                 Worktrees = _worktrees.ToArray(),
                 SparseCheckout = ConfigParser.IsEnabled(_config, "core.sparseCheckout"),
+                LfsPaths = _lfsPaths,
             };
         }
     }
@@ -1000,7 +1002,9 @@ public sealed partial class RepositorySession : IAsyncDisposable
         return await _scheduler.ReadAsync(async token =>
         {
             var output = Checked(await ExecuteAsync(GitCommands.Status(_toplevel), null, token).ConfigureAwait(false));
-            return new StatusLoad(StatusParser.Parse(output.Stdout), output.Duration);
+            var snapshot = StatusParser.Parse(output.Stdout);
+            var lfs = await ReadLfsAsync(AttributePaths(snapshot.Entries), null, token).ConfigureAwait(false);
+            return new StatusLoad(snapshot, output.Duration, lfs);
         }, cancellationToken).ConfigureAwait(false);
     }
 
@@ -1280,6 +1284,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
     {
         _branch = status.Snapshot.Branch;
         _entries = status.Snapshot.Entries.ToList();
+        _lfsPaths = new HashSet<string>(status.LfsPaths, StringComparer.Ordinal);
         _statusDuration = status.Duration;
         var git = _gitDirectory;
         var rebase = Directory.Exists(Path.Combine(git, "rebase-merge"))
@@ -1486,7 +1491,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
         }
     }
 
-    private readonly record struct StatusLoad(StatusSnapshot Snapshot, TimeSpan Duration);
+    private readonly record struct StatusLoad(StatusSnapshot Snapshot, TimeSpan Duration, IReadOnlySet<string> LfsPaths);
 
     private readonly record struct RefLoad(
         IReadOnlyList<GitRef> Refs,

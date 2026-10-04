@@ -78,6 +78,94 @@ public partial class RepositoryViewModel
     }
 
     [RelayCommand]
+    private Task FetchLfs()
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)
+            return Task.CompletedTask;
+        var progress = Progress();
+        return HoldFocus(async () =>
+        {
+            var ok = await dialogs.ConfirmAsync(
+                "Fetch LFS objects",
+                "Download Git LFS objects for the current commit? Files in the working tree stay as they are.",
+                "Download");
+            if (!ok || _session is null)
+                return;
+            await RunAsync("Fetching LFS objects…", ct => _session.LfsFetchAsync(progress, ct));
+        });
+    }
+
+    [RelayCommand]
+    private Task PullLfs()
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)
+            return Task.CompletedTask;
+        var progress = Progress();
+        return HoldFocus(async () =>
+        {
+            var ok = await dialogs.ConfirmAsync(
+                "Pull LFS files",
+                "Download Git LFS files for this commit and replace pointer files in the working tree? Files you have changed are left alone.",
+                "Pull");
+            if (!ok || _session is null)
+                return;
+            await RunAsync("Pulling LFS files…", ct => _session.LfsPullAsync(progress, ct));
+        });
+    }
+
+    private Task TrackWithLfs(string path)
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)
+            return Task.CompletedTask;
+        return HoldFocus(async () =>
+        {
+            var ok = await dialogs.ConfirmAsync(
+                "Track with LFS",
+                $"Store {path} with Git LFS? .gitattributes and this file will be staged. The next commit stores a pointer instead of the file contents.",
+                "Track");
+            if (!ok || _session is null)
+                return;
+            await RunAsync("Tracking with LFS…", ct => _session.TrackWithLfsAsync(path, ct));
+        });
+    }
+
+    private Task UntrackLfs(string path)
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)
+            return Task.CompletedTask;
+        return HoldFocus(async () =>
+        {
+            var ok = await dialogs.ConfirmAsync(
+                "Stop tracking with LFS",
+                $"Stop tracking {path} with Git LFS? The matching pattern is removed from .gitattributes, and .gitattributes is staged. The file itself is not staged. Other files that used the same pattern are no longer tracked. History is left as it is.",
+                "Stop tracking");
+            if (!ok || _session is null)
+                return;
+            await RunAsync("Stopping LFS tracking…", ct => _session.UntrackLfsAsync(path, ct));
+        });
+    }
+
+    private Task DownloadLfs(string path)
+    {
+        if (_session is null || IsBusy)
+            return Task.CompletedTask;
+        if (!GitCommands.LfsNameHasComma(path))
+            return RunAsync("Downloading…", ct => _session.LfsPullFileAsync(path, ct));
+        if (_host.Dialogs is not { } dialogs)
+            return Task.CompletedTask;
+        return HoldFocus(async () =>
+        {
+            var ok = await dialogs.ConfirmAsync(
+                "Download",
+                $"Download {path}? Its name contains a comma, so Git LFS cannot ask for that file alone. Every LFS object for this commit is downloaded, then this pointer is replaced. Other files stay as they are.",
+                "Download");
+            if (!ok || _session is null)
+                return;
+            await RunAsync("Downloading…", ct => _session.LfsPullFileAsync(path, ct));
+        });
+    }
+
+    [RelayCommand]
     private async Task ShowLfs()
     {
         if (_session is null || IsBusy || _lfsPath.Length == 0)
@@ -603,6 +691,7 @@ public partial class RepositoryViewModel
         {
             Path = path,
             Label = path + "  (loaded)",
+            LfsTracked = MarkedLfs(path),
             FileMenu = FileMenuFor(path),
         });
         var endsWithNewline = text.EndsWith('\n');
@@ -736,13 +825,15 @@ public partial class RepositoryViewModel
 
     private DiffSection CreateImageSection(string path)
     {
+        var tracked = MarkedLfs(path);
         var header = new DiffFileRow
         {
             Path = path,
             Label = path,
+            LfsTracked = tracked,
             CanFold = true,
             Expanded = IsFoldOpen(path),
-            FileMenu = FileMenuFor(path),
+            FileMenu = FileMenuFor(path, tracked),
         };
         var section = new DiffSection(path, header);
         header.ToggleCommand = new RelayCommand(() => SetExpanded(section, !header.Expanded));

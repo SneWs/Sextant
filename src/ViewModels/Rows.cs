@@ -219,6 +219,20 @@ public partial class FileRowViewModel : ObservableObject
 
     public bool ShowHistory { get; init; }
 
+    public bool LfsTracked { get; init; }
+
+    public bool ShowLfsTrack { get; init; }
+
+    public bool ShowLfsUntrack { get; init; }
+
+    public bool ShowLfsDownload { get; init; }
+
+    public bool ShowLfsMenu => ShowLfsTrack || ShowLfsUntrack || ShowLfsDownload;
+
+    public string Tip => IsHeader || Path.Length == 0
+        ? ""
+        : LfsTracked ? Path + " — tracked with Git LFS" : Path + " — not tracked with Git LFS";
+
     public ICommand StageCommand { get; init; } = UiCommands.Disabled;
 
     public ICommand UnstageCommand { get; init; } = UiCommands.Disabled;
@@ -228,6 +242,12 @@ public partial class FileRowViewModel : ObservableObject
     public ICommand MergetoolCommand { get; init; } = UiCommands.Disabled;
 
     public ICommand HistoryCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand LfsTrackCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand LfsUntrackCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand LfsDownloadCommand { get; init; } = UiCommands.Disabled;
 }
 
 public abstract class DiffRow;
@@ -390,6 +410,12 @@ public sealed class DiffFileRow : DiffRow, INotifyPropertyChanged
     /// <summary>Repository path this header names. Scroll-to-file matches this, not the display label.</summary>
     public string Path { get; init; } = "";
 
+    public bool LfsTracked { get; init; }
+
+    public string Tip => Path.Length == 0
+        ? ""
+        : LfsTracked ? Path + " — tracked with Git LFS" : Path + " — not tracked with Git LFS";
+
     public required string Label { get; init; }
 
     /// <summary>All-files headers fold. A loaded-file banner does not.</summary>
@@ -431,6 +457,20 @@ public sealed class WorktreeFileMenu
     public ICommand OpenFolderCommand { get; init; } = UiCommands.Disabled;
 
     public ICommand OpenEditorCommand { get; init; } = UiCommands.Disabled;
+
+    public bool ShowLfsTrack { get; init; }
+
+    public bool ShowLfsUntrack { get; init; }
+
+    public bool ShowLfsDownload { get; init; }
+
+    public bool ShowLfsMenu => ShowLfsTrack || ShowLfsUntrack || ShowLfsDownload;
+
+    public ICommand LfsTrackCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand LfsUntrackCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand LfsDownloadCommand { get; init; } = UiCommands.Disabled;
 }
 
 public sealed class BlameRow : DiffRow
