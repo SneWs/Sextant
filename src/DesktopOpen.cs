@@ -72,7 +72,7 @@ public static class DesktopOpen
         {
             DesktopKind.Windows => new ShellLaunch("explorer.exe", null, [directory], false),
             DesktopKind.Mac => new ShellLaunch("open", null, ["--", directory], false),
-            _ => new ShellLaunch("xdg-open", null, ["--", directory], false),
+            _ => LinuxOpen(directory),
         };
     }
 
@@ -83,9 +83,16 @@ public static class DesktopOpen
         {
             DesktopKind.Windows => new ShellLaunch(fullPath, null, [], true),
             DesktopKind.Mac => new ShellLaunch("open", null, ["--", fullPath], false),
-            _ => new ShellLaunch("xdg-open", null, ["--", fullPath], false),
+            _ => LinuxOpen(fullPath),
         };
     }
+
+    /// <summary>
+    /// <c>xdg-open</c> rejects a <c>--</c> end-of-options marker and exits without opening the path.
+    /// The path is absolute, so it is not read as an option.
+    /// </summary>
+    private static ShellLaunch LinuxOpen(string path) =>
+        new("xdg-open", null, [path], false);
 
     public static void Start(ShellLaunch launch)
     {
