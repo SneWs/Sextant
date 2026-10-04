@@ -129,44 +129,46 @@
                 </ListBox.ItemsPanel>
                 <ListBox.Styles>
                     <Style Selector="ListBoxItem">
-                        <Setter Property="Padding" Value="2,0"/>
+                        <Setter Property="Padding" Value="0"/>
                         <Setter Property="MinHeight" Value="0"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
                     </Style>
                 </ListBox.Styles>
                 <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="vm:LocationItem">
-                        <Grid ColumnDefinitions="16,*" Margin="{Binding Indent}">
-                            <Button Grid.Column="0" Classes="flat" Width="16" Height="16" Padding="0" MinWidth="0"
-                                    IsVisible="{Binding HasChildren}"
-                                    Click="OnLocationExpand" DoubleTapped="OnLocationExpandDoubleTapped"
-                                    Background="Transparent" VerticalAlignment="Center">
-                                <Path Data="M2,1 L7,6 L2,11" Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
-                                      StrokeLineCap="Round" StrokeJoin="Round" Stretch="None"
-                                      RenderTransformOrigin="50%,50%">
-                                    <Path.RenderTransform>
-                                        <RotateTransform Angle="{Binding ExpandAngle}"/>
-                                    </Path.RenderTransform>
-                                </Path>
-                            </Button>
-                            <Border Grid.Column="1">
-                                <Border.ContextMenu>
-                                    <ContextMenu Opening="OnMenuOpening">
-                                        <MenuItem Header="Open" Command="{Binding OpenCommand}" IsVisible="{Binding ShowOpen}"/>
-                                        <MenuItem Header="Checkout" Command="{Binding CheckoutCommand}" IsVisible="{Binding ShowCheckout}"/>
-                                        <MenuItem Header="{Binding MergeLabel}" Command="{Binding MergeCommand}" IsVisible="{Binding ShowMerge}"/>
-                                        <MenuItem Header="{Binding RebaseLabel}" Command="{Binding RebaseCommand}" IsVisible="{Binding ShowRebase}"/>
-                                        <MenuItem Header="Delete" Command="{Binding DeleteCommand}" IsVisible="{Binding ShowDelete}"/>
-                                        <MenuItem Header="Set upstream" Command="{Binding SetUpstreamCommand}" IsVisible="{Binding ShowSetUpstream}"/>
-                                        <MenuItem Header="Show in graph" Command="{Binding RevealCommand}" IsVisible="{Binding ShowReveal}"/>
-                                        <MenuItem Header="Rename" Command="{Binding RenameCommand}" IsVisible="{Binding ShowRename}"/>
-                                        <MenuItem Header="Pop" Command="{Binding PopCommand}" IsVisible="{Binding ShowPop}"/>
-                                        <MenuItem Header="Apply" Command="{Binding ApplyCommand}" IsVisible="{Binding ShowApply}"/>
-                                        <MenuItem Header="Drop" Command="{Binding DropCommand}" IsVisible="{Binding ShowDrop}"/>
-                                    </ContextMenu>
-                                </Border.ContextMenu>
-                                <TextBlock Text="{Binding Label}" FontWeight="{Binding Weight}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                            </Border>
-                        </Grid>
+                        <Border Background="Transparent" Padding="2,0">
+                            <Border.ContextMenu>
+                                <ContextMenu Opening="OnMenuOpening">
+                                    <MenuItem Header="Open" Command="{Binding OpenCommand}" IsVisible="{Binding ShowOpen}"/>
+                                    <MenuItem Header="Checkout" Command="{Binding CheckoutCommand}" IsVisible="{Binding ShowCheckout}"/>
+                                    <MenuItem Header="{Binding MergeLabel}" Command="{Binding MergeCommand}" IsVisible="{Binding ShowMerge}"/>
+                                    <MenuItem Header="{Binding RebaseLabel}" Command="{Binding RebaseCommand}" IsVisible="{Binding ShowRebase}"/>
+                                    <MenuItem Header="Delete" Command="{Binding DeleteCommand}" IsVisible="{Binding ShowDelete}"/>
+                                    <MenuItem Header="Set upstream" Command="{Binding SetUpstreamCommand}" IsVisible="{Binding ShowSetUpstream}"/>
+                                    <MenuItem Header="Show in graph" Command="{Binding RevealCommand}" IsVisible="{Binding ShowReveal}"/>
+                                    <MenuItem Header="Rename" Command="{Binding RenameCommand}" IsVisible="{Binding ShowRename}"/>
+                                    <MenuItem Header="Pop" Command="{Binding PopCommand}" IsVisible="{Binding ShowPop}"/>
+                                    <MenuItem Header="Apply" Command="{Binding ApplyCommand}" IsVisible="{Binding ShowApply}"/>
+                                    <MenuItem Header="Drop" Command="{Binding DropCommand}" IsVisible="{Binding ShowDrop}"/>
+                                </ContextMenu>
+                            </Border.ContextMenu>
+                            <Grid ColumnDefinitions="16,*" Margin="{Binding Indent}">
+                                <Button Grid.Column="0" Classes="flat" Width="16" Height="16" Padding="0" MinWidth="0"
+                                        IsVisible="{Binding HasChildren}"
+                                        Click="OnLocationExpand" DoubleTapped="OnLocationExpandDoubleTapped"
+                                        Background="Transparent" VerticalAlignment="Center">
+                                    <Path Data="M2,1 L7,6 L2,11" Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                                          StrokeLineCap="Round" StrokeJoin="Round" Stretch="None"
+                                          RenderTransformOrigin="50%,50%">
+                                        <Path.RenderTransform>
+                                            <RotateTransform Angle="{Binding ExpandAngle}"/>
+                                        </Path.RenderTransform>
+                                    </Path>
+                                </Button>
+                                <TextBlock Grid.Column="1" Text="{Binding Label}" FontWeight="{Binding Weight}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
@@ -188,9 +190,10 @@
                          SelectionMode="Multiple" SelectionChanged="OnGraphSelectionChanged">
                     <ListBox.Styles>
                         <Style Selector="ListBoxItem">
-                            <Setter Property="Padding" Value="4,0"/>
+                            <Setter Property="Padding" Value="0"/>
                             <Setter Property="MinHeight" Value="0"/>
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
                         </Style>
                     </ListBox.Styles>
                     <ListBox.ItemsPanel>
@@ -200,8 +203,8 @@
                     </ListBox.ItemsPanel>
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:GraphRowViewModel">
-                            <Grid ColumnDefinitions="Auto,*">
-                                <Grid.ContextMenu>
+                            <Border Background="Transparent" Padding="4,0">
+                                <Border.ContextMenu>
                                     <ContextMenu Opening="OnMenuOpening">
                                         <MenuItem Header="Checkout" Command="{Binding CheckoutCommand}" IsVisible="{Binding ShowCheckout}"/>
                                         <MenuItem Header="Cherry pick commit" Command="{Binding CherryPickCommand}" IsVisible="{Binding ShowRewrite}"/>
@@ -220,13 +223,15 @@
                                         <MenuItem Header="Rebase interactive…" Command="{Binding RebaseCommand}" IsVisible="{Binding ShowRewrite}"/>
                                         <MenuItem Header="Reword…" Command="{Binding RewordCommand}" IsVisible="{Binding ShowRewrite}"/>
                                     </ContextMenu>
-                                </Grid.ContextMenu>
+                                </Border.ContextMenu>
+                                <Grid ColumnDefinitions="Auto,*">
                                 <controls:LaneCanvas Grid.Column="0" Geometry="{Binding Lanes}" IsVisible="{Binding ShowLanes}" VerticalAlignment="Stretch" Margin="0,0,8,0"/>
                                 <StackPanel Grid.Column="1" Margin="0,3" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding Subject}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
                                     <TextBlock Text="{Binding Detail}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" FontSize="12" Opacity="0.65" Margin="0,1,0,0"/>
                                 </StackPanel>
-                            </Grid>
+                                </Grid>
+                            </Border>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
@@ -275,6 +280,13 @@
 
                 <ListBox x:Name="FileList" Grid.Row="2" ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}"
                          PointerReleased="OnFilePointerReleased">
+                    <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                        </Style>
+                    </ListBox.Styles>
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
                             <VirtualizingStackPanel/>
@@ -282,8 +294,8 @@
                     </ListBox.ItemsPanel>
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:FileRowViewModel">
-                            <Grid ColumnDefinitions="22,*,Auto">
-                                <Grid.ContextMenu>
+                            <Border Background="Transparent" Padding="6,2">
+                                <Border.ContextMenu>
                                     <ContextMenu Opening="OnMenuOpening">
                                         <MenuItem Header="Stage" Command="{Binding StageCommand}" IsVisible="{Binding ShowStage}"/>
                                         <MenuItem Header="Unstage" Command="{Binding UnstageCommand}" IsVisible="{Binding ShowUnstage}"/>
@@ -291,7 +303,8 @@
                                         <MenuItem Header="{Binding MergetoolMenu}" Command="{Binding MergetoolCommand}" IsVisible="{Binding ShowMergetool}"/>
                                         <MenuItem Header="File history" Command="{Binding HistoryCommand}" IsVisible="{Binding ShowHistory}"/>
                                     </ContextMenu>
-                                </Grid.ContextMenu>
+                                </Border.ContextMenu>
+                                <Grid ColumnDefinitions="22,*,Auto">
                                 <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" VerticalAlignment="Center" IsVisible="{Binding IsFile}"/>
                                 <TextBlock Grid.Column="1" Text="{Binding Label}" FontWeight="SemiBold" Opacity="0.7" IsVisible="{Binding IsHeader}"/>
                                 <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" IsVisible="{Binding IsFile}" ToolTip.Tip="{Binding Path}"/>
@@ -302,7 +315,8 @@
                                     <Button Classes="flat" Content="{Binding MergetoolLabel}" Command="{Binding MergetoolCommand}" IsVisible="{Binding ShowMergetool}" Padding="6,0"/>
                                     <Button Classes="flat" Content="History" Command="{Binding HistoryCommand}" IsVisible="{Binding ShowHistory}" Padding="6,0"/>
                                 </StackPanel>
-                            </Grid>
+                                </Grid>
+                            </Border>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
