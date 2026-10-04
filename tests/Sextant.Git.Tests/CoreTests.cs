@@ -52,6 +52,12 @@ public class CoreTests
         Assert.Equal(["-C", "repo", "branch", "topic", "abc"], GitCommands.CreateBranchAt("repo", "topic", "abc"));
         Assert.Equal(["-C", "repo", "--no-optional-locks", "format-patch", "-1", "--stdout", "abc"], GitCommands.FormatPatch("repo", "abc"));
         Assert.DoesNotContain("--no-optional-locks", GitCommands.CreateBranchAt("repo", "topic", "abc"));
+        Assert.Equal(["-C", "repo", "switch", "--detach", "v1"], GitCommands.SwitchDetach("repo", "v1"));
+        Assert.Equal(["-C", "repo", "push", "--progress", "origin", "refs/tags/v1"], GitCommands.PushTag("repo", "origin", "v1"));
+        Assert.Equal(["-C", "repo", "push", "--progress", "origin", "--delete", "refs/tags/v1"], GitCommands.DeleteRemoteTag("repo", "origin", "v1"));
+        Assert.DoesNotContain("--no-optional-locks", GitCommands.SwitchDetach("repo", "v1"));
+        Assert.DoesNotContain("--no-optional-locks", GitCommands.PushTag("repo", "origin", "v1"));
+        Assert.DoesNotContain("--no-optional-locks", GitCommands.DeleteRemoteTag("repo", "origin", "v1"));
         Assert.Equal(["-C", "repo", "branch", "-d", "topic"], GitCommands.DeleteBranch("repo", "topic"));
         Assert.Equal(["-C", "repo", "branch", "-D", "topic"], GitCommands.ForceDeleteBranch("repo", "topic"));
         Assert.Equal(["-C", "repo", "push", "--progress", "origin", "--delete", "topic"], GitCommands.DeleteRemoteBranch("repo", "origin", "topic"));

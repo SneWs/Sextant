@@ -331,6 +331,44 @@ public partial class RepositoryViewModel
     private Task DeleteTagAsync(string name) =>
         ConfirmRun("Delete tag", $"Delete tag {name}?", "Delete", "Deleting tag…", ct => _session!.DeleteTagAsync(name, ct));
 
+    private Task CreateBranchFromTagAsync(string tag)
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)
+            return Task.CompletedTask;
+        return HoldFocus(async () =>
+        {
+            var name = await dialogs.PromptAsync("Create branch", $"Branch name from {tag}");
+            if (string.IsNullOrWhiteSpace(name) || _session is null)
+                return;
+            await RunAsync("Creating branch…", ct => _session.CreateBranchAtAsync(name, tag, ct));
+        });
+    }
+
+    private Task CheckoutTagAsync(string tag) =>
+        RunAsync("Checking out tag…", ct => _session!.SwitchDetachAsync(tag, ct));
+
+    private Task PushTagAsync(string tag)
+    {
+        if (_session is null || IsBusy)
+            return Task.CompletedTask;
+        var progress = Progress();
+        return RunAsync("Pushing tag…", ct => _session.PushTagAsync("origin", tag, progress, ct));
+    }
+
+    private Task DeleteRemoteTagAsync(string tag)
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)
+            return Task.CompletedTask;
+        var progress = Progress();
+        return HoldFocus(async () =>
+        {
+            var ok = await dialogs.ConfirmAsync("Delete tag from origin", $"Delete tag {tag} from origin?", "Delete");
+            if (!ok || _session is null)
+                return;
+            await RunAsync("Deleting tag…", ct => _session.DeleteRemoteTagAsync("origin", tag, progress, ct));
+        });
+    }
+
     private Task PopStashAsync(StashEntry stash) =>
         ConfirmRun("Pop stash", $"Pop {stash.Ref}? Git will try to apply it and then drop it.", "Pop", "Popping stash…", ct => _session!.StashPopAsync(stash.Ref, ct));
 

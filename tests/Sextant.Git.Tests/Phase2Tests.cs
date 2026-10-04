@@ -322,6 +322,31 @@ public class Phase2Tests
     }
 
     [Fact]
+    public async Task Branch_from_a_tag_stays_put_and_checkout_detaches_there()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("first");
+        var first = repo.RunCapture("rev-parse", "HEAD").Trim();
+        repo.Run("tag", "v1");
+        repo.WriteFile("a.txt", "two\n");
+        repo.CommitAll("second");
+        var second = repo.RunCapture("rev-parse", "HEAD").Trim();
+        var branch = repo.CurrentBranch();
+        await using var session = await Open(repo);
+        await session.CreateBranchAtAsync("from-tag", "v1", CancellationToken.None);
+        var created = session.Snapshot();
+        Assert.Equal(branch, created.Branch.HeadName);
+        Assert.Equal(second, created.Branch.Oid, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains(created.Refs, reference => reference.Name == "refs/heads/from-tag" && string.Equals(reference.Oid, first, StringComparison.OrdinalIgnoreCase));
+
+        await session.SwitchDetachAsync("v1", CancellationToken.None);
+        var detached = session.Snapshot();
+        Assert.True(detached.Branch.Detached);
+        Assert.Equal(first, detached.Branch.Oid, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Tag_and_remote_commands_update_refs()
     {
         using var repo = new TempRepo();

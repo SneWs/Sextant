@@ -140,6 +140,12 @@
                         <Border Background="Transparent" Padding="2,0">
                             <Border.ContextMenu>
                                 <ContextMenu Opening="OnMenuOpening">
+                                    <MenuItem Header="Create branch from tag" Command="{Binding CreateBranchFromTagCommand}" IsVisible="{Binding ShowTag}"/>
+                                    <MenuItem Header="Checkout tag" Command="{Binding CheckoutTagCommand}" IsVisible="{Binding ShowTag}"/>
+                                    <MenuItem Header="Push tag" Command="{Binding PushTagCommand}" IsVisible="{Binding ShowTag}"/>
+                                    <MenuItem Header="Delete tag" Command="{Binding DeleteCommand}" IsVisible="{Binding ShowTag}"/>
+                                    <Separator IsVisible="{Binding ShowTag}"/>
+                                    <MenuItem Header="Delete tag from origin" Command="{Binding DeleteRemoteTagCommand}" IsVisible="{Binding ShowTag}"/>
                                     <MenuItem Header="Open" Command="{Binding OpenCommand}" IsVisible="{Binding ShowOpen}"/>
                                     <MenuItem Header="Checkout" Command="{Binding CheckoutCommand}" IsVisible="{Binding ShowCheckout}"/>
                                     <MenuItem Header="{Binding MergeLabel}" Command="{Binding MergeCommand}" IsVisible="{Binding ShowMerge}"/>

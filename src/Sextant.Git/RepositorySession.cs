@@ -509,6 +509,15 @@ public sealed partial class RepositorySession : IAsyncDisposable
     public Task DeleteTagAsync(string name, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.DeleteTag(_toplevel, name), null, cancellationToken);
 
+    public Task SwitchDetachAsync(string revision, CancellationToken cancellationToken) =>
+        MutateAsync(GitCommands.SwitchDetach(_toplevel, revision), null, cancellationToken);
+
+    public Task PushTagAsync(string remote, string name, IProgress<string>? progress, CancellationToken cancellationToken) =>
+        MutateAsync(GitCommands.PushTag(_toplevel, remote, name), progress, cancellationToken);
+
+    public Task DeleteRemoteTagAsync(string remote, string name, IProgress<string>? progress, CancellationToken cancellationToken) =>
+        MutateAsync(GitCommands.DeleteRemoteTag(_toplevel, remote, name), progress, cancellationToken);
+
     public Task AddRemoteAsync(string name, string url, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.AddRemote(_toplevel, name, url), null, cancellationToken);
 

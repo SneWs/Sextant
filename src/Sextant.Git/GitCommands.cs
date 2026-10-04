@@ -200,6 +200,15 @@ public static class GitCommands
     public static IReadOnlyList<string> DeleteTag(string toplevel, string name) =>
         ["-C", toplevel, "tag", "-d", name];
 
+    public static IReadOnlyList<string> SwitchDetach(string toplevel, string revision) =>
+        ["-C", toplevel, "switch", "--detach", revision];
+
+    public static IReadOnlyList<string> PushTag(string toplevel, string remote, string name) =>
+        ["-C", toplevel, "push", "--progress", remote, "refs/tags/" + name];
+
+    public static IReadOnlyList<string> DeleteRemoteTag(string toplevel, string remote, string name) =>
+        ["-C", toplevel, "push", "--progress", remote, "--delete", "refs/tags/" + name];
+
     public static IReadOnlyList<string> AddRemote(string toplevel, string name, string url) =>
         ["-C", toplevel, "remote", "add", name, url];
 

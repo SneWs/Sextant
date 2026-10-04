@@ -561,6 +561,33 @@ public class SessionTests
     }
 
     [Fact]
+    public async Task Push_tag_publishes_it_and_delete_from_origin_removes_it()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("first");
+        var bare = Path.Combine(Path.GetTempPath(), "sextant-bare-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            repo.Run("clone", "--bare", repo.Directory, bare);
+            repo.Run("remote", "add", "origin", bare);
+            repo.Run("push", "-u", "origin", repo.CurrentBranch());
+            repo.Run("tag", "v1");
+            await using var session = await Open(repo);
+            await session.PushTagAsync("origin", "v1", null, CancellationToken.None);
+            Assert.Contains("refs/tags/v1", repo.RunCapture("ls-remote", "--tags", bare), StringComparison.Ordinal);
+
+            await session.DeleteRemoteTagAsync("origin", "v1", null, CancellationToken.None);
+            Assert.DoesNotContain("refs/tags/v1", repo.RunCapture("ls-remote", "--tags", bare), StringComparison.Ordinal);
+            Assert.Contains(session.Snapshot().Refs, reference => reference.Name == "refs/tags/v1");
+        }
+        finally
+        {
+            TryDelete(bare);
+        }
+    }
+
+    [Fact]
     public async Task Accepted_performance_keys_are_in_local_config_on_reopen()
     {
         using var repo = new TempRepo();

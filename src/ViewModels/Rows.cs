@@ -152,7 +152,17 @@ public partial class LocationItem : ObservableObject
 
     public bool ShowOpen { get; init; }
 
+    public bool ShowTag { get; init; }
+
     public ICommand OpenCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand CreateBranchFromTagCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand CheckoutTagCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand PushTagCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand DeleteRemoteTagCommand { get; init; } = UiCommands.Disabled;
 
     public ICommand CheckoutCommand { get; init; } = UiCommands.Disabled;
 

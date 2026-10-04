@@ -273,7 +273,7 @@ public partial class RepositoryViewModel : ViewModelBase
             item.CheckoutCommand.Execute(null);
         else if (item.ShowOpen)
             item.OpenCommand.Execute(null);
-        else if (item.ShowReveal)
+        else if (item.ShowReveal || item.ShowTag)
             item.RevealCommand.Execute(null);
     }
 
@@ -1317,10 +1317,13 @@ public partial class RepositoryViewModel : ViewModelBase
                 Key = "t:" + name,
                 Label = name,
                 Oid = tag.Oid,
-                ShowReveal = true,
-                ShowDelete = true,
+                ShowTag = true,
                 RevealCommand = new AsyncRelayCommand(() => RevealAsync(tag.Oid)),
+                CreateBranchFromTagCommand = new AsyncRelayCommand(() => CreateBranchFromTagAsync(name)),
+                CheckoutTagCommand = new AsyncRelayCommand(() => CheckoutTagAsync(name)),
+                PushTagCommand = new AsyncRelayCommand(() => PushTagAsync(name)),
                 DeleteCommand = new AsyncRelayCommand(() => DeleteTagAsync(name)),
+                DeleteRemoteTagCommand = new AsyncRelayCommand(() => DeleteRemoteTagAsync(name)),
             });
         }
 
