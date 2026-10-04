@@ -442,10 +442,14 @@ public static class GitCommands
         if (tool is null)
             return ["-C", toplevel, "mergetool", "--no-prompt", "--", path];
 
+        // trustExitCode: macOS /bin/sh compares the merged file's time in whole
+        // seconds, so a command that finishes in the same second looks unchanged
+        // and git reports the merge as failed. The command's own exit code is the signal.
         return
         [
             "-C", toplevel,
             "-c", "mergetool.keepBackup=false",
+            "-c", "mergetool.sextant.trustExitCode=true",
             "-c", "mergetool.sextant.cmd=" + tool,
             "mergetool", "--no-prompt", "-t", "sextant", "--", path,
         ];

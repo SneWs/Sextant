@@ -72,10 +72,10 @@ public class MergeSessionTests
         var custom = GitCommands.Mergetool("repo", "a.txt", "meld \"$LOCAL\" \"$MERGED\" \"$REMOTE\"");
         Assert.Contains("mergetool.sextant.cmd=meld \"$LOCAL\" \"$MERGED\" \"$REMOTE\"", custom);
         Assert.Contains("mergetool.keepBackup=false", custom);
+        Assert.Contains("mergetool.sextant.trustExitCode=true", custom);
         Assert.Equal(["--", "a.txt"], custom.TakeLast(2));
         Assert.Contains("-t", custom);
         Assert.Contains("sextant", custom);
-        Assert.DoesNotContain(custom, argument => argument.Contains("trustExitCode", StringComparison.Ordinal));
         Assert.Null(MergeToolCommand.Normalize("meld\n"));
         Assert.Null(MergeToolCommand.Normalize(null));
     }
