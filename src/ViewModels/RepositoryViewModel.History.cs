@@ -417,6 +417,20 @@ public partial class RepositoryViewModel
         });
     }
 
+    [RelayCommand]
+    private Task ApplyPatch()
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)
+            return Task.CompletedTask;
+        return HoldFocus(async () =>
+        {
+            var path = await dialogs.PickFileAsync("Apply patch", "Patch", ["*.patch", "*.diff"]);
+            if (string.IsNullOrWhiteSpace(path) || _session is null)
+                return;
+            await RunAsync("Applying patch…", ct => _session.ApplyPatchFileAsync(path, ct));
+        });
+    }
+
     private Task SavePatchAsync(CommitRecord commit)
     {
         if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)

@@ -383,6 +383,13 @@ public static class GitCommands
     public static IReadOnlyList<string> ApplyCached(string toplevel, string patchFile) =>
         ["-C", toplevel, "apply", "--cached", patchFile];
 
+    /// <summary>
+    /// Applies a patch file to the working tree. A format-patch file contributes its diff.
+    /// The index is left alone, and this does not start <c>git am</c>.
+    /// </summary>
+    public static IReadOnlyList<string> ApplyPatch(string toplevel, string patchFile) =>
+        ["-C", toplevel, "apply", "--", patchFile];
+
     public static IReadOnlyList<string> ApplyCachedReverse(string toplevel, string patchFile) =>
         ["-C", toplevel, "apply", "--cached", "--reverse", patchFile];
 

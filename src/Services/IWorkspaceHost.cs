@@ -15,6 +15,8 @@ public interface IDialogService
 
     Task<string?> SaveFileAsync(string title, string suggestedName);
 
+    Task<string?> PickFileAsync(string title, string typeName, IReadOnlyList<string> patterns);
+
     Task<CloneRequest?> PromptCloneAsync();
 
     Task<string?> PickAsync(string title, string message, IReadOnlyList<string> options);

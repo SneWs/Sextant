@@ -705,6 +705,9 @@ public sealed partial class RepositorySession : IAsyncDisposable
     public Task CreateBranchAtAsync(string name, string sha, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.CreateBranchAt(_toplevel, name, sha), null, cancellationToken);
 
+    public Task ApplyPatchFileAsync(string patchFile, CancellationToken cancellationToken) =>
+        MutateAsync(GitCommands.ApplyPatch(_toplevel, patchFile), null, cancellationToken);
+
     public Task<byte[]> FormatPatchAsync(string sha, CancellationToken cancellationToken) =>
         RunAsync(async ct =>
         {

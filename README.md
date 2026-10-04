@@ -102,6 +102,7 @@ Checked items are in the app. The rest are still ahead. [PLAN.md](PLAN.md) is th
 - [x] Reset soft and mixed.
 - [x] Hard reset only after a confirmation that names the commit that will be discarded.
 - [x] Cherry-pick and revert the selected commit.
+- [x] Apply a patch from the Repository menu and the command palette. The change stays in the working tree and is not staged.
 - [x] Create a tag, and delete a tag after a confirmation.
 - [x] Add, remove, and rename remotes.
 - [x] Side-by-side diff, and an ignore-whitespace toggle that applies to that view only.

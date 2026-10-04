@@ -96,6 +96,18 @@ public sealed class AvaloniaDialogService : IDialogService
         return file?.Path.LocalPath;
     }
 
+    public async Task<string?> PickFileAsync(string title, string typeName, IReadOnlyList<string> patterns)
+    {
+        var kind = new FilePickerFileType(typeName) { Patterns = patterns };
+        var files = await _owner.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = false,
+            FileTypeFilter = [kind, FilePickerFileTypes.All],
+        });
+        return files.Count == 0 ? null : files[0].Path.LocalPath;
+    }
+
     public async Task<CloneRequest?> PromptCloneAsync()
     {
         var window = Create("Clone repository");

@@ -51,6 +51,10 @@ public class CoreTests
         Assert.Equal(["-C", "repo", "fetch", "--all", "--prune", "--progress"], GitCommands.FetchAllPrune("repo"));
         Assert.Equal(["-C", "repo", "branch", "topic", "abc"], GitCommands.CreateBranchAt("repo", "topic", "abc"));
         Assert.Equal(["-C", "repo", "--no-optional-locks", "format-patch", "-1", "--stdout", "abc"], GitCommands.FormatPatch("repo", "abc"));
+        Assert.Equal(["-C", "repo", "apply", "--", "change.patch"], GitCommands.ApplyPatch("repo", "change.patch"));
+        Assert.DoesNotContain("--cached", GitCommands.ApplyPatch("repo", "change.patch"));
+        Assert.DoesNotContain("--index", GitCommands.ApplyPatch("repo", "change.patch"));
+        Assert.DoesNotContain("am", GitCommands.ApplyPatch("repo", "change.patch"));
         Assert.DoesNotContain("--no-optional-locks", GitCommands.CreateBranchAt("repo", "topic", "abc"));
         Assert.Equal(["-C", "repo", "switch", "--detach", "v1"], GitCommands.SwitchDetach("repo", "v1"));
         Assert.Equal(["-C", "repo", "push", "--progress", "origin", "refs/tags/v1"], GitCommands.PushTag("repo", "origin", "v1"));

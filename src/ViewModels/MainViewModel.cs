@@ -244,6 +244,9 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
     private Task AddWorktree() => ActiveTab?.AddWorktreeCommand.ExecuteAsync(null) ?? Task.CompletedTask;
 
+    [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
+    private Task ApplyPatch() => ActiveTab?.ApplyPatchCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
     private void ToggleCommands() => ActiveTab?.ToggleCommandsCommand.Execute(null);
 
@@ -365,6 +368,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         StashCommand.NotifyCanExecuteChanged();
         AddRemoteCommand.NotifyCanExecuteChanged();
         AddWorktreeCommand.NotifyCanExecuteChanged();
+        ApplyPatchCommand.NotifyCanExecuteChanged();
         ToggleCommandsCommand.NotifyCanExecuteChanged();
         ToggleHistorySearchCommand.NotifyCanExecuteChanged();
         ToggleBranchViewCommand.NotifyCanExecuteChanged();
@@ -702,6 +706,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _palette.Add(new PaletteItem { Title = "Stash", Run = () => tab.StashCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Add remote", Run = () => tab.AddRemoteCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Add worktree", Run = () => tab.AddWorktreeCommand.ExecuteAsync(null) });
+            _palette.Add(new PaletteItem { Title = "Apply patch", Run = () => tab.ApplyPatchCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Toggle branch view", Run = () => { tab.ToggleLocationsCommand.Execute(null); return Task.CompletedTask; } });
             _palette.Add(new PaletteItem { Title = "Toggle side-by-side diff", Run = ToggleSavedSideBySide });
             _palette.Add(new PaletteItem { Title = "Toggle ignore whitespace", Run = ToggleSavedWhitespace });
