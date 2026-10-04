@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.5
+Type=Application
+Name=Sextant
+GenericName=Git client
+Comment=A Git client for large repositories
+Exec=Sextant
+TryExec=Sextant
+Terminal=false
+Categories=Development;RevisionControl;
+Keywords=Git;Repository;
+StartupNotify=true
+StartupWMClass=Sextant

@@ -12,6 +12,8 @@
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
     <Content Include="ThirdParty\AssimpNetter-License.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="sextant.desktop" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\sextant.png" Link="sextant.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
