@@ -22,6 +22,8 @@ On 2026-10-01 Phase 4 is in the window. The locations list has a Submodules sect
 
 On 2026-10-05 a local or remote-tracking branch row offers Hide branch and Hide all other branches. Show branch and Show all branches bring them back. The commit graph then starts only from the branches still shown, so a commit no visible branch reaches is left out. A tag or a stash does not bring that commit back while a branch is hidden. The choice is saved with that repository. `Hidden_branches_drop_commits_reached_only_from_those_branches` passed against system git. The desktop window was not launched.
 
+On 2026-10-05 the locations list keeps a Stashes root and a Submodules root when those lists are empty. Each label includes the count, so an empty repository shows Stashes (0) and Submodules (0). A stash or a submodule is still a row under that root. `Stashes_and_submodules_stay_visible_when_empty` and `A_submodule_is_a_row_under_the_submodules_root` passed against system git. A headless window confirmed the empty labels, a stash row under Stashes, and a submodule row under Submodules. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

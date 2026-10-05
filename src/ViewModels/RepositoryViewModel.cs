@@ -1391,50 +1391,44 @@ public partial class RepositoryViewModel : ViewModelBase
 
         _locationRoots.Add(Section("h:remotes", "Remotes", remotes, remotes.Count));
 
-        if (state.Stashes.Count > 0)
+        var stashes = new List<LocationItem>();
+        foreach (var stash in state.Stashes)
         {
-            var stashes = new List<LocationItem>();
-            foreach (var stash in state.Stashes)
+            stashes.Add(new LocationItem
             {
-                stashes.Add(new LocationItem
-                {
-                    Key = "s:" + stash.Ref,
-                    Label = stash.Ref + "  " + stash.Subject,
-                    ShowPop = true,
-                    ShowApply = true,
-                    ShowDrop = true,
-                    PopCommand = new AsyncRelayCommand(() => PopStashAsync(stash)),
-                    ApplyCommand = new AsyncRelayCommand(() => ApplyStashAsync(stash)),
-                    DropCommand = new AsyncRelayCommand(() => DropStashAsync(stash)),
-                });
-            }
-
-            _locationRoots.Add(Section("h:stashes", "Stashes", stashes, stashes.Count));
+                Key = "s:" + stash.Ref,
+                Label = stash.Ref + "  " + stash.Subject,
+                ShowPop = true,
+                ShowApply = true,
+                ShowDrop = true,
+                PopCommand = new AsyncRelayCommand(() => PopStashAsync(stash)),
+                ApplyCommand = new AsyncRelayCommand(() => ApplyStashAsync(stash)),
+                DropCommand = new AsyncRelayCommand(() => DropStashAsync(stash)),
+            });
         }
 
-        if (state.Submodules.Count > 0)
-        {
-            var modules = new List<LocationItem>();
-            foreach (var module in state.Submodules)
-            {
-                var suffix = module.State switch
-                {
-                    SubmoduleState.Uninitialized => "not checked out",
-                    SubmoduleState.Modified => "modified",
-                    SubmoduleState.Conflict => "conflict",
-                    _ => string.IsNullOrEmpty(module.Describe) ? Short(module.Sha) : module.Describe,
-                };
-                modules.Add(new LocationItem
-                {
-                    Key = "u:" + module.Path,
-                    Label = module.Path + "  " + suffix,
-                    ShowOpen = module.State != SubmoduleState.Uninitialized,
-                    OpenCommand = new AsyncRelayCommand(() => OpenSubmoduleAsync(module)),
-                });
-            }
+        _locationRoots.Add(Section("h:stashes", "Stashes", stashes, stashes.Count));
 
-            _locationRoots.Add(Section("h:submodules", "Submodules", modules, modules.Count));
+        var modules = new List<LocationItem>();
+        foreach (var module in state.Submodules)
+        {
+            var suffix = module.State switch
+            {
+                SubmoduleState.Uninitialized => "not checked out",
+                SubmoduleState.Modified => "modified",
+                SubmoduleState.Conflict => "conflict",
+                _ => string.IsNullOrEmpty(module.Describe) ? Short(module.Sha) : module.Describe,
+            };
+            modules.Add(new LocationItem
+            {
+                Key = "u:" + module.Path,
+                Label = module.Path + "  " + suffix,
+                ShowOpen = module.State != SubmoduleState.Uninitialized,
+                OpenCommand = new AsyncRelayCommand(() => OpenSubmoduleAsync(module)),
+            });
         }
+
+        _locationRoots.Add(Section("h:submodules", "Submodules", modules, modules.Count));
 
         if (state.Worktrees.Count > 0)
         {
