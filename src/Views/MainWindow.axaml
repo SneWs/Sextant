@@ -25,7 +25,7 @@
             </NativeMenuItem>
             <NativeMenuItem Header="_View" IsEnabled="{Binding HasActiveTab}">
                 <NativeMenu>
-                    <NativeMenuItem Header="Toggle _branch view" Command="{Binding ToggleBranchViewCommand}"/>
+                    <NativeMenuItem Header="Toggle _locations" Command="{Binding ToggleBranchViewCommand}"/>
                 </NativeMenu>
             </NativeMenuItem>
             <NativeMenuItem Header="_Settings" IsVisible="{Binding ShowWindowSettingsMenu}">

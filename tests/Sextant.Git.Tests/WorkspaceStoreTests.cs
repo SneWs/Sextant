@@ -165,7 +165,7 @@ public class WorkspaceStoreTests
                 220,
                 520,
                 180,
-                hiddenBranches: ["refs/tags/v1", "refs/heads/feature", "refs/remotes/origin/HEAD", "refs/remotes/origin/side"]);
+                hiddenBranches: ["refs/tags/v1", "refs/heads/feature", "refs/remotes/origin/HEAD", "refs/remotes/origin/side", "stash:abc"]);
             RepoLayouts.Remember(state, @"C:\repos\sextant", 310, 520, 180);
             RepoLayouts.Remember(state, @"C:\repos\other", 180, 640, 220, hiddenBranches: []);
             store.SaveWorkspace(state);
@@ -174,7 +174,7 @@ public class WorkspaceStoreTests
             var sextant = RepoLayouts.Resolve(loaded, @"C:\repos\sextant");
             var other = RepoLayouts.Resolve(loaded, @"C:\repos\other");
             Assert.Equal(310, sextant.LocationsWidth);
-            Assert.Equal(["refs/heads/feature", "refs/remotes/origin/side"], sextant.HiddenBranches);
+            Assert.Equal(["refs/heads/feature", "refs/remotes/origin/side", "stash:abc"], sextant.HiddenBranches);
             Assert.Empty(other.HiddenBranches);
 
             RepoLayouts.Remember(loaded, @"C:\repos\sextant", 310, 520, 180, hiddenBranches: []);

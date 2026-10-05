@@ -718,7 +718,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _palette.Add(new PaletteItem { Title = "Apply patch", Run = () => tab.ApplyPatchCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Fetch LFS objects", Run = () => tab.FetchLfsCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Pull LFS files", Run = () => tab.PullLfsCommand.ExecuteAsync(null) });
-            _palette.Add(new PaletteItem { Title = "Toggle branch view", Run = () => { tab.ToggleLocationsCommand.Execute(null); return Task.CompletedTask; } });
+            _palette.Add(new PaletteItem { Title = "Toggle locations", Run = () => { tab.ToggleLocationsCommand.Execute(null); return Task.CompletedTask; } });
             _palette.Add(new PaletteItem { Title = "Toggle side-by-side diff", Run = ToggleSavedSideBySide });
             _palette.Add(new PaletteItem { Title = "Toggle ignore whitespace", Run = ToggleSavedWhitespace });
             _palette.Add(new PaletteItem { Title = "Toggle all files", Run = () => tab.ToggleAllFilesCommand.ExecuteAsync(null) });

@@ -55,7 +55,8 @@ public static class GitCommands
         string? grep = null,
         string? author = null,
         string? path = null,
-        IReadOnlyCollection<string>? hiddenBranches = null)
+        IReadOnlyCollection<string>? hiddenBranches = null,
+        IReadOnlyList<string>? visibleStashes = null)
     {
         // An unborn HEAD (fresh init, or an orphan branch) is not a revision. Passing it
         // makes log exit 128 with "ambiguous argument 'HEAD'" before --branches is considered.
@@ -77,18 +78,20 @@ public static class GitCommands
                 arguments.Add("--branches");
                 arguments.Add("--tags");
                 arguments.Add("--remotes");
-                if (includeStash)
-                    arguments.Add("refs/stash");
             }
             else
             {
                 // --exclude applies only to the next --branches or --remotes, then git clears it.
-                // A tag or a stash is not a root while a branch is hidden, or it would bring that branch's commits back.
+                // Tags stay out while a branch is hidden, or a tag would bring that branch's commits back.
+                // A stash revision is explicit, so its eye decides whether it is a root.
                 AddExcludes(arguments, excluded);
                 arguments.Add("--branches");
                 AddExcludes(arguments, excluded);
                 arguments.Add("--remotes");
             }
+
+            foreach (var stash in StashTips(includeStash, visibleStashes))
+                arguments.Add(stash);
         }
 
         arguments.Add("--format=%H%x1f%P%x1f%at%x1f%an%x1f%ae%x1f%s");
@@ -133,6 +136,19 @@ public static class GitCommands
         }
 
         return patterns.Count == 0 ? [] : patterns.ToArray();
+    }
+
+    /// <summary>
+    /// Null <paramref name="visibleStashes"/> means every stash (<c>refs/stash</c>).
+    /// A list is the stash refs whose eye is still on, and an empty list adds none.
+    /// </summary>
+    private static IReadOnlyList<string> StashTips(bool includeStash, IReadOnlyList<string>? visibleStashes)
+    {
+        if (!includeStash)
+            return [];
+        if (visibleStashes is null)
+            return ["refs/stash"];
+        return visibleStashes;
     }
 
     public static IReadOnlyList<string> RevParseCommit(string toplevel, string revision) =>

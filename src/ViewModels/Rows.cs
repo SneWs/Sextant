@@ -107,6 +107,9 @@ public partial class LocationItem : ObservableObject
 
     public string Label { get; set; } = "";
 
+    /// <summary>Text the locations filter matches. Headers use the section title, without the count.</summary>
+    public string SearchText { get; set; } = "";
+
     public int Depth { get; set; }
 
     public ObservableCollection<LocationItem> Children { get; } = [];
@@ -143,6 +146,14 @@ public partial class LocationItem : ObservableObject
     public bool ShowReveal { get; init; }
 
     public bool ShowHide { get; init; }
+
+    public bool ShowHideOthers { get; init; }
+
+    public bool ShowEye { get; init; }
+
+    public bool EyeHidden { get; init; }
+
+    public bool EyeOpen { get; init; }
 
     public string HideLabel { get; init; } = "Hide branch";
 

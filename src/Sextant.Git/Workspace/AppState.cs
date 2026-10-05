@@ -39,7 +39,7 @@ public sealed class RepoLayout
     /// <summary>False hides the locations column. Missing values in older files stay visible.</summary>
     public bool ShowLocations { get; set; } = true;
 
-    /// <summary>Full ref names left out of the commit graph. Missing values in older files show every branch.</summary>
+    /// <summary>Branch refs and stash tokens left out of the commit graph. Missing values in older files show every branch and stash.</summary>
     public List<string> HiddenBranches { get; set; } = [];
 }
 
@@ -101,7 +101,7 @@ public static class RepoLayouts
     {
         if (names is null)
             return [];
-        return names.Where(BranchVisibility.IsGraphBranch)
+        return names.Where(BranchVisibility.IsRemembered)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();

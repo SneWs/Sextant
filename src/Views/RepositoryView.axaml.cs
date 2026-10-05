@@ -306,6 +306,14 @@ public partial class RepositoryView : UserControl
                 HistorySearchBox.SelectAll();
             }, DispatcherPriority.Background);
         }
+        else if (e.PropertyName == nameof(RepositoryViewModel.LocationFilterOpen) && vm.LocationFilterOpen)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                LocationFilterBox.Focus();
+                LocationFilterBox.SelectAll();
+            }, DispatcherPriority.Background);
+        }
         else if (e.PropertyName == nameof(RepositoryViewModel.CommandLog))
             ApplyCommandLog(vm.CommandLog);
         else if (e.PropertyName == nameof(RepositoryViewModel.CommandsOpen) && vm.CommandsOpen)
@@ -722,6 +730,14 @@ public partial class RepositoryView : UserControl
             vm.SearchHistoryCommand.Execute(null);
             e.Handled = true;
         }
+    }
+
+    private void OnLocationFilterKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || DataContext is not RepositoryViewModel vm)
+            return;
+        vm.ToggleLocationFilterCommand.Execute(null);
+        e.Handled = true;
     }
 
     private void OnGraphSelectionChanged(object? sender, SelectionChangedEventArgs e)

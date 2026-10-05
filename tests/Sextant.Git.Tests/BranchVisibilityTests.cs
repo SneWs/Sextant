@@ -30,8 +30,25 @@ public class BranchVisibilityTests
 
         var withoutHead = GitCommands.Log("repo", 0, 10, includeHead: false, includeStash: true, hiddenBranches: ["refs/heads/main"]);
         Assert.DoesNotContain(withoutHead, argument => argument == "HEAD");
-        Assert.DoesNotContain("refs/stash", withoutHead);
+        Assert.Contains("refs/stash", withoutHead);
+        Assert.DoesNotContain("--tags", withoutHead);
         Assert.Contains("--exclude=main", withoutHead);
+
+        var oneStash = GitCommands.Log(
+            "repo",
+            0,
+            10,
+            includeStash: true,
+            hiddenBranches: ["refs/heads/main"],
+            visibleStashes: ["stash@{1}"]);
+        Assert.Contains("stash@{1}", oneStash);
+        Assert.DoesNotContain("refs/stash", oneStash);
+        Assert.DoesNotContain("--tags", oneStash);
+
+        var noStash = GitCommands.Log("repo", 0, 10, includeStash: true, visibleStashes: []);
+        Assert.DoesNotContain("refs/stash", noStash);
+        Assert.DoesNotContain(noStash, argument => argument.StartsWith("stash@", StringComparison.Ordinal));
+        Assert.Contains("--tags", noStash);
 
         var stashed = GitCommands.Log("repo", 0, 10, includeStash: true);
         Assert.Contains("refs/stash", stashed);
@@ -53,6 +70,11 @@ public class BranchVisibilityTests
         Assert.Equal(
             "Hiding 3 branches",
             BranchVisibility.Describe(["refs/heads/a", "refs/heads/b", "refs/remotes/origin/c"]));
+        Assert.Equal("Hiding 1 stash", BranchVisibility.Describe(["stash:abc"]));
+        Assert.Equal(
+            "Hiding feature/grass and 1 stash",
+            BranchVisibility.Describe(["stash:abc", "refs/heads/feature/grass"]));
+        Assert.Equal("Hiding 2 stashes", BranchVisibility.Describe(["stash:aaa", "stash:bbb"]));
         Assert.Null(BranchVisibility.Caption(null, []));
         Assert.Equal("Hiding feature/grass", BranchVisibility.Caption(null, ["refs/heads/feature/grass"]));
         var search = HistoryQueryParser.Parse("feature-only");
@@ -138,6 +160,47 @@ public class BranchVisibilityTests
         Assert.Equal(["feature-only", "root", "side-only", "trunk-only"], Subjects(session));
         Assert.Null(session.Snapshot().HistoryLabel);
         Assert.Contains("--tags", LastLog(session));
+    }
+
+    [Fact]
+    public async Task Hidden_stash_drops_that_stash_and_a_hidden_branch_keeps_a_visible_one()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "root\n");
+        repo.CommitAll("root");
+        var trunk = repo.CurrentBranch();
+        repo.Run("switch", "-c", "feature/grass");
+        repo.WriteFile("c.txt", "feature\n");
+        repo.CommitAll("feature-only");
+        repo.Run("switch", trunk);
+        repo.WriteFile("a.txt", "wip\n");
+        repo.Run("stash", "push", "-m", "kept-stash");
+        repo.WriteFile("a.txt", "other\n");
+        repo.Run("stash", "push", "-m", "dropped-stash");
+
+        await using var session = await Open(repo);
+        Assert.Contains(Subjects(session), subject => subject.Contains("kept-stash", StringComparison.Ordinal));
+        Assert.Contains(Subjects(session), subject => subject.Contains("dropped-stash", StringComparison.Ordinal));
+        var dropped = session.Snapshot().Stashes.Single(stash => stash.Subject.Contains("dropped-stash", StringComparison.Ordinal));
+        var kept = session.Snapshot().Stashes.Single(stash => stash.Subject.Contains("kept-stash", StringComparison.Ordinal));
+
+        await session.SetHiddenBranchesAsync([BranchVisibility.StashToken(dropped.Sha)], CancellationToken.None);
+        Assert.DoesNotContain(Subjects(session), subject => subject.Contains("dropped-stash", StringComparison.Ordinal));
+        Assert.Contains(Subjects(session), subject => subject.Contains("kept-stash", StringComparison.Ordinal));
+        Assert.Contains("feature-only", Subjects(session));
+        Assert.Equal("Hiding 1 stash", session.Snapshot().HistoryLabel);
+        Assert.Contains(kept.Ref, LastLog(session));
+        Assert.DoesNotContain("refs/stash", LastLog(session));
+        Assert.DoesNotContain(dropped.Ref, LastLog(session));
+
+        await session.SetHiddenBranchesAsync(
+            [BranchVisibility.StashToken(dropped.Sha), "refs/heads/feature/grass"],
+            CancellationToken.None);
+        Assert.DoesNotContain(Subjects(session), subject => subject == "feature-only");
+        Assert.Contains(Subjects(session), subject => subject.Contains("kept-stash", StringComparison.Ordinal));
+        Assert.DoesNotContain("--tags", LastLog(session));
+        Assert.Contains("--exclude=feature/grass", LastLog(session));
+        Assert.Contains(kept.Ref, LastLog(session));
     }
 
     [Fact]

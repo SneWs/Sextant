@@ -80,7 +80,7 @@ public partial class RepositoryViewModel : ViewModelBase
             return;
         foreach (var name in names)
         {
-            if (BranchVisibility.IsGraphBranch(name))
+            if (BranchVisibility.IsRemembered(name))
                 _hiddenBranches.Add(name);
         }
     }
@@ -138,6 +138,12 @@ public partial class RepositoryViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool ShowLocations { get; set; } = true;
 
+    [ObservableProperty]
+    public partial bool LocationFilterOpen { get; set; }
+
+    [ObservableProperty]
+    public partial string LocationFilter { get; set; } = "";
+
     [RelayCommand]
     private void ToggleLocations()
     {
@@ -145,6 +151,23 @@ public partial class RepositoryViewModel : ViewModelBase
         NotePaneEdit();
         _host.Save();
     }
+
+    [RelayCommand]
+    private void ToggleLocationFilter()
+    {
+        if (LocationFilterOpen)
+        {
+            LocationFilterOpen = false;
+            if (LocationFilter.Length > 0)
+                LocationFilter = "";
+        }
+        else
+        {
+            LocationFilterOpen = true;
+        }
+    }
+
+    partial void OnLocationFilterChanged(string value) => PublishLocations(SelectedLocation?.Key);
 
     public ObservableCollection<GraphRowViewModel> Rows { get; } = [];
 
@@ -1280,16 +1303,19 @@ public partial class RepositoryViewModel : ViewModelBase
         _locationRoots.Clear();
 
         var head = HeadLabel(state.Branch);
+        var anyBranchHidden = state.HiddenBranches.Any(BranchVisibility.IsGraphBranch);
         var branches = new List<LocationItem>();
         foreach (var branch in state.Refs.Where(reference => reference.Name.StartsWith("refs/heads/", StringComparison.Ordinal))
                      .OrderBy(reference => reference.Name, StringComparer.Ordinal))
         {
             var name = ShortHead(branch.Name);
             var current = branch.IsHead;
+            var hidden = state.HiddenBranches.Contains(branch.Name);
             branches.Add(new LocationItem
             {
                 Key = "b:" + name,
                 Label = name + UpstreamTrackParser.Suffix(branch.Ahead, branch.Behind),
+                SearchText = name,
                 IsCurrent = current,
                 Oid = branch.Oid,
                 ShowCheckout = !current,
@@ -1301,9 +1327,13 @@ public partial class RepositoryViewModel : ViewModelBase
                 ShowSetUpstream = true,
                 ShowReveal = true,
                 ShowHide = true,
-                HideLabel = state.HiddenBranches.Contains(branch.Name) ? "Show branch" : "Hide branch",
-                ShowAllBranches = state.HiddenBranches.Count > 0,
-                LabelOpacity = state.HiddenBranches.Contains(branch.Name) ? 0.45 : 1,
+                ShowHideOthers = true,
+                ShowEye = true,
+                EyeHidden = hidden,
+                EyeOpen = !hidden,
+                HideLabel = hidden ? "Show branch" : "Hide branch",
+                ShowAllBranches = anyBranchHidden,
+                LabelOpacity = hidden ? 0.45 : 1,
                 CheckoutCommand = new AsyncRelayCommand(() => RunAsync("Checking out…", ct => Session.SwitchAsync(name, ct))),
                 MergeCommand = new AsyncRelayCommand(() => MergeNamedAsync(name)),
                 RebaseCommand = new AsyncRelayCommand(() => RebaseOntoAsync(name)),
@@ -1329,18 +1359,24 @@ public partial class RepositoryViewModel : ViewModelBase
             {
                 var name = ShortRemote(remote.Name);
                 var branchName = name.Length > remoteName.Length + 1 ? name[(remoteName.Length + 1)..] : name;
+                var hidden = state.HiddenBranches.Contains(remote.Name);
                 tracked.Add(new LocationItem
                 {
                     Key = "r:" + name,
                     Label = branchName,
+                    SearchText = name,
                     Oid = remote.Oid,
                     ShowCheckout = true,
                     ShowDelete = true,
                     ShowReveal = true,
                     ShowHide = true,
-                    HideLabel = state.HiddenBranches.Contains(remote.Name) ? "Show branch" : "Hide branch",
-                    ShowAllBranches = state.HiddenBranches.Count > 0,
-                    LabelOpacity = state.HiddenBranches.Contains(remote.Name) ? 0.45 : 1,
+                    ShowHideOthers = true,
+                    ShowEye = true,
+                    EyeHidden = hidden,
+                    EyeOpen = !hidden,
+                    HideLabel = hidden ? "Show branch" : "Hide branch",
+                    ShowAllBranches = anyBranchHidden,
+                    LabelOpacity = hidden ? 0.45 : 1,
                     CheckoutCommand = new AsyncRelayCommand(() => RunAsync("Checking out…", ct => Session.SwitchTrackAsync(name, ct))),
                     DeleteCommand = new AsyncRelayCommand(() => DeleteRemoteBranchAsync(remoteName, branchName)),
                     RevealCommand = new AsyncRelayCommand(() => RevealAsync(remote.Oid)),
@@ -1362,6 +1398,7 @@ public partial class RepositoryViewModel : ViewModelBase
             {
                 Key = "t:" + name,
                 Label = name,
+                SearchText = name,
                 Oid = tag.Oid,
                 ShowTag = true,
                 RevealCommand = new AsyncRelayCommand(() => RevealAsync(tag.Oid)),
@@ -1382,6 +1419,7 @@ public partial class RepositoryViewModel : ViewModelBase
             {
                 Key = "m:" + remote,
                 Label = remote,
+                SearchText = remote,
                 ShowDelete = true,
                 ShowRename = true,
                 DeleteCommand = new AsyncRelayCommand(() => RemoveRemoteAsync(remote)),
@@ -1394,16 +1432,25 @@ public partial class RepositoryViewModel : ViewModelBase
         var stashes = new List<LocationItem>();
         foreach (var stash in state.Stashes)
         {
+            var hidden = state.HiddenBranches.Contains(BranchVisibility.StashToken(stash.Sha));
+            var label = stash.Ref + "  " + stash.Subject;
             stashes.Add(new LocationItem
             {
                 Key = "s:" + stash.Ref,
-                Label = stash.Ref + "  " + stash.Subject,
+                Label = label,
+                SearchText = label,
                 ShowPop = true,
                 ShowApply = true,
                 ShowDrop = true,
+                ShowEye = true,
+                EyeHidden = hidden,
+                EyeOpen = !hidden,
+                HideLabel = hidden ? "Show stash" : "Hide stash",
+                LabelOpacity = hidden ? 0.45 : 1,
                 PopCommand = new AsyncRelayCommand(() => PopStashAsync(stash)),
                 ApplyCommand = new AsyncRelayCommand(() => ApplyStashAsync(stash)),
                 DropCommand = new AsyncRelayCommand(() => DropStashAsync(stash)),
+                HideCommand = new AsyncRelayCommand(() => ToggleHiddenAsync(BranchVisibility.StashToken(stash.Sha))),
             });
         }
 
@@ -1423,6 +1470,7 @@ public partial class RepositoryViewModel : ViewModelBase
             {
                 Key = "u:" + module.Path,
                 Label = module.Path + "  " + suffix,
+                SearchText = module.Path,
                 ShowOpen = module.State != SubmoduleState.Uninitialized,
                 OpenCommand = new AsyncRelayCommand(() => OpenSubmoduleAsync(module)),
             });
@@ -1447,6 +1495,7 @@ public partial class RepositoryViewModel : ViewModelBase
                 {
                     Key = "w:" + tree.Path,
                     Label = name + pending + "  " + tree.Path,
+                    SearchText = tree.Path,
                     IsCurrent = current,
                     ShowOpen = !current,
                     OpenCommand = new AsyncRelayCommand(() => _host.OpenRepositoryAsync(tree.Path)),
@@ -1478,10 +1527,59 @@ public partial class RepositoryViewModel : ViewModelBase
     private void PublishLocations(string? selectedKey)
     {
         var flat = new List<LocationItem>();
+        var filter = LocationFilter.Trim();
         foreach (var root in _locationRoots)
-            AppendVisible(root, 0, flat);
+        {
+            if (filter.Length == 0)
+                AppendVisible(root, 0, flat);
+            else
+                AppendFiltered(root, 0, filter, flat);
+        }
+
         Locations.Reset(flat);
         SelectedLocation = selectedKey is null ? null : flat.FirstOrDefault(item => item.Key == selectedKey);
+    }
+
+    private static bool AppendFiltered(LocationItem item, int depth, string filter, List<LocationItem> flat)
+    {
+        if (Matches(item, filter))
+        {
+            AppendAll(item, depth, flat);
+            return true;
+        }
+
+        if (item.Children.Count == 0)
+            return false;
+
+        var start = flat.Count;
+        item.Depth = depth;
+        flat.Add(item);
+        var any = false;
+        foreach (var child in item.Children)
+        {
+            if (AppendFiltered(child, depth + 1, filter, flat))
+                any = true;
+        }
+
+        if (any)
+            return true;
+        flat.RemoveRange(start, flat.Count - start);
+        return false;
+    }
+
+    private static void AppendAll(LocationItem item, int depth, List<LocationItem> flat)
+    {
+        item.Depth = depth;
+        flat.Add(item);
+        foreach (var child in item.Children)
+            AppendAll(child, depth + 1, flat);
+    }
+
+    private static bool Matches(LocationItem item, string filter)
+    {
+        if (item.SearchText.Contains(filter, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return !item.IsHeader && item.Label.Contains(filter, StringComparison.OrdinalIgnoreCase);
     }
 
     private static void AppendVisible(LocationItem item, int depth, List<LocationItem> flat)
@@ -1572,6 +1670,7 @@ public partial class RepositoryViewModel : ViewModelBase
             IsHeader = true,
             Key = key,
             Label = $"{title} ({count})",
+            SearchText = title,
             IsExpanded = !_collapsedLocations.Contains(key),
             CollapseKey = key,
         };
@@ -2672,10 +2771,24 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         if (_session is null)
             return Task.CompletedTask;
-        return CommitHiddenAsync(BranchVisibility.HiddenExcept(_session.Snapshot().Refs, refName));
+        var snapshot = _session.Snapshot();
+        var next = BranchVisibility.HiddenExcept(snapshot.Refs, refName);
+        foreach (var name in snapshot.HiddenBranches)
+        {
+            if (BranchVisibility.IsStashToken(name))
+                next.Add(name);
+        }
+
+        return CommitHiddenAsync(next);
     }
 
-    private Task ShowAllBranchesAsync() => CommitHiddenAsync([]);
+    private Task ShowAllBranchesAsync()
+    {
+        if (_session is null)
+            return Task.CompletedTask;
+        var kept = _session.Snapshot().HiddenBranches.Where(BranchVisibility.IsStashToken).ToArray();
+        return CommitHiddenAsync(kept);
+    }
 
     private async Task CommitHiddenAsync(IReadOnlyCollection<string> hidden)
     {

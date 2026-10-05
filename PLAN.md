@@ -24,6 +24,8 @@ On 2026-10-05 a local or remote-tracking branch row offers Hide branch and Hide 
 
 On 2026-10-05 the locations list keeps a Stashes root and a Submodules root when those lists are empty. Each label includes the count, so an empty repository shows Stashes (0) and Submodules (0). A stash or a submodule is still a row under that root. `Stashes_and_submodules_stay_visible_when_empty` and `A_submodule_is_a_row_under_the_submodules_root` passed against system git. A headless window confirmed the empty labels, a stash row under Stashes, and a submodule row under Submodules. The desktop window was not launched.
 
+On 2026-10-05 the locations column is titled Locations. A search icon on the right opens a filter field, and the text hides branches, remote-tracking branches, tags, stashes, and the other rows that do not match. Escape or the icon again clears it. Each local branch, remote-tracking branch, and stash has an eye that hides or shows that row in the commit list. The row stays, dimmed, and the choice is saved with the repository. A stash is remembered by its commit sha. Every stash whose eye is on is its own root, so an older stash stays in the list until its eye is closed. A tag still does not bring a hidden branch back. `Filter_keeps_matching_rows_and_eyes_hide_a_branch_and_a_stash` and `Hidden_stash_drops_that_stash_and_a_hidden_branch_keeps_a_visible_one` passed against system git. A headless window confirmed the Locations title, the filter field, and an eye on the branch row. The desktop window was not launched. View → Toggle locations and the command palette use that name.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
