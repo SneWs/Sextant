@@ -239,8 +239,14 @@ public partial class MainWindow : Window
 
     private void OnPaletteChosen(object? sender, TappedEventArgs e)
     {
-        if (DataContext is MainViewModel vm)
-            _ = vm.RunPaletteAsync();
+        if (DataContext is not MainViewModel vm || e.Source is not Visual source)
+            return;
+        var row = source as ListBoxItem ?? source.FindAncestorOfType<ListBoxItem>();
+        if (row?.DataContext is not PaletteItem chosen)
+            return;
+        vm.SelectedPalette = chosen;
+        _ = vm.RunPaletteAsync();
+        e.Handled = true;
     }
 
     private void OnPaletteBackdrop(object? sender, PointerPressedEventArgs e)

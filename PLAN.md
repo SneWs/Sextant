@@ -26,6 +26,12 @@ On 2026-10-05 the locations list keeps a Stashes root and a Submodules root when
 
 On 2026-10-05 the locations column is titled Locations. A search icon on the right opens a filter field, and the text hides branches, remote-tracking branches, tags, stashes, and the other rows that do not match. Escape or the icon again clears it. Each local branch, remote-tracking branch, and stash has an eye that hides or shows that row in the commit list. The row stays, dimmed, and the choice is saved with the repository. A stash is remembered by its commit sha. Every stash whose eye is on is its own root, so an older stash stays in the list until its eye is closed. A tag still does not bring a hidden branch back. `Filter_keeps_matching_rows_and_eyes_hide_a_branch_and_a_stash` and `Hidden_stash_drops_that_stash_and_a_hidden_branch_keeps_a_visible_one` passed against system git. A headless window confirmed the Locations title, the filter field, and an eye on the branch row. The desktop window was not launched. View → Toggle locations and the command palette use that name.
 
+On 2026-10-05 the command palette has a border and a shadow under the card. Each command row is padded a little more. `Command_palette_has_a_shadow_a_border_and_padded_rows` passed. A headless window confirmed the border, the shadow, and the row padding. The desktop window was not launched.
+
+On 2026-10-05 a single click on a command palette row runs that command and closes the palette, including after the list has been scrolled. Enter still does the same. `Clicking_a_command_after_scrolling_runs_it_and_closes_the_palette` passed. A headless window scrolled the list, clicked Toggle command log, and confirmed the palette closed and the log opened. The desktop window was not launched.
+
+On 2026-10-05 the command palette lists its commands from A to Z. A search keeps that order. `Command_palette_lists_commands_from_a_to_z` passed. A headless window confirmed the first row is Add remote when a repository is open. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

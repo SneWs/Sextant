@@ -734,6 +734,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
         _palette.Add(new PaletteItem { Title = "Next tab", Run = () => { NextTab(); return Task.CompletedTask; } });
         _palette.Add(new PaletteItem { Title = "Close tab", Run = () => { CloseActive(); return Task.CompletedTask; } });
+        _palette.Sort(static (left, right) => string.Compare(left.Title, right.Title, StringComparison.OrdinalIgnoreCase));
     }
 
     private void FilterPalette()
