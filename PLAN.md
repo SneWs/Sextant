@@ -50,6 +50,8 @@ On 2026-10-05 the history search action is a magnifying-glass icon with no label
 
 On 2026-10-05 the working-copy file list puts staged files above unstaged files. Conflicts stay first when a merge is in progress. Staged, Unstaged, Conflicts, and a commit's Changes title are a rounded bar with a background and a border. The file rows stay plain. Choosing a title leaves the open file selected. `Staged_files_sit_above_unstaged_and_the_section_is_a_bar` passed. A headless window confirmed the staged bar, its file, the unstaged bar, and its file in that order, and that the bar has a fill and a stroke while a file row does not. The desktop window was not launched.
 
+On 2026-10-05 a tag is a label on the right of its commit in the history. The label is a rounded bar with an amber fill and a border. The subject and the author line stay on the left, and the tag name is no longer repeated in that line. A lightweight tag and an annotated tag both use the commit the tag points at. A click on that tag in Locations selects the commit. `Tag_labels_sit_on_the_right_and_a_location_click_selects_that_commit` passed. A headless window confirmed the label sits to the right of the subject and that clicking the tag selects its commit. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

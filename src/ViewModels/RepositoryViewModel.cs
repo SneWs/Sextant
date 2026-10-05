@@ -1148,6 +1148,7 @@ public partial class RepositoryViewModel : ViewModelBase
             When = Relative(commit.Commit.AuthorUnixSeconds),
             IsHead = head,
             Detail = CommitDetail(commit.Commit, RefLabel(commit.Commit.Sha, state.Refs, state.HiddenBranches), head),
+            Tags = TagNames(commit.Commit.Sha, state.Refs, state.HiddenBranches),
             ShowCheckout = checkout,
             ShowRewrite = true,
             CheckoutCommand = checkout
@@ -2830,6 +2831,8 @@ public partial class RepositoryViewModel : ViewModelBase
                 continue;
             if (!string.Equals(reference.Oid, sha, StringComparison.OrdinalIgnoreCase))
                 continue;
+            if (reference.Name.StartsWith("refs/tags/", StringComparison.Ordinal))
+                continue;
             if (reference.Name.StartsWith("refs/remotes/", StringComparison.Ordinal)
                 && reference.Name.EndsWith("/HEAD", StringComparison.Ordinal))
                 continue;
@@ -2841,6 +2844,27 @@ public partial class RepositoryViewModel : ViewModelBase
         if (names.Count <= 4)
             return string.Join("  ", names);
         return string.Join("  ", names.Take(4)) + $"  +{names.Count - 4}";
+    }
+
+    private static IReadOnlyList<string> TagNames(string sha, IReadOnlyList<GitRef> refs, IReadOnlySet<string> hidden)
+    {
+        var names = new List<string>();
+        foreach (var reference in refs)
+        {
+            if (!reference.Name.StartsWith("refs/tags/", StringComparison.Ordinal))
+                continue;
+            if (hidden.Contains(reference.Name))
+                continue;
+            if (!string.Equals(reference.Oid, sha, StringComparison.OrdinalIgnoreCase))
+                continue;
+            names.Add(reference.Name["refs/tags/".Length..]);
+        }
+
+        if (names.Count <= 4)
+            return names;
+        var shown = names.Take(4).ToList();
+        shown.Add($"+{names.Count - 4}");
+        return shown;
     }
 
     private static string ShortRef(string name)

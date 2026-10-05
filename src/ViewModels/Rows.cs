@@ -50,6 +50,11 @@ public partial class GraphRowViewModel : ObservableObject
     [ObservableProperty]
     public partial string Detail { get; set; } = "";
 
+    /// <summary>Tag names drawn as labels on the right of the history row.</summary>
+    public IReadOnlyList<string> Tags { get; init; } = [];
+
+    public bool HasTags => Tags.Count > 0;
+
     [ObservableProperty]
     public partial bool IsHead { get; set; }
 

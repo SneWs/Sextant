@@ -21,10 +21,13 @@ public static class GitCommands
     public static IReadOnlyList<string> Status(string toplevel) =>
         ["-C", toplevel, "--no-optional-locks", "status", "--porcelain=v2", "-z", "-b"];
 
+    /// <summary>
+    /// Refs and the commit each one points at. An annotated tag peels to that commit.
+    /// </summary>
     public static IReadOnlyList<string> Refs(string toplevel) =>
     [
         "-C", toplevel, "--no-optional-locks", "for-each-ref",
-        "--format=%(objectname)\t%(refname)\t%(HEAD)\t%(upstream:short)",
+        "--format=%(if)%(*objectname)%(then)%(*objectname)%(else)%(objectname)%(end)\t%(refname)\t%(HEAD)\t%(upstream:short)",
     ];
 
     /// <summary>

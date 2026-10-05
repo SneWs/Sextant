@@ -165,9 +165,9 @@
                 <TextBox x:Name="LocationFilterBox" Grid.Row="1" Margin="4,0,4,4"
                          PlaceholderText="Filter" Text="{Binding LocationFilter}"
                          IsVisible="{Binding LocationFilterOpen}" KeyDown="OnLocationFilterKeyDown"/>
-            <ListBox Grid.Row="2" ItemsSource="{Binding Locations}" SelectedItem="{Binding SelectedLocation}"
+            <ListBox x:Name="LocationList" Grid.Row="2" ItemsSource="{Binding Locations}" SelectedItem="{Binding SelectedLocation}"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                     DoubleTapped="OnLocationDoubleTapped">
+                     Tapped="OnLocationTapped" DoubleTapped="OnLocationDoubleTapped">
                 <ListBox.ItemsPanel>
                     <ItemsPanelTemplate>
                         <VirtualizingStackPanel/>
@@ -298,6 +298,22 @@
                                         <TextBlock Text="{Binding Subject}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
                                         <TextBlock Text="{Binding Detail}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" FontSize="12" Opacity="0.65" Margin="0,1,0,0"/>
                                     </StackPanel>
+                                    <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}"
+                                                  VerticalAlignment="Center" Margin="8,0,4,0">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="4"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="x:String">
+                                                <Border Classes="taglabel" Padding="6,0" CornerRadius="3" BorderThickness="1"
+                                                        Background="#40E6B450" BorderBrush="#E6B450">
+                                                    <TextBlock Text="{Binding}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </controls:GraphRowPanel>
                             </Border>
                         </DataTemplate>

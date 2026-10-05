@@ -779,6 +779,18 @@ public partial class RepositoryView : UserControl
 
     private void OnLocationExpandDoubleTapped(object? sender, TappedEventArgs e) => e.Handled = true;
 
+    private void OnLocationTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Source is not Visual source)
+            return;
+        if (source.FindAncestorOfType<Button>(includeSelf: true) is not null)
+            return;
+        var row = source as ListBoxItem ?? source.FindAncestorOfType<ListBoxItem>();
+        if (row?.DataContext is not LocationItem { ShowTag: true, Oid: { Length: > 0 } } item)
+            return;
+        item.RevealCommand.Execute(null);
+    }
+
     private void OnLocationDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (DataContext is not RepositoryViewModel vm || vm.SelectedLocation is not { } item)
