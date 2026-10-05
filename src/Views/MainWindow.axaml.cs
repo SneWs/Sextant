@@ -70,6 +70,7 @@ public partial class MainWindow : Window
     /// <summary>
     /// The repository pane's top rule runs the full width and stops under the selected tab,
     /// so that tab's side borders meet the rule and its bottom stays open.
+    /// With no tab open, the rule is not drawn.
     /// </summary>
     private void PlacePaneRule()
     {
@@ -81,6 +82,13 @@ public partial class MainWindow : Window
         _placingPaneRule = true;
         try
         {
+            if (DataContext is not MainViewModel { ActiveTab: not null })
+            {
+                SetRule(PaneRuleLeft, 0, 0);
+                SetRule(PaneRuleRight, 0, 0);
+                return;
+            }
+
             double left;
             double rightStart;
             if (!TryActiveTabSpan(out var x, out var tabWidth))
@@ -129,6 +137,16 @@ public partial class MainWindow : Window
 
     private static void SetRule(Border rule, double x, double width)
     {
+        var show = width > 0.5;
+        if (rule.IsVisible != show)
+            rule.IsVisible = show;
+        if (!show)
+        {
+            if (double.IsNaN(rule.Width) || rule.Width > 0.5)
+                rule.Width = 0;
+            return;
+        }
+
         if (Math.Abs(rule.Margin.Left - x) > 0.5)
             rule.Margin = new Thickness(x, 0, 0, 0);
         if (double.IsNaN(rule.Width) || Math.Abs(rule.Width - width) > 0.5)

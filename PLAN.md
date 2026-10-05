@@ -40,6 +40,8 @@ On 2026-10-05 the headless window tests share one xUnit collection named Headles
 
 On 2026-10-05 checking out a remote-tracking branch still does not ask a credential helper. The Windows test had cleared `credential.helper` and timed the whole switch, including the history reload, so a slow runner failed with "checkout waited on a credential helper". The test now clears inherited helpers, then adds one that only records a call, and it times `git switch` and `git lfs checkout` on their own. `Remote_checkout_keeps_a_cached_lfs_file_and_leaves_a_missing_one` passed. The desktop window was not launched.
 
+On 2026-10-05 an empty window draws no line under the tab bar. The pane rule stays off until a repository tab is open, and then it still stops under the selected tab. `Empty_window_draws_no_tab_rule_and_an_open_tab_draws_one` passed. A headless window confirmed the rule is hidden with no tabs, appears with a tab, and hides again when that tab closes. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
