@@ -240,22 +240,21 @@ public class LfsTests
 
         var clone = Path.Combine(Path.GetTempPath(), "sextant-test-" + Guid.NewGuid().ToString("N"));
         var credentialMarker = Path.Combine(Path.GetTempPath(), "sextant-cred-" + Guid.NewGuid().ToString("N"));
-        var credentialHelper = credentialMarker + ".sh";
         try
         {
             origin.Run("clone", origin.Directory, clone);
             WriteLfsObject(clone, cachedOid, cached);
             RemoveLfsObject(clone, missingOid);
-            if (OperatingSystem.IsWindows())
-                Git(origin.Git, clone, "config", "credential.helper", "");
-            else
-                Git(origin.Git, clone, "config", "credential.helper", HangCredentialHelper(credentialMarker, credentialHelper));
+            // An empty helper clears ones inherited from the system config, including Git
+            // Credential Manager. The probe is the only helper after that. It records a
+            // request and returns. The leading ! is git's shell snippet, so Windows runs
+            // it without chmod. A slow history reload is not treated as a prompt.
+            Git(origin.Git, clone, "config", "credential.helper", "");
+            Git(origin.Git, clone, "config", "--add", "credential.helper", CredentialProbe(credentialMarker));
             Git(origin.Git, clone, "config", "lfs.url", "https://127.0.0.1:9/no-such-lfs");
             await using var session = await RepositorySession.OpenAsync(new GitProcessRunner(), origin.Git, clone, CancellationToken.None);
-            var started = Stopwatch.StartNew();
             await session.SwitchTrackAsync("origin/feature/ColliderCreator", CancellationToken.None);
-            Assert.True(started.Elapsed < TimeSpan.FromSeconds(4), "checkout waited on a credential helper");
-            Assert.False(File.Exists(credentialMarker));
+            Assert.False(File.Exists(credentialMarker), "checkout asked a credential helper");
             var state = session.Snapshot();
             Assert.Equal("feature/ColliderCreator", state.Branch.HeadName);
             Assert.Equal("origin/feature/ColliderCreator", state.Branch.Upstream);
@@ -267,12 +266,14 @@ public class LfsTests
             Assert.Equal(0, made.ExitCode);
             Assert.Contains("-c", made.Arguments);
             Assert.Contains("--track", made.Arguments);
-            Assert.Contains(state.Commands, command => command.Arguments.Contains("lfs") && command.Arguments.Contains("checkout") && command.ExitCode == 0);
+            Assert.True(made.Duration < TimeSpan.FromSeconds(8), $"git switch took {made.Duration.TotalSeconds:0.0}s");
+            var hydrated = state.Commands.Last(command => command.Arguments.Contains("lfs") && command.Arguments.Contains("checkout"));
+            Assert.Equal(0, hydrated.ExitCode);
+            Assert.True(hydrated.Duration < TimeSpan.FromSeconds(8), $"git lfs checkout took {hydrated.Duration.TotalSeconds:0.0}s");
         }
         finally
         {
             TryDelete(credentialMarker);
-            TryDelete(credentialHelper);
             for (var attempt = 0; attempt < 5 && Directory.Exists(clone); attempt++)
             {
                 try
@@ -321,18 +322,10 @@ public class LfsTests
     private static string LfsObjectPath(string repo, string oid) =>
         Path.Combine(repo, ".git", "lfs", "objects", oid[..2], oid[2..4], oid);
 
-    private static string HangCredentialHelper(string marker, string helper)
+    private static string CredentialProbe(string marker)
     {
-        File.WriteAllText(helper, "#!/bin/sh\nprintf called > \"" + marker + "\"\nsleep 8\n");
-        using var chmod = Process.Start(new ProcessStartInfo("chmod")
-        {
-            ArgumentList = { "755", helper },
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        });
-        chmod?.WaitForExit();
-        return helper;
+        var path = marker.Replace('\\', '/');
+        return "!printf called > '" + path + "'";
     }
 
     private static void TryDelete(string path)
