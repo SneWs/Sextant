@@ -73,6 +73,14 @@ public class HistorySearchTests
         repo.CommitAll("decoy");
         repo.WriteFile("readme.txt", "read\n");
         repo.CommitAll("readme");
+        repo.WriteFile("lib/SomeCoolFile.cs", "cool\n");
+        repo.CommitAll("cool");
+        repo.WriteFile("nested/dir/MyFile.cs", "mine\n");
+        repo.CommitAll("mine");
+        repo.WriteFile("other/place/MyFile.cs", "also\n");
+        repo.CommitAll("also");
+        repo.WriteFile("src/NotSomeFile.cs", "nope\n");
+        repo.CommitAll("not some");
 
         await using var session = await Open(repo);
 
@@ -84,12 +92,21 @@ public class HistorySearchTests
 
         Assert.Equal(["hero"], await Subjects("file:*.fbx"));
         Assert.Equal("file:*.fbx", session.Snapshot().HistoryLabel);
+        Assert.Equal(["hero"], await Subjects("*.fbx"));
+        Assert.Equal("file:*.fbx", session.Snapshot().HistoryLabel);
+        Assert.Equal(["hero"], await Subjects("*.FBX"));
         Assert.Equal(["hero"], await Subjects("file:*.FBX"));
         Assert.Equal(["player"], await Subjects("file:CodeFile*Asset.cs"));
+        Assert.Equal(["cool"], await Subjects("Some*File.cs"));
+        Assert.Equal(["also", "mine"], await Subjects("MyFile.cs"));
+        Assert.Equal(["also", "mine"], await Subjects("myfile.cs"));
+        Assert.Equal(["not some", "also", "mine", "cool", "other", "player"], await Subjects("*.cs"));
         Assert.Equal(["notes"], await Subjects("file:SomeFile.md"));
+        Assert.Equal(["notes"], await Subjects("SomeFile.md"));
         Assert.Equal(["notes"], await Subjects("file:somefile.md"));
         Assert.Equal(["notes"], await Subjects("file:docs/SomeFile.md"));
         Assert.Equal(["notes"], await Subjects("file:docs/*.md"));
+        Assert.Equal(["hero"], await Subjects("hero"));
     }
 
     private static Task<RepositorySession> Open(TempRepo repo) =>

@@ -2,8 +2,9 @@ namespace Sextant.Git.Parsing;
 
 /// <summary>
 /// One history box. <c>branch:name</c> limits the revision. <c>author:name</c> limits the author.
-/// <c>file:pattern</c> limits commits to a path or a file name. <c>*</c> and <c>?</c> are wildcards.
-/// A pattern with no slash matches that file name in any directory.
+/// A file pattern limits commits to matching paths. The <c>file:</c> prefix is optional, so
+/// <c>*.fbx</c>, <c>Some*File.cs</c>, and <c>MyFile.cs</c> are file searches.
+/// <c>*</c> and <c>?</c> are wildcards. A pattern with no slash matches that file name in any directory.
 /// A lone hexadecimal token of at least 7 digits is a revision. Any other text matches the subject or the author.
 /// </summary>
 public sealed record HistoryQuery(
@@ -89,6 +90,11 @@ public static class HistoryQueryParser
                     filePattern = true;
                 }
             }
+            else if (LooksLikeFilePattern(Unquote(token).Trim()))
+            {
+                path = Unquote(token).Trim();
+                filePattern = true;
+            }
             else
                 free.Add(token);
         }
@@ -111,6 +117,31 @@ public static class HistoryQueryParser
     public static bool IsSha(string text) =>
         text.Length is >= 7 and <= 64
         && text.All(static character => character is (>= '0' and <= '9') or (>= 'a' and <= 'f') or (>= 'A' and <= 'F'));
+
+    /// <summary>
+    /// A wildcard, a path, or a file name such as <c>MyFile.cs</c>. A version such as <c>1.2.3</c> stays text.
+    /// </summary>
+    private static bool LooksLikeFilePattern(string token)
+    {
+        if (token.Length == 0)
+            return false;
+        if (token.IndexOfAny(['*', '?', '[']) >= 0)
+            return true;
+        if (token.Contains('/') || token.Contains('\\'))
+            return true;
+        var dot = token.LastIndexOf('.');
+        if (dot <= 0 || dot == token.Length - 1)
+            return false;
+        if (!char.IsAsciiLetter(token[dot + 1]))
+            return false;
+        for (var i = dot + 1; i < token.Length; i++)
+        {
+            if (!char.IsAsciiLetterOrDigit(token[i]))
+                return false;
+        }
+
+        return true;
+    }
 
     private static bool StartsWith(string token, string prefix) =>
         token.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);

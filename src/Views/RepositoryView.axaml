@@ -235,7 +235,7 @@
             <DockPanel Grid.Column="2">
                 <StackPanel DockPanel.Dock="Top" Margin="0,0,0,4" Spacing="4" IsVisible="{Binding ShowHistoryChrome}">
                     <Grid ColumnDefinitions="*,Auto,Auto" IsVisible="{Binding ShowHistorySearch}">
-                        <TextBox x:Name="HistorySearchBox" PlaceholderText="Search subject, author, sha, branch:name, or file:*.cs" Text="{Binding HistoryText}" KeyDown="OnHistoryKeyDown"/>
+                        <TextBox x:Name="HistorySearchBox" PlaceholderText="Search subject, author, sha, branch:name, *.fbx, or MyFile.cs" Text="{Binding HistoryText}" KeyDown="OnHistoryKeyDown"/>
                         <Button Grid.Column="1" Classes="flat" Content="Search" Command="{Binding SearchHistoryCommand}" Margin="4,0,0,0"/>
                         <Button Grid.Column="2" Classes="flat" Content="Clear" Command="{Binding ClearHistoryCommand}" Margin="4,0,0,0"/>
                     </Grid>
