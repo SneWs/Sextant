@@ -31,6 +31,20 @@ public partial class SettingsWindow : Window
             Light.IsChecked = true;
         else
             FollowSystem.IsChecked = true;
+        DialogFocus.WhenShown(this, CurrentPage);
+    }
+
+    private Control? CurrentPage()
+    {
+        if (AppearancePage is null)
+            return null;
+        if (DiffPage.IsVisible)
+            return DiffPage;
+        if (GitPage.IsVisible)
+            return GitPage;
+        if (MergePage.IsVisible)
+            return MergePage;
+        return AppearancePage;
     }
 
     public SettingsDraft? Result { get; private set; }

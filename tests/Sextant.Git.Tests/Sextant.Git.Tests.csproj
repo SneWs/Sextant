@@ -14,6 +14,7 @@
   <ItemGroup>
     <PackageReference Include="AssimpNetter" Version="6.0.5" />
     <PackageReference Include="BitMiracle.LibTiff.NET" Version="2.4.660" />
+    <PackageReference Include="Avalonia.Headless" Version="12.1.3" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <!-- SkiaSharp itself only depends on the Win32 and macOS natives. Pin the managed build to the same version as this native library. -->
     <PackageReference Include="SkiaSharp" Version="4.153.1" />

@@ -392,16 +392,21 @@ public sealed class AvaloniaDialogService : IDialogService
             await clipboard.SetTextAsync(text);
     }
 
-    private static Window Create(string title) => new()
+    private static Window Create(string title)
     {
-        Title = title,
-        Width = 520,
-        MinWidth = 420,
-        SizeToContent = SizeToContent.Height,
-        WindowStartupLocation = WindowStartupLocation.CenterOwner,
-        CanResize = false,
-        Padding = new Avalonia.Thickness(16),
-    };
+        var window = new Window
+        {
+            Title = title,
+            Width = 520,
+            MinWidth = 420,
+            SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Padding = new Avalonia.Thickness(16),
+        };
+        DialogFocus.WhenShown(window);
+        return window;
+    }
 
     private static TextBlock Message(string text) => new()
     {
