@@ -35,19 +35,17 @@ Status, history, and the file list ask git for a slice and paint what is on scre
   <img src="screenshots/screenshot-01.png" alt="Empty Sextant window with the logo, the name, and Open, Clone, and Init" width="900">
 </p>
 
-An empty window starts with the mark, then Open, Clone, or Init.
-
 <p align="center">
   <img src="screenshots/screenshot-02.png" alt="Three repository tabs, with branches, the commit graph, and the files in the selected commit" width="900">
 </p>
 
-Several repositories stay open as tabs. Locations, the graph, and the files for the selected commit share the window.
+<p align="center">
+  <img src="screenshots/screenshot-05.png" alt="Command palette for easily finding and executing commands and actions" width="900">
+</p>
 
 <p align="center">
   <img src="screenshots/screenshot-03.png" alt="Side-by-side diff of a C++ change, removed lines on the left and added lines on the right" width="900">
 </p>
-
-A side-by-side diff keeps both copies in view. One horizontal bar moves them together.
 
 <p align="center">
   <img src="screenshots/screenshot-04.png" alt="Before and after FBX previews of a missile mesh, each with a mesh summary" width="900">
