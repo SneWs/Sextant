@@ -259,7 +259,10 @@ public static class GitCommands
             arguments.Add(path);
         }
 
-        KeepLfsPointers(arguments);
+        // The index stores pointers and the working tree stores the files. Clearing the clean filter
+        // compares those bytes, so a clean checkout looks modified whenever git re-reads the file.
+        if (staged)
+            KeepLfsPointers(arguments);
         return arguments;
     }
 
@@ -409,6 +412,28 @@ public static class GitCommands
 
     public static IReadOnlyList<string> SwitchTrack(string toplevel, string remoteBranch) =>
         ["-C", toplevel, "switch", "--track", remoteBranch];
+
+    /// <summary>
+    /// Creates <paramref name="name"/> at <paramref name="remoteBranch"/> and checks it out.
+    /// <c>--track</c> sets that remote-tracking branch as the upstream.
+    /// </summary>
+    public static IReadOnlyList<string> SwitchCreateTrack(string toplevel, string name, string remoteBranch) =>
+        ["-C", toplevel, "switch", "-c", name, "--track", remoteBranch];
+
+    /// <summary>
+    /// <c>origin/feature/name</c> is the local branch <c>feature/name</c>.
+    /// The remote is only the first path segment, matching <c>refs/heads/*:refs/remotes/origin/*</c>.
+    /// </summary>
+    public static string? LocalBranchOfRemote(string remoteBranch)
+    {
+        var slash = remoteBranch.IndexOf('/');
+        if (slash <= 0 || slash >= remoteBranch.Length - 1)
+            return null;
+        return remoteBranch[(slash + 1)..];
+    }
+
+    public static IReadOnlyList<string> VerifyLocalBranch(string toplevel, string name) =>
+        ["-C", toplevel, "--no-optional-locks", "rev-parse", "--verify", "--quiet", "refs/heads/" + name];
 
     public static IReadOnlyList<string> CreateBranch(string toplevel, string name) =>
         ["-C", toplevel, "switch", "-c", name];
@@ -618,6 +643,12 @@ public static class GitCommands
     public static IReadOnlyList<string> LfsCheckout(string toplevel, string path) =>
         ["-C", toplevel, "lfs", "checkout", "--", LfsInclude(path)];
 
+    /// <summary>
+    /// Writes LFS objects that are already in the local store. This does not download.
+    /// </summary>
+    public static IReadOnlyList<string> LfsCheckoutAll(string toplevel) =>
+        ["-C", toplevel, "lfs", "checkout"];
+
     public static IReadOnlyList<string> StageAttributes(string toplevel) =>
         ["-C", toplevel, "add", "--", ".gitattributes"];
 
@@ -649,7 +680,8 @@ public static class GitCommands
     }
 
     /// <summary>
-    /// Diff and show stay on the pointer. Clearing the LFS smudge and process filters keeps a normal diff from downloading the blob.
+    /// Blob diffs stay on the pointer. Clearing the LFS smudge and process filters keeps show, blame, and a staged or range diff from downloading the blob.
+    /// An unstaged worktree diff does not use this. That comparison has to run the clean filter, or a clean checkout looks modified.
     /// Text conversion is turned off with --no-textconv on the command. An empty diff.lfs.textconv makes git try to spawn a blank program.
     /// </summary>
     private static void KeepLfsPointers(List<string> arguments)

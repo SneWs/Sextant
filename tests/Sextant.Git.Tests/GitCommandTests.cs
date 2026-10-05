@@ -34,6 +34,7 @@ public class GitCommandTests
         Assert.True(GitCommands.LfsNameHasComma("dir/a,b.bin"));
         Assert.False(GitCommands.LfsNameHasComma("dir/a.bin"));
         Assert.Equal(["-C", "repo", "lfs", "checkout", "--", "dir/a,b.bin"], GitCommands.LfsCheckout("repo", "dir/a,b.bin"));
+        Assert.Equal(["-C", "repo", "lfs", "checkout"], GitCommands.LfsCheckoutAll("repo"));
         Assert.DoesNotContain("--include", GitCommands.LfsCheckout("repo", "dir/a,b.bin"));
         Assert.Equal("dir/a].bin", GitCommands.LfsInclude("dir/a].bin"));
         Assert.Equal("dir/a.bin", GitCommands.LfsInclude("dir\\a.bin"));
@@ -45,6 +46,12 @@ public class GitCommandTests
         Assert.DoesNotContain("am", GitCommands.ApplyPatch("repo", "change.patch"));
         Assert.DoesNotContain("--no-optional-locks", GitCommands.CreateBranchAt("repo", "topic", "abc"));
         Assert.Equal(["-C", "repo", "switch", "--detach", "v1"], GitCommands.SwitchDetach("repo", "v1"));
+        Assert.Equal(["-C", "repo", "switch", "-c", "feature/name", "--track", "origin/feature/name"], GitCommands.SwitchCreateTrack("repo", "feature/name", "origin/feature/name"));
+        Assert.Equal("feature/name", GitCommands.LocalBranchOfRemote("origin/feature/name"));
+        Assert.Equal("master", GitCommands.LocalBranchOfRemote("upstream/master"));
+        Assert.Null(GitCommands.LocalBranchOfRemote("origin"));
+        Assert.Contains("--no-optional-locks", GitCommands.VerifyLocalBranch("repo", "feature/name"));
+        Assert.Equal("refs/heads/feature/name", GitCommands.VerifyLocalBranch("repo", "feature/name")[^1]);
         Assert.Equal(["-C", "repo", "push", "--progress", "origin", "refs/tags/v1"], GitCommands.PushTag("repo", "origin", "v1"));
         Assert.Equal(["-C", "repo", "push", "--progress", "origin", "--delete", "refs/tags/v1"], GitCommands.DeleteRemoteTag("repo", "origin", "v1"));
         Assert.DoesNotContain("--no-optional-locks", GitCommands.SwitchDetach("repo", "v1"));
@@ -88,9 +95,13 @@ public class GitCommandTests
     [Fact]
     public void Diff_and_show_keep_lfs_pointers_and_status_does_not()
     {
-        Assert.Contains("filter.lfs.process=", GitCommands.DiffWorktree("repo", false, false));
+        Assert.DoesNotContain("filter.lfs.process=", GitCommands.DiffWorktree("repo", false, false));
+        Assert.DoesNotContain("filter.lfs.smudge=", GitCommands.DiffWorktree("repo", false, false));
+        Assert.DoesNotContain("filter.lfs.required=false", GitCommands.DiffWorktree("repo", false, false));
         Assert.Contains("--no-textconv", GitCommands.DiffWorktree("repo", false, false));
         Assert.DoesNotContain("diff.lfs.textconv=", GitCommands.DiffWorktree("repo", false, false));
+        Assert.Contains("filter.lfs.process=", GitCommands.DiffWorktree("repo", true, false));
+        Assert.Contains("--no-textconv", GitCommands.DiffWorktree("repo", true, false));
         Assert.Contains("filter.lfs.process=", GitCommands.DiffUntracked("repo", "a.bin"));
         Assert.Contains("--no-textconv", GitCommands.DiffRange("repo", "a", "b", "file.bin"));
         Assert.Contains("--no-textconv", GitCommands.ShowPatch("repo", "abc", "a.bin"));

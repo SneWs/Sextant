@@ -99,6 +99,55 @@ public class LfsTests
     }
 
     [Fact]
+    public async Task Clean_lfs_worktree_is_not_a_pointer_diff()
+    {
+        if (!GitLfsInstalled())
+            return;
+        using var repo = new TempRepo();
+        repo.Run("config", "core.autocrlf", "false");
+        var textPath = Path.Combine(repo.Directory, "picture.bin");
+        var binaryPath = Path.Combine(repo.Directory, "blob.bin");
+        var textBytes = "hello-lfs\n"u8.ToArray();
+        byte[] binaryBytes = [0, 1, 2, 3, 4, 5, 6, 7];
+        File.WriteAllBytes(textPath, textBytes);
+        File.WriteAllBytes(binaryPath, binaryBytes);
+        await using var session = await Open(repo);
+        await session.TrackWithLfsAsync("picture.bin", CancellationToken.None);
+        await session.TrackWithLfsAsync("blob.bin", CancellationToken.None);
+        repo.CommitAll("tracked");
+        Assert.Equal(textBytes, File.ReadAllBytes(textPath));
+        Assert.Equal(binaryBytes, File.ReadAllBytes(binaryPath));
+
+        // Same bytes, new mtime. Git re-reads the file. The clean filter must still match the index pointer.
+        File.WriteAllBytes(textPath, textBytes);
+        File.WriteAllBytes(binaryPath, binaryBytes);
+        var clean = await session.WorktreeDiffAsync(false, true, false, CancellationToken.None);
+        Assert.NotNull(clean);
+        Assert.True(string.IsNullOrEmpty(clean.RawPatch));
+        Assert.Empty(clean.LfsFiles);
+        Assert.Contains(session.Snapshot().Commands, command =>
+            command.Arguments.Contains("diff")
+            && command.Arguments.Contains("--no-textconv")
+            && !command.Arguments.Contains("--cached")
+            && !command.Arguments.Contains("filter.lfs.process="));
+
+        File.WriteAllBytes(textPath, "hello-lfs-changed\n"u8.ToArray());
+        File.WriteAllBytes(binaryPath, [0, 1, 2, 3, 9, 9, 9, 9]);
+        var dirty = await session.WorktreeDiffAsync(false, true, false, CancellationToken.None);
+        Assert.NotNull(dirty);
+        Assert.Contains("git-lfs.github.com", dirty.RawPatch, StringComparison.Ordinal);
+        Assert.DoesNotContain("hello-lfs-changed", dirty.RawPatch, StringComparison.Ordinal);
+        Assert.DoesNotContain("Binary files ", dirty.RawPatch, StringComparison.Ordinal);
+        Assert.Equal(2, dirty.LfsFiles.Count);
+        Assert.All(dirty.LfsFiles, note => Assert.Null(note.LocalBytes));
+        var picture = Assert.Single(dirty.LfsFiles, note => note.Path == "picture.bin");
+        Assert.NotNull(picture.Before);
+        Assert.NotNull(picture.After);
+        Assert.NotEqual(picture.Before.Oid, picture.After.Oid);
+        Assert.Equal("hello-lfs-changed\n", File.ReadAllText(textPath));
+    }
+
+    [Fact]
     public async Task Lfs_attribute_marks_the_worktree_and_a_commit()
     {
         using var repo = new TempRepo();
@@ -166,6 +215,160 @@ public class LfsTests
         await session.LfsPullFileAsync("a,b.bin", CancellationToken.None);
         Assert.Equal("hello-comma\n", ReadText(repo, "a,b.bin"));
         Assert.Contains("git-lfs.github.com", ReadText(repo, "c.bin"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Remote_checkout_keeps_a_cached_lfs_file_and_leaves_a_missing_one()
+    {
+        if (!GitLfsInstalled())
+            return;
+        using var origin = new TempRepo();
+        origin.Run("config", "core.autocrlf", "false");
+        origin.Run("lfs", "track", "*.bin");
+        var cached = "cached-but-new\n"u8.ToArray();
+        var missing = "needs-download\n"u8.ToArray();
+        File.WriteAllBytes(Path.Combine(origin.Directory, "have.bin"), "old-cached\n"u8.ToArray());
+        origin.CommitAll("main");
+        var main = origin.CurrentBranch();
+        origin.Run("switch", "-c", "feature/ColliderCreator");
+        File.WriteAllBytes(Path.Combine(origin.Directory, "have.bin"), cached);
+        File.WriteAllBytes(Path.Combine(origin.Directory, "need.bin"), missing);
+        origin.CommitAll("feature");
+        var cachedOid = PointerOid(origin, "feature/ColliderCreator:have.bin");
+        var missingOid = PointerOid(origin, "feature/ColliderCreator:need.bin");
+        origin.Run("switch", main);
+
+        var clone = Path.Combine(Path.GetTempPath(), "sextant-test-" + Guid.NewGuid().ToString("N"));
+        var credentialMarker = Path.Combine(Path.GetTempPath(), "sextant-cred-" + Guid.NewGuid().ToString("N"));
+        var credentialHelper = credentialMarker + ".sh";
+        try
+        {
+            origin.Run("clone", origin.Directory, clone);
+            WriteLfsObject(clone, cachedOid, cached);
+            RemoveLfsObject(clone, missingOid);
+            if (OperatingSystem.IsWindows())
+                Git(origin.Git, clone, "config", "credential.helper", "");
+            else
+                Git(origin.Git, clone, "config", "credential.helper", HangCredentialHelper(credentialMarker, credentialHelper));
+            Git(origin.Git, clone, "config", "lfs.url", "https://127.0.0.1:9/no-such-lfs");
+            await using var session = await RepositorySession.OpenAsync(new GitProcessRunner(), origin.Git, clone, CancellationToken.None);
+            var started = Stopwatch.StartNew();
+            await session.SwitchTrackAsync("origin/feature/ColliderCreator", CancellationToken.None);
+            Assert.True(started.Elapsed < TimeSpan.FromSeconds(4), "checkout waited on a credential helper");
+            Assert.False(File.Exists(credentialMarker));
+            var state = session.Snapshot();
+            Assert.Equal("feature/ColliderCreator", state.Branch.HeadName);
+            Assert.Equal("origin/feature/ColliderCreator", state.Branch.Upstream);
+            Assert.Equal(cached, File.ReadAllBytes(Path.Combine(clone, "have.bin")));
+            var pointer = File.ReadAllText(Path.Combine(clone, "need.bin"));
+            Assert.Contains("git-lfs.github.com/spec/v1", pointer, StringComparison.Ordinal);
+            Assert.Contains(missingOid, pointer, StringComparison.Ordinal);
+            var made = state.Commands.Last(command => command.Arguments.Contains("switch"));
+            Assert.Equal(0, made.ExitCode);
+            Assert.Contains("-c", made.Arguments);
+            Assert.Contains("--track", made.Arguments);
+            Assert.Contains(state.Commands, command => command.Arguments.Contains("lfs") && command.Arguments.Contains("checkout") && command.ExitCode == 0);
+        }
+        finally
+        {
+            TryDelete(credentialMarker);
+            TryDelete(credentialHelper);
+            for (var attempt = 0; attempt < 5 && Directory.Exists(clone); attempt++)
+            {
+                try
+                {
+                    Directory.Delete(clone, recursive: true);
+                }
+                catch (IOException)
+                {
+                    Thread.Sleep(40);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    Thread.Sleep(40);
+                }
+            }
+        }
+    }
+
+    private static string PointerOid(TempRepo repo, string revision)
+    {
+        var pointer = repo.RunCapture(
+            "-c", "filter.lfs.smudge=",
+            "-c", "filter.lfs.process=",
+            "-c", "filter.lfs.required=false",
+            "show", revision);
+        var line = pointer.Split('\n').First(part => part.StartsWith("oid sha256:", StringComparison.Ordinal));
+        return line["oid sha256:".Length..].Trim();
+    }
+
+    private static void WriteLfsObject(string repo, string oid, byte[] bytes)
+    {
+        var path = LfsObjectPath(repo, oid);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        if (File.Exists(path))
+            File.Delete(path);
+        File.WriteAllBytes(path, bytes);
+    }
+
+    private static void RemoveLfsObject(string repo, string oid)
+    {
+        var path = LfsObjectPath(repo, oid);
+        if (File.Exists(path))
+            File.Delete(path);
+    }
+
+    private static string LfsObjectPath(string repo, string oid) =>
+        Path.Combine(repo, ".git", "lfs", "objects", oid[..2], oid[2..4], oid);
+
+    private static string HangCredentialHelper(string marker, string helper)
+    {
+        File.WriteAllText(helper, "#!/bin/sh\nprintf called > \"" + marker + "\"\nsleep 8\n");
+        using var chmod = Process.Start(new ProcessStartInfo("chmod")
+        {
+            ArgumentList = { "755", helper },
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        });
+        chmod?.WaitForExit();
+        return helper;
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private static void Git(string git, string directory, params string[] args)
+    {
+        var info = new ProcessStartInfo(git)
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        };
+        info.ArgumentList.Add("-C");
+        info.ArgumentList.Add(directory);
+        foreach (var arg in args)
+            info.ArgumentList.Add(arg);
+        using var process = Process.Start(info) ?? throw new InvalidOperationException("git did not start.");
+        var stderr = process.StandardError.ReadToEnd();
+        process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException($"git {string.Join(' ', args)} exited {process.ExitCode}{Environment.NewLine}{stderr}");
     }
 
     private static void WritePointer(TempRepo repo, string path)

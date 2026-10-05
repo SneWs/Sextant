@@ -512,7 +512,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
         MutateAsync(GitCommands.DeleteTag(_toplevel, name), null, cancellationToken);
 
     public Task SwitchDetachAsync(string revision, CancellationToken cancellationToken) =>
-        MutateAsync(GitCommands.SwitchDetach(_toplevel, revision), null, cancellationToken);
+        MutateAsync(GitCommands.SwitchDetach(_toplevel, revision), null, cancellationToken, environment: CheckoutEnvironment, hydrateLfs: true);
 
     public Task PushTagAsync(string remote, string name, IProgress<string>? progress, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.PushTag(_toplevel, remote, name), progress, cancellationToken);
@@ -696,10 +696,37 @@ public sealed partial class RepositorySession : IAsyncDisposable
         }, cancellationToken);
 
     public Task SwitchAsync(string branch, CancellationToken cancellationToken) =>
-        MutateAsync(GitCommands.Switch(_toplevel, branch), null, cancellationToken);
+        MutateAsync(GitCommands.Switch(_toplevel, branch), null, cancellationToken, environment: CheckoutEnvironment, hydrateLfs: true);
 
-    public Task SwitchTrackAsync(string remoteBranch, CancellationToken cancellationToken) =>
-        MutateAsync(GitCommands.SwitchTrack(_toplevel, remoteBranch), null, cancellationToken);
+    public async Task SwitchTrackAsync(string remoteBranch, CancellationToken cancellationToken)
+    {
+        var local = GitCommands.LocalBranchOfRemote(remoteBranch);
+        if (local is null)
+        {
+            await MutateAsync(GitCommands.SwitchTrack(_toplevel, remoteBranch), null, cancellationToken, environment: CheckoutEnvironment, hydrateLfs: true).ConfigureAwait(false);
+            return;
+        }
+
+        // --track refuses to run when this name already exists, and it does not check the branch out.
+        var exists = await LocalBranchExistsAsync(local, cancellationToken).ConfigureAwait(false);
+        var arguments = exists
+            ? GitCommands.Switch(_toplevel, local)
+            : GitCommands.SwitchCreateTrack(_toplevel, local, remoteBranch);
+        await MutateAsync(arguments, null, cancellationToken, environment: CheckoutEnvironment, hydrateLfs: true).ConfigureAwait(false);
+    }
+
+    private async Task<bool> LocalBranchExistsAsync(string name, CancellationToken cancellationToken)
+    {
+        var output = await _scheduler.ReadAsync(
+            token => ExecuteAsync(GitCommands.VerifyLocalBranch(_toplevel, name), null, token),
+            cancellationToken).ConfigureAwait(false);
+        Track(output);
+        if (output.ExitCode == 0)
+            return true;
+        if (output.ExitCode == 1)
+            return false;
+        throw new GitCommandFailedException(output);
+    }
 
     public Task CreateBranchAsync(string name, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.CreateBranch(_toplevel, name), null, cancellationToken);
@@ -1177,12 +1204,20 @@ public sealed partial class RepositorySession : IAsyncDisposable
         }, cancellationToken).ConfigureAwait(false);
     }
 
+    // Asking for an LFS password can sit forever in the credential helper, so checkout must not download.
+    // git lfs checkout afterwards writes objects that are already in the local store, and it does not download.
+    private static readonly Dictionary<string, string> CheckoutEnvironment = new()
+    {
+        ["GIT_LFS_SKIP_SMUDGE"] = "1",
+    };
+
     private async Task MutateAsync(
         IReadOnlyList<string> arguments,
         IProgress<string>? progress,
         CancellationToken cancellationToken,
         IReadOnlyList<string>? whenHeadMissing = null,
-        IReadOnlyDictionary<string, string>? environment = null)
+        IReadOnlyDictionary<string, string>? environment = null,
+        bool hydrateLfs = false)
     {
         await RunAsync(async ct =>
         {
@@ -1195,6 +1230,8 @@ public sealed partial class RepositorySession : IAsyncDisposable
                     if (output.ExitCode != 0 && whenHeadMissing is not null && IsMissingHead(output.StandardError))
                         output = await ExecuteAsync(whenHeadMissing, null, token).ConfigureAwait(false);
                     Checked(output);
+                    if (hydrateLfs)
+                        await HydrateLocalLfsAsync(_toplevel, token).ConfigureAwait(false);
                     return 0;
                 }, ct).ConfigureAwait(false);
             }
@@ -1214,6 +1251,15 @@ public sealed partial class RepositorySession : IAsyncDisposable
             if (failure is not null)
                 throw failure;
         }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Fills pointer files from the local LFS store. A repository without Git LFS leaves those pointers as they are.
+    /// </summary>
+    private async Task HydrateLocalLfsAsync(string directory, CancellationToken cancellationToken)
+    {
+        var output = await ExecuteAsync(GitCommands.LfsCheckoutAll(directory), null, cancellationToken).ConfigureAwait(false);
+        Track(output);
     }
 
     private async Task RunAsync(Func<CancellationToken, Task> work, CancellationToken cancellationToken)

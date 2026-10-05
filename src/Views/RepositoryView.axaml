@@ -39,13 +39,17 @@
         </Style>
     </UserControl.Styles>
     <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
-        <Border Grid.Row="0" IsVisible="{Binding HasBanner}" Padding="10,6" Background="#33C42B1C">
+        <!-- Eight rows. A longer message scrolls inside the bar, and Copy still takes the whole text. -->
+        <Border Grid.Row="0" IsVisible="{Binding HasBanner}" Padding="10,6" MaxHeight="168"
+                ClipToBounds="True" Background="#33C42B1C">
             <DockPanel>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
                     <Button Classes="flat" Content="Copy" Command="{Binding CopyBannerCommand}"/>
                     <Button Classes="flat" Content="Dismiss" Command="{Binding DismissBannerCommand}"/>
                 </StackPanel>
-                <TextBlock Text="{Binding Banner}" TextWrapping="Wrap"/>
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                    <TextBlock Text="{Binding Banner}" TextWrapping="Wrap"/>
+                </ScrollViewer>
             </DockPanel>
         </Border>
 
@@ -368,9 +372,13 @@
                         <Button Classes="flat" Content="Save and stage" Command="{Binding SaveConflictCommand}" Margin="0,0,4,4"/>
                     </WrapPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="8,4">
-                        <TextBlock Text="{Binding DiffNotice}" IsVisible="{Binding HasDiffNotice}" TextWrapping="Wrap" Opacity="0.75"/>
+                        <TextBlock Text="{Binding DiffNotice}" IsVisible="{Binding HasDiffNotice}" TextWrapping="Wrap"
+                                   MaxLines="8" TextTrimming="CharacterEllipsis" Opacity="0.75"/>
                         <Button Classes="flat" Content="Load anyway" Command="{Binding LoadLargeDiffCommand}" IsVisible="{Binding ShowLoadDiff}" HorizontalAlignment="Left" Margin="0,4,0,0"/>
-                        <TextBlock Text="{Binding LfsNotice}" IsVisible="{Binding HasLfsNotice}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                        <ScrollViewer IsVisible="{Binding HasLfsNotice}" MaxHeight="168" Margin="0,4,0,0"
+                                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                            <TextBlock Text="{Binding LfsNotice}" TextWrapping="Wrap"/>
+                        </ScrollViewer>
                         <Button Classes="flat" Content="Show the file" Command="{Binding ShowLfsCommand}" IsVisible="{Binding ShowLfsDownload}" HorizontalAlignment="Left" Margin="0,4,0,0"/>
                     </StackPanel>
                     <Grid RowDefinitions="*,Auto">

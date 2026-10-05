@@ -1,8 +1,12 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Input.Platform;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using Sextant.Git;
 using Sextant.Views;
 
@@ -164,17 +168,61 @@ public sealed class AvaloniaDialogService : IDialogService
         string? selected = null;
         var ok = new Button { Content = "OK", IsDefault = true };
         var cancel = new Button { Content = "Cancel", IsCancel = true };
-        ok.Click += (_, _) =>
+
+        void Accept()
         {
             selected = list.SelectedItem as string;
             if (selected is not null)
                 window.Close();
-        };
+        }
+
+        ok.Click += (_, _) => Accept();
         cancel.Click += (_, _) => window.Close();
+        list.DoubleTapped += (_, eventArgs) =>
+        {
+            if (BranchAt(eventArgs.Source) is not string name)
+                return;
+            list.SelectedItem = name;
+            selected = name;
+            eventArgs.Handled = true;
+            window.Close();
+        };
+        // ListBoxItem selects on Enter and marks the key handled, so the default button never sees it.
+        window.AddHandler(InputElement.KeyDownEvent, OnPickKey, RoutingStrategies.Bubble, handledEventsToo: true);
         window.Content = Column(Message(message), list, Buttons(cancel, ok));
         await window.ShowDialog(_owner);
         return selected;
+
+        void OnPickKey(object? sender, KeyEventArgs eventArgs)
+        {
+            if (eventArgs.KeyModifiers != KeyModifiers.None)
+                return;
+            if (eventArgs.Key == Key.Escape)
+            {
+                selected = null;
+                eventArgs.Handled = true;
+                window.Close();
+                return;
+            }
+
+            if (eventArgs.Key != Key.Enter || !InList(list, eventArgs.Source))
+                return;
+            Accept();
+            if (selected is not null)
+                eventArgs.Handled = true;
+        }
     }
+
+    private static string? BranchAt(object? source)
+    {
+        if (source is not Visual visual)
+            return null;
+        var item = visual as ListBoxItem ?? visual.FindAncestorOfType<ListBoxItem>();
+        return item?.DataContext as string;
+    }
+
+    private static bool InList(ListBox list, object? source) =>
+        source is Visual visual && (visual == list || list.IsVisualAncestorOf(visual));
 
     public async Task<PerformanceChoice?> ConfirmPerformanceAsync(PerformanceSuggestion suggestion)
     {

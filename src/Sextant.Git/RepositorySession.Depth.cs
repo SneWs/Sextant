@@ -157,7 +157,8 @@ public sealed partial class RepositorySession
                 {
                     Checked(await ExecuteAsync(GitCommands.SparseSet(path, cone, patterns), null, token).ConfigureAwait(false));
                     // set records the patterns. A --no-checkout worktree stays empty until checkout, which leaves excluded paths out.
-                    Checked(await ExecuteAsync(GitCommands.CheckoutCurrent(path), null, token).ConfigureAwait(false));
+                    Checked(await ExecuteAsync(GitCommands.CheckoutCurrent(path), null, token, CheckoutEnvironment).ConfigureAwait(false));
+                    await HydrateLocalLfsAsync(path, token).ConfigureAwait(false);
                 }
                 catch (GitCommandFailedException)
                 {
