@@ -36,6 +36,8 @@ On 2026-10-05 history search treats a file pattern as a file search without a `f
 
 On 2026-10-05 a history search is a flat list. The colored lane lines and the indent stay off, because the matching commits are not one continuous branch. A branch pin and the normal graph still draw lanes. The history list scrolls sideways when those lanes are wider than the column. `Search_drops_lanes_and_a_wide_graph_scrolls_sideways` passed. A headless window confirmed a wide row scrolls and a file search starts at the left with no lane lines. The desktop window was not launched.
 
+On 2026-10-05 the headless window tests share one xUnit collection named Headless. Avalonia keeps a single dispatcher for the process, and two sessions at once could clear it while a window was opening. `Settings_opens_on_the_selected_appearance_option` failed that way on CI with `Unable to locate 'Avalonia.Platform.IWindowingPlatform'`. The headless tests then passed together, 11 of 11. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

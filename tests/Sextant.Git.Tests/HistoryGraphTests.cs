@@ -12,6 +12,7 @@ using Sextant.Views;
 
 namespace Sextant.Git.Tests;
 
+[Collection(HeadlessCollection.Name)]
 public class HistoryGraphTests
 {
     [Fact]

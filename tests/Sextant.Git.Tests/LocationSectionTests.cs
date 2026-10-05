@@ -5,6 +5,7 @@ using Sextant.ViewModels;
 
 namespace Sextant.Git.Tests;
 
+[Collection(HeadlessCollection.Name)]
 public class LocationSectionTests
 {
     [Fact]

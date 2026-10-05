@@ -7,6 +7,7 @@ using Sextant.Views;
 
 namespace Sextant.Git.Tests;
 
+[Collection(HeadlessCollection.Name)]
 public class DialogFocusTests
 {
     [Fact]
