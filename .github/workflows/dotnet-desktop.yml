@@ -8,12 +8,15 @@
 # a self-contained osx-arm64 app. On a Mac that publish is a Sextant.app
 # bundle. stamp-mac-app.sh ad-hoc signs that bundle. The SDK's loose apphost
 # signature does not seal bundle resources, and Gatekeeper reports a
-# quarantined copy as damaged. The signed bundle is tarred so the app host
-# stays executable, then uploaded with actions/upload-artifact@v7 and
+# quarantined copy as damaged. When the Apple secrets below are set, the
+# macOS job signs that bundle with Developer ID, notarizes a zip, and staples
+# the ticket before the tar. When APPLE_CERTIFICATE_BASE64 is empty, the
+# ad-hoc signature stays, and a browser download still carries the quarantine
+# attribute. The stapled or ad-hoc bundle is tarred so the app host stays
+# executable, then uploaded with actions/upload-artifact@v7 and
 # archive: false. The artifact name is the filename, Sextant-osx-arm64.tar.
-# The app is not notarized, so a browser download still carries the
-# quarantine attribute. The Windows job still uploads a directory, which
-# archive: false does not allow, so it stays on v4.
+# The Windows job still uploads a directory, which archive: false does not
+# allow, so it stays on v4.
 #
 # Signing uses the same secrets as the starter workflow. Add them under
 # Settings, Secrets and variables, Actions:
@@ -29,6 +32,22 @@
 # skips Authenticode signing.
 #
 # https://github.com/microsoft/github-actions-for-desktop-apps#signing
+#
+# macOS Developer ID signing uses these secrets on the build-macos sign step.
+# Add them under Settings, Secrets and variables, Actions. The step maps each
+# one to an environment variable of the same name. A secret that is not
+# mapped is not visible to the runner.
+#
+# 1. APPLE_CERTIFICATE_BASE64 — the Developer ID Application .p12, one line:
+#    base64 < SigningCertificate.p12 | tr -d '\n'
+# 2. APPLE_CERTIFICATE_PASSWORD — the .p12 password.
+# 3. APPLE_TEAM_ID — the 10-character Team ID.
+# 4. APPLE_API_KEY_ID — the App Store Connect API Key ID.
+# 5. APPLE_API_ISSUER — the Issuer ID.
+# 6. APPLE_API_KEY — the .p8 file contents, including the BEGIN and END lines.
+#
+# When APPLE_CERTIFICATE_BASE64 is empty, build-macos keeps the ad-hoc
+# signature. When it is set, the other five are required.
 
 name: Build all Platforms
 
@@ -131,6 +150,16 @@ jobs:
 
     - name: Publish the application
       run: dotnet publish "$Project_Path" --configuration Release --runtime "$Runtime" --self-contained true --output "$Publish_Directory"
+
+    - name: Sign and notarize the application
+      env:
+        APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+        APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+        APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      run: bash src/tools/notarize-mac-app.sh "$Publish_Directory/Sextant.app"
 
     - name: Check the app bundle
       run: |
