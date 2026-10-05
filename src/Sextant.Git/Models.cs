@@ -204,6 +204,9 @@ public sealed class SessionState
 
     public required string? HistoryLabel { get; init; }
 
+    /// <summary>Search results are a flat list. A branch pin and the normal graph keep their lanes.</summary>
+    public required bool FlatHistory { get; init; }
+
     /// <summary>Full ref names left out of the commit graph. Empty shows every branch.</summary>
     public required IReadOnlySet<string> HiddenBranches { get; init; }
 

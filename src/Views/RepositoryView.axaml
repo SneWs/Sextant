@@ -244,6 +244,7 @@
                 <Button Classes="flat" DockPanel.Dock="Bottom" Content="{Binding LoadMoreText}" Command="{Binding LoadMoreCommand}"
                         IsVisible="{Binding ShowLoadMore}" HorizontalAlignment="Stretch" Margin="0,4,0,0"/>
                 <ListBox x:Name="GraphList" Classes="graph" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedGraphRow}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
                          SelectionMode="Multiple" SelectionChanged="OnGraphSelectionChanged">
                     <ListBox.Styles>
                         <Style Selector="ListBoxItem">
@@ -281,13 +282,13 @@
                                         <MenuItem Header="Reword…" Command="{Binding RewordCommand}" IsVisible="{Binding ShowRewrite}"/>
                                     </ContextMenu>
                                 </Border.ContextMenu>
-                                <Grid ColumnDefinitions="Auto,*">
-                                <controls:LaneCanvas Grid.Column="0" Geometry="{Binding Lanes}" IsVisible="{Binding ShowLanes}" VerticalAlignment="Stretch" Margin="0,0,8,0"/>
-                                <StackPanel Grid.Column="1" Margin="0,3" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Subject}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
-                                    <TextBlock Text="{Binding Detail}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" FontSize="12" Opacity="0.65" Margin="0,1,0,0"/>
-                                </StackPanel>
-                                </Grid>
+                                <controls:GraphRowPanel>
+                                    <controls:LaneCanvas Geometry="{Binding Lanes}" IsVisible="{Binding DrawLanes}" VerticalAlignment="Stretch" Margin="0,0,8,0"/>
+                                    <StackPanel Margin="0,3" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Subject}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
+                                        <TextBlock Text="{Binding Detail}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" FontSize="12" Opacity="0.65" Margin="0,1,0,0"/>
+                                    </StackPanel>
+                                </controls:GraphRowPanel>
                             </Border>
                         </DataTemplate>
                     </ListBox.ItemTemplate>

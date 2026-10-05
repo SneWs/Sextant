@@ -1123,6 +1123,7 @@ public partial class RepositoryViewModel : ViewModelBase
             Commit = commit.Commit,
             Lanes = commit.Lanes,
             ShowLanes = true,
+            DrawLanes = !state.FlatHistory,
             Subject = commit.Commit.Subject,
             Author = commit.Commit.AuthorName,
             When = Relative(commit.Commit.AuthorUnixSeconds),

@@ -34,6 +34,8 @@ On 2026-10-05 the command palette lists its commands from A to Z. A search keeps
 
 On 2026-10-05 history search treats a file pattern as a file search without a `file:` prefix. `*.fbx`, `Some*File.cs`, and `MyFile.cs` list commits that touch a matching path. A name with no slash matches that file in any directory, and the match ignores case. Words such as `icon fix` still search the subject and the author. `History_query_reads_branch_author_and_sha` and `File_pattern_limits_history_to_matching_paths` passed against system git. The desktop window was not launched.
 
+On 2026-10-05 a history search is a flat list. The colored lane lines and the indent stay off, because the matching commits are not one continuous branch. A branch pin and the normal graph still draw lanes. The history list scrolls sideways when those lanes are wider than the column. `Search_drops_lanes_and_a_wide_graph_scrolls_sideways` passed. A headless window confirmed a wide row scrolls and a file search starts at the left with no lane lines. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

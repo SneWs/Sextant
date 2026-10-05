@@ -62,5 +62,15 @@ public class HistoryQueryTests
         Assert.False(history.FilePattern);
         Assert.Equal("a.txt", history.LogPath);
         Assert.Equal("File a.txt", history.Describe());
+        Assert.True(history.FlattensGraph);
+
+        Assert.True(HistoryQueryParser.Parse("*.fbx").FlattensGraph);
+        Assert.True(HistoryQueryParser.Parse("Some*File.cs").FlattensGraph);
+        Assert.True(HistoryQueryParser.Parse("MyFile.cs").FlattensGraph);
+        Assert.True(HistoryQueryParser.Parse("icon fix").FlattensGraph);
+        Assert.True(HistoryQueryParser.Parse("author:Ada").FlattensGraph);
+        Assert.True(HistoryQueryParser.Parse("abc1234").FlattensGraph);
+        Assert.False(HistoryQueryParser.Parse("branch:main").FlattensGraph);
+        Assert.False(HistoryQueryParser.Parse("   ").FlattensGraph);
     }
 }

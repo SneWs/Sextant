@@ -31,6 +31,9 @@ public partial class GraphRowViewModel : ObservableObject
 
     public bool ShowLanes { get; init; }
 
+    /// <summary>Draw the colored lane column. Search results stay left-aligned and leave this off.</summary>
+    public bool DrawLanes { get; init; }
+
     public string? Sha { get; init; }
 
     public CommitRecord? Commit { get; init; }

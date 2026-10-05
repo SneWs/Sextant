@@ -97,6 +97,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
                 Sequencer = _sequencer,
                 MergeMessage = _mergeMessage,
                 HistoryLabel = BranchVisibility.Caption(_historyQuery, _hiddenBranches),
+                FlatHistory = _historyQuery?.FlattensGraph == true,
                 HiddenBranches = new HashSet<string>(_hiddenBranches, StringComparer.Ordinal),
                 Stashes = _stashes.ToArray(),
                 LastStatusDuration = _statusDuration,

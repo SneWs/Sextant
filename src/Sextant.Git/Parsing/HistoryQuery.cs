@@ -18,6 +18,14 @@ public sealed record HistoryQuery(
 {
     public bool IsEmpty => Path is null && !ShaLookup && Revision is null && Grep is null && Author is null;
 
+    /// <summary>
+    /// A subject, author, path, or sha search is a flat list. The commits are not one continuous branch,
+    /// so lane lines and indentation would paint several colors for a single line of history.
+    /// A branch pin still has a graph.
+    /// </summary>
+    public bool FlattensGraph =>
+        !IsEmpty && (Path is not null || Grep is not null || Author is not null || ShaLookup);
+
     /// <summary>Path passed to <c>git log --</c>. A file pattern becomes a pathspec. File history stays the exact path.</summary>
     public string? LogPath =>
         FilePattern && !string.IsNullOrEmpty(Path) ? FilePatterns.ToPathspec(Path) : Path;
