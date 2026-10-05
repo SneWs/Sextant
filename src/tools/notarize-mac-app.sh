@@ -91,17 +91,55 @@ if ! grep -q "BEGIN PRIVATE KEY" "$api_key"; then
 fi
 
 # GitHub keeps a trailing newline when a secret is pasted or piped in with
-# echo. security import then reports that the passphrase is wrong.
+# echo. security import then reports that the passphrase is wrong. A Keychain
+# .p12 also uses RC2, and an OpenSSL 3 .p12 uses a MAC that older macOS
+# import rejects with the same message even when the password is right.
 password="${APPLE_CERTIFICATE_PASSWORD//$'\r'/}"
-while [[ "$password" == *$'\n' ]]; do
-  password="${password%$'\n'}"
+while [[ "$password" == [[:space:]]* ]]; do
+  password="${password#?}"
 done
-while [[ "$password" == $'\n'* ]]; do
-  password="${password#$'\n'}"
+while [[ "$password" == *[[:space:]] ]]; do
+  password="${password%?}"
 done
 
-import_p12() {
-  security import "$p12" -k "$keychain" -P "$1" -f pkcs12 -A -T /usr/bin/codesign
+import_pkcs12() {
+  security import "$1" -k "$keychain" -P "$2" -f pkcs12 -A -T /usr/bin/codesign
+}
+
+# Prints the PEM to stdout. Tries each openssl because a Keychain export is
+# RC2, which OpenSSL 3 hides unless -legacy is set, and LibreSSL has no -legacy.
+read_p12() {
+  local bin="$1" src="$2" err="$3"
+  if "$bin" pkcs12 -in "$src" -passin "file:$passfile" -nodes -out "$pem" 2>"$err"; then
+    return 0
+  fi
+  local first
+  first="$(cat "$err")"
+  if "$bin" pkcs12 -legacy -in "$src" -passin "file:$passfile" -nodes -out "$pem" 2>"$err"; then
+    return 0
+  fi
+  if grep -q "unknown option" "$err"; then
+    printf '%s\n' "$first" > "$err"
+  fi
+  return 1
+}
+
+explain_p12_failure() {
+  local bytes err
+  bytes="$(wc -c < "$p12" | tr -d ' ')"
+  echo "notarize-mac-app: the decoded certificate is ${bytes} bytes and was not imported." >&2
+  if [[ -s "$work/openssl.err" ]]; then
+    cat "$work/openssl.err" >&2
+  fi
+  if openssl x509 -inform DER -in "$p12" -noout >/dev/null 2>&1 || grep -q "BEGIN CERTIFICATE" "$p12"; then
+    echo "APPLE_CERTIFICATE_BASE64 is a certificate (.cer), not a .p12. In Keychain Access, select the Developer ID Application certificate and its private key, export a .p12, and set the secret from: base64 < SigningCertificate.p12 | tr -d '\\n'" >&2
+    return
+  fi
+  if grep -q "invalid password" "$work/openssl.err"; then
+    echo "APPLE_CERTIFICATE_PASSWORD does not open that .p12. A line break or surrounding space is already ignored. Use the password from the .p12 export." >&2
+    return
+  fi
+  echo "security import could not read this .p12, and OpenSSL could not either. Export it again from Keychain Access with the private key included." >&2
 }
 
 previous_default="$(security default-keychain | tr -d '"' | xargs)"
@@ -109,12 +147,53 @@ previous_list="$(security list-keychains -d user | tr -d '"')"
 security create-keychain -p "$keychain_password" "$keychain"
 security set-keychain-settings -lut 21600 "$keychain"
 security unlock-keychain -p "$keychain_password" "$keychain"
-if ! import_p12 "$password"; then
-  if [[ "$password" == "$APPLE_CERTIFICATE_PASSWORD" ]] || ! import_p12 "$APPLE_CERTIFICATE_PASSWORD"; then
-    echo "notarize-mac-app: the .p12 passphrase was rejected." >&2
-    echo "APPLE_CERTIFICATE_PASSWORD does not open the certificate in APPLE_CERTIFICATE_BASE64. A line break around that password is already ignored. Use the password from the .p12 export. The certificate secret has to be that .p12: base64 < SigningCertificate.p12 | tr -d '\\n'" >&2
+passfile="$work/p12.pass"
+pem="$work/identity.pem"
+printf '%s' "$password" > "$passfile"
+chmod 600 "$passfile"
+if ! import_pkcs12 "$p12" "$password" 2>"$work/security.err"; then
+  openssl_err="$work/openssl.err"
+  : > "$openssl_err"
+  opened=0
+  while IFS= read -r bin; do
+    [[ -n "$bin" && -x "$bin" ]] || continue
+    if read_p12 "$bin" "$p12" "$openssl_err"; then
+      opened=1
+      break
+    fi
+  done < <(printf '%s\n' "$(command -v openssl)" /usr/bin/openssl /opt/homebrew/bin/openssl | awk 'NF && !seen[$0]++')
+  if [[ "$opened" -ne 1 ]]; then
+    cat "$work/security.err" >&2
+    explain_p12_failure
     exit 1
   fi
+  if ! grep -q "PRIVATE KEY" "$pem"; then
+    echo "notarize-mac-app: the .p12 password worked, but the file has no private key. Export the certificate and its private key together." >&2
+    exit 1
+  fi
+  echo "Rewriting the .p12 into the format macOS import accepts."
+  legacy="$work/legacy.p12"
+  legacy_pass="$(openssl rand -hex 16)"
+  printf '%s' "$legacy_pass" > "$work/legacy.pass"
+  chmod 600 "$pem" "$work/legacy.pass"
+  exported=0
+  while IFS= read -r bin; do
+    [[ -n "$bin" && -x "$bin" ]] || continue
+    if "$bin" pkcs12 -export -legacy -in "$pem" -out "$legacy" -passout "file:$work/legacy.pass" -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1 2>"$work/export.err"; then
+      exported=1
+      break
+    fi
+    if "$bin" pkcs12 -export -in "$pem" -out "$legacy" -passout "file:$work/legacy.pass" -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1 2>"$work/export.err"; then
+      exported=1
+      break
+    fi
+  done < <(printf '%s\n' "$(command -v openssl)" /usr/bin/openssl /opt/homebrew/bin/openssl | awk 'NF && !seen[$0]++')
+  if [[ "$exported" -ne 1 ]]; then
+    cat "$work/export.err" >&2
+    echo "notarize-mac-app: could not rewrite the .p12 for macOS import." >&2
+    exit 1
+  fi
+  import_pkcs12 "$legacy" "$legacy_pass"
 fi
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
 security list-keychains -d user -s "$keychain" $previous_list >/dev/null
