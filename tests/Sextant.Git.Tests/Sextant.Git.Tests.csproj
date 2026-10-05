@@ -15,7 +15,10 @@
     <PackageReference Include="AssimpNetter" Version="6.0.5" />
     <PackageReference Include="BitMiracle.LibTiff.NET" Version="2.4.660" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
-    <PackageReference Include="Svg.Skia" Version="4.9.1" />
+    <!-- SkiaSharp itself only depends on the Win32 and macOS natives. Pin the managed build to the same version as this native library. -->
+    <PackageReference Include="SkiaSharp" Version="4.153.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="4.153.1" />
+    <PackageReference Include="Svg.Skia" Version="5.2.3" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
       <PrivateAssets>all</PrivateAssets>

@@ -52,6 +52,7 @@ public static class ImageRaster
         using var svg = new SKSvg();
         svg.Settings.EnableJavaScript = false;
         svg.Settings.EnableExternalJavaScript = false;
+        svg.Settings.EnableBrokenImagePlaceholders = false;
         using var input = new MemoryStream(data, writable: false);
         var picture = svg.Load(input);
         if (picture is null)
