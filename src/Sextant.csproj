@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="Sextant.Git\Sextant.Git.csproj" />
+    <InternalsVisibleTo Include="Sextant.Git.Tests" />
   </ItemGroup>
 
   <ItemGroup>

@@ -35,14 +35,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sextant.Git\Sextant.Git.csproj" />
-    <Compile Include="..\..\src\LineCopy.cs" Link="LineCopy.cs" />
-    <Compile Include="..\..\src\LineFold.cs" Link="LineFold.cs" />
-    <Compile Include="..\..\src\DiffSyntax.cs" Link="DiffSyntax.cs" />
-    <Compile Include="..\..\src\ImageRaster.cs" Link="ImageRaster.cs" />
-    <Compile Include="..\..\src\FbxPreview.cs" Link="FbxPreview.cs" />
-    <Compile Include="..\..\src\TabShortcut.cs" Link="TabShortcut.cs" />
-    <Compile Include="..\..\src\DesktopOpen.cs" Link="DesktopOpen.cs" />
-    <Compile Include="..\..\src\LinuxDesktopEntry.cs" Link="LinuxDesktopEntry.cs" Condition="$([MSBuild]::IsOSPlatform('Linux'))" />
+    <ProjectReference Include="..\..\src\Sextant.csproj" />
     <Content Include="Fixtures\box.fbx" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Fixtures\animation.fbx" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
