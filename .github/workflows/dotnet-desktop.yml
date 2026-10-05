@@ -69,7 +69,8 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  windows-x64:
+    name: Windows x64 Build
     runs-on: windows-latest
 
     env:

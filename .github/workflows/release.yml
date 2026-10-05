@@ -43,9 +43,11 @@ jobs:
           cd "$(dirname "$exe")"
           zip -r -q "$GITHUB_WORKSPACE/dist/Sextant-win-x64.zip" .
         )
-        if ! unzip -l dist/Sextant-win-x64.zip | awk '{ print $NF }' | grep -qx 'Sextant.exe'; then
+        # Read every stored name. grep -q closes the pipe early, and pipefail
+        # then fails the step even though Sextant.exe is in the archive.
+        if ! unzip -Z1 dist/Sextant-win-x64.zip | tr -d '\r' | grep -F -x 'Sextant.exe' >/dev/null; then
           echo "Sextant.exe is not at the root of Sextant-win-x64.zip." >&2
-          unzip -l dist/Sextant-win-x64.zip
+          unzip -Z1 dist/Sextant-win-x64.zip
           exit 1
         fi
         mac="$(find release-artifacts -type f -name 'Sextant-osx-arm64.tar' -print -quit)"
@@ -57,7 +59,8 @@ jobs:
           exit 1
         fi
         cp "$mac" dist/Sextant-osx-arm64.tar
-        mode="$(tar -tvf dist/Sextant-osx-arm64.tar | awk '/Contents\/MacOS\/Sextant$/ { print $1; exit }')"
+        # Read the whole listing. Stopping at the first match closes the pipe and fails under pipefail.
+        mode="$(tar -tvf dist/Sextant-osx-arm64.tar | tr -d '\r' | awk '/Contents\/MacOS\/Sextant$/ { mode = $1 } END { print mode }')"
         case "$mode" in
           *x*) ;;
           *)
