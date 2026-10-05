@@ -41,12 +41,14 @@ public class LinuxDesktopEntryTests
             Comment=kept
 
             """;
-        var text = LinuxDesktopEntry.WithLaunchPath(template, "/opt/Sextant/Sextant", "/opt/Sextant/sextant.png");
+        var executable = Path.Combine(Path.GetTempPath(), "Sextant");
+        var icon = Path.Combine(Path.GetTempPath(), "sextant.png");
+        var text = LinuxDesktopEntry.WithLaunchPath(template, executable, icon);
         Assert.Contains("Name=Sextant", text, StringComparison.Ordinal);
         Assert.Contains("Comment=kept", text, StringComparison.Ordinal);
-        Assert.Contains("Exec=\"/opt/Sextant/Sextant\"", text, StringComparison.Ordinal);
-        Assert.Contains("TryExec=/opt/Sextant/Sextant", text, StringComparison.Ordinal);
-        Assert.Contains("Icon=/opt/Sextant/sextant.png", text, StringComparison.Ordinal);
+        Assert.Contains("Exec=" + LinuxDesktopEntry.QuoteExec(Path.GetFullPath(executable)), text, StringComparison.Ordinal);
+        Assert.Contains("TryExec=" + Path.GetFullPath(executable), text, StringComparison.Ordinal);
+        Assert.Contains("Icon=" + Path.GetFullPath(icon), text, StringComparison.Ordinal);
         Assert.DoesNotContain("Icon=sextant.png", text, StringComparison.Ordinal);
     }
 
@@ -54,11 +56,13 @@ public class LinuxDesktopEntryTests
     public void Shipped_desktop_file_uses_the_launched_executable()
     {
         var template = ShippedTemplate();
-        var text = LinuxDesktopEntry.WithLaunchPath(template, "/opt/Sextant/Sextant", "/opt/Sextant/sextant.png");
+        var executable = Path.Combine(Path.GetTempPath(), "Sextant");
+        var icon = Path.Combine(Path.GetTempPath(), "sextant.png");
+        var text = LinuxDesktopEntry.WithLaunchPath(template, executable, icon);
         Assert.Contains("Name=Sextant", text, StringComparison.Ordinal);
-        Assert.Contains("Exec=\"/opt/Sextant/Sextant\"", text, StringComparison.Ordinal);
-        Assert.Contains("TryExec=/opt/Sextant/Sextant", text, StringComparison.Ordinal);
-        Assert.Contains("Icon=/opt/Sextant/sextant.png", text, StringComparison.Ordinal);
+        Assert.Contains("Exec=" + LinuxDesktopEntry.QuoteExec(Path.GetFullPath(executable)), text, StringComparison.Ordinal);
+        Assert.Contains("TryExec=" + Path.GetFullPath(executable), text, StringComparison.Ordinal);
+        Assert.Contains("Icon=" + Path.GetFullPath(icon), text, StringComparison.Ordinal);
         Assert.Contains("StartupWMClass=Sextant", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Exec=Sextant", text, StringComparison.Ordinal);
     }
@@ -101,8 +105,8 @@ public class LinuxDesktopEntryTests
             Assert.False(Directory.Exists(apps));
             Assert.True(LinuxDesktopEntry.TryInstall(source, first, apps));
             var installed = File.ReadAllText(Path.Combine(apps, LinuxDesktopEntry.FileName));
-            Assert.Contains("Exec=\"" + first + "\"", installed, StringComparison.Ordinal);
-            Assert.Contains("Icon=" + Path.Combine(source, LinuxDesktopEntry.IconFileName), installed, StringComparison.Ordinal);
+            Assert.Contains("Exec=" + LinuxDesktopEntry.QuoteExec(Path.GetFullPath(first)), installed, StringComparison.Ordinal);
+            Assert.Contains("Icon=" + Path.GetFullPath(Path.Combine(source, LinuxDesktopEntry.IconFileName)), installed, StringComparison.Ordinal);
             Assert.False(LinuxDesktopEntry.TryInstall(source, second, apps));
             Assert.Equal(installed, File.ReadAllText(Path.Combine(apps, LinuxDesktopEntry.FileName)));
             Assert.False(LinuxDesktopEntry.TryInstall(source, "/tmp/has\nnewline", apps));

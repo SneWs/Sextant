@@ -23,6 +23,16 @@
     </PackageReference>
   </ItemGroup>
 
+  <!-- Platform folders compile only on that OS. Shared tests always compile. -->
+  <ItemGroup>
+    <Compile Remove="Windows/**/*.cs" />
+    <Compile Remove="Linux/**/*.cs" />
+    <Compile Remove="Mac/**/*.cs" />
+    <Compile Include="Windows/**/*.cs" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
+    <Compile Include="Linux/**/*.cs" Condition="$([MSBuild]::IsOSPlatform('Linux'))" />
+    <Compile Include="Mac/**/*.cs" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sextant.Git\Sextant.Git.csproj" />
     <Compile Include="..\..\src\LineCopy.cs" Link="LineCopy.cs" />
@@ -32,7 +42,7 @@
     <Compile Include="..\..\src\FbxPreview.cs" Link="FbxPreview.cs" />
     <Compile Include="..\..\src\TabShortcut.cs" Link="TabShortcut.cs" />
     <Compile Include="..\..\src\DesktopOpen.cs" Link="DesktopOpen.cs" />
-    <Compile Include="..\..\src\LinuxDesktopEntry.cs" Link="LinuxDesktopEntry.cs" />
+    <Compile Include="..\..\src\LinuxDesktopEntry.cs" Link="LinuxDesktopEntry.cs" Condition="$([MSBuild]::IsOSPlatform('Linux'))" />
     <Content Include="Fixtures\box.fbx" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Fixtures\animation.fbx" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

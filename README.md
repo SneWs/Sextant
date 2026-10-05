@@ -144,6 +144,8 @@ dotnet run --project src/Sextant.csproj
 dotnet test Sextant.slnx
 ```
 
+That command builds the shared tests and the tests for the operating system you are on. Windows tests compile on Windows, Linux tests on Linux, and macOS tests on macOS.
+
 On macOS the build is a `Sextant.app` bundle.
 
 On Linux a published build includes `sextant.desktop` and the sextant mark beside the executable. The first launch copies that desktop file into `~/.local/share/applications` (or `$XDG_DATA_HOME/applications`) when it is not already there, and sets the executable to the path that was launched.

@@ -1,0 +1,12 @@
+namespace Sextant.Git.Tests;
+
+public class WindowsRepoPathTests
+{
+    [Fact]
+    public void Repo_paths_ignore_case_only_on_windows()
+    {
+        var left = Path.Combine(Path.GetTempPath(), "SextantRepo");
+        var right = Path.Combine(Path.GetTempPath(), "sextantrepo");
+        Assert.True(RepoPath.Same(left, right));
+    }
+}
