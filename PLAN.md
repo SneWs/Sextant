@@ -42,6 +42,12 @@ On 2026-10-05 checking out a remote-tracking branch still does not ask a credent
 
 On 2026-10-05 an empty window draws no line under the tab bar. The pane rule stays off until a repository tab is open, and then it still stops under the selected tab. `Empty_window_draws_no_tab_rule_and_an_open_tab_draws_one` passed. A headless window confirmed the rule is hidden with no tabs, appears with a tab, and hides again when that tab closes. The desktop window was not launched.
 
+On 2026-10-05 history search sits under the branch bar and the repository messages, and above the locations list and the commit graph, so the field uses the full window width. `History_search_spans_the_window_under_the_branch` passed. A headless window confirmed the field is below the banner, the conflict line, and Pull, and above Locations and the graph, and wider than the graph column. The desktop window was not launched.
+
+On 2026-10-05 Escape in the history search box hides that row and clears the text. A search that was already applied is cleared too, so the graph and its caption return. `Escape_in_the_search_box_hides_it_and_clears_the_text` passed. A headless window focused the box, pressed Escape, and confirmed the row was gone, the text was empty, and both commits were listed again. The desktop window was not launched.
+
+On 2026-10-05 the history search action is a magnifying-glass icon with no label, and the Clear button is gone. Escape still clears the text. `History_search_spans_the_window_under_the_branch` passed and confirmed the icon button and the absence of Search and Clear labels. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

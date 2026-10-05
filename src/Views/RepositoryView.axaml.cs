@@ -725,11 +725,19 @@ public partial class RepositoryView : UserControl
 
     private void OnHistoryKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter && DataContext is RepositoryViewModel vm)
+        if (DataContext is not RepositoryViewModel vm)
+            return;
+        if (e.Key == Key.Enter)
         {
             vm.SearchHistoryCommand.Execute(null);
             e.Handled = true;
+            return;
         }
+
+        if (e.Key != Key.Escape)
+            return;
+        vm.DismissHistorySearchCommand.Execute(null);
+        e.Handled = true;
     }
 
     private void OnLocationFilterKeyDown(object? sender, KeyEventArgs e)

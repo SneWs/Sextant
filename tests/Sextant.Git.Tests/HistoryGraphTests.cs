@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
@@ -87,6 +88,132 @@ public class HistoryGraphTests
             await vm.DisposeAsync();
         }, CancellationToken.None);
     }
+
+    [Fact]
+    public async Task Escape_in_the_search_box_hides_it_and_clears_the_text()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("alpha");
+        repo.WriteFile("b.txt", "two\n");
+        repo.CommitAll("beta");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new GraphHost(repo.Git), repo.Directory);
+            await vm.EnsureLoadedAsync();
+            vm.ShowHistorySearch = true;
+            vm.HistoryText = "b.txt";
+            await vm.SearchHistoryCommand.ExecuteAsync(null);
+            Assert.Contains(vm.Rows, row => row.Subject == "beta");
+            Assert.DoesNotContain(vm.Rows, row => row.Subject == "alpha");
+
+            var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 700 };
+            var window = new Window { Content = view, Width = 1100, Height = 700 };
+            window.Show();
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            var search = view.FindControl<TextBox>("HistorySearchBox");
+            Assert.NotNull(search);
+            Assert.True(search.Focus());
+            window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.False(vm.ShowHistorySearch);
+            Assert.Equal("", vm.HistoryText);
+            var until = DateTime.UtcNow.AddSeconds(5);
+            while (vm.IsBusy && DateTime.UtcNow < until)
+                await Task.Delay(30);
+            Assert.False(vm.IsBusy);
+            Assert.False(vm.HasHistoryFilter);
+            Assert.False(vm.ShowHistoryChrome);
+            Assert.Contains(vm.Rows, row => row.Subject == "alpha");
+            Assert.Contains(vm.Rows, row => row.Subject == "beta");
+            view.UpdateLayout();
+            Assert.False(search.IsEffectivelyVisible);
+
+            window.Close();
+            await vm.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task History_search_spans_the_window_under_the_branch()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-search-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var vm = new RepositoryViewModel(new GraphHost("git"), directory);
+                vm.HasBanner = true;
+                vm.Banner = "A repository message";
+                vm.IsConflicted = true;
+                vm.ConflictText = "A merge is in progress";
+                vm.ShowHistorySearch = true;
+                var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 700 };
+                var window = new Window { Content = view, Width = 1100, Height = 700 };
+                window.Show();
+                view.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                var search = view.FindControl<TextBox>("HistorySearchBox");
+                Assert.NotNull(search);
+                Assert.True(search.IsEffectivelyVisible);
+                var searchButton = view.FindControl<Button>("HistorySearchButton");
+                Assert.NotNull(searchButton);
+                Assert.True(searchButton.IsEffectivelyVisible);
+                Assert.Null(searchButton.Content as string);
+                Assert.NotEmpty(searchButton.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Ellipse>());
+                Assert.True(searchButton.Bounds.Width <= 28);
+                Assert.DoesNotContain(view.GetVisualDescendants().OfType<Button>(), button => button.Content as string is "Search" or "Clear");
+                var banner = view.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == "A repository message");
+                var conflict = view.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == "A merge is in progress");
+                var pull = view.GetVisualDescendants().OfType<SplitButton>().First(button => button.Content as string == "Pull");
+                var locations = view.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == "Locations");
+                var graph = view.FindControl<ListBox>("GraphList");
+                Assert.NotNull(graph);
+
+                var searchTop = Top(search, view);
+                var searchBottom = searchTop + search.Bounds.Height;
+                Assert.True(searchTop >= Bottom(banner, view) - 1);
+                Assert.True(searchTop >= Bottom(conflict, view) - 1);
+                Assert.True(searchTop >= Bottom(pull, view) - 1);
+                Assert.True(searchBottom <= Top(locations, view) + 1);
+                Assert.True(searchBottom <= Top(graph, view) + 1);
+                Assert.True(Left(search, view) < Left(graph, view));
+                Assert.True(search.Bounds.Width > graph.Bounds.Width + 40, $"search {search.Bounds.Width} graph {graph.Bounds.Width}");
+
+                window.Close();
+                await vm.DisposeAsync();
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static double Top(Control control, Visual relative)
+    {
+        var origin = control.TranslatePoint(default, relative);
+        Assert.NotNull(origin);
+        return origin.Value.Y;
+    }
+
+    private static double Left(Control control, Visual relative)
+    {
+        var origin = control.TranslatePoint(default, relative);
+        Assert.NotNull(origin);
+        return origin.Value.X;
+    }
+
+    private static double Bottom(Control control, Visual relative) => Top(control, relative) + control.Bounds.Height;
 
     private sealed class GraphHost(string git) : IWorkspaceHost
     {

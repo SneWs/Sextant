@@ -41,7 +41,7 @@
             <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
         </Style>
     </UserControl.Styles>
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto">
         <!-- Eight rows. A longer message scrolls inside the bar, and Copy still takes the whole text. -->
         <Border Grid.Row="0" IsVisible="{Binding HasBanner}" Padding="10,6" MaxHeight="168"
                 ClipToBounds="True" Background="#33C42B1C">
@@ -117,7 +117,25 @@
             </StackPanel>
         </Grid>
 
-        <Grid x:Name="Columns" Grid.Row="4" Margin="4,0,4,4">
+        <StackPanel Grid.Row="4" Margin="8,0,8,4" Spacing="4" IsVisible="{Binding ShowHistoryChrome}">
+            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding ShowHistorySearch}">
+                <TextBox x:Name="HistorySearchBox" PlaceholderText="Search subject, author, sha, branch:name, *.fbx, or MyFile.cs" Text="{Binding HistoryText}" KeyDown="OnHistoryKeyDown"/>
+                <Button x:Name="HistorySearchButton" Grid.Column="1" Classes="flat" Width="22" Height="22" Padding="0" MinWidth="0"
+                        Margin="4,0,0,0" Command="{Binding SearchHistoryCommand}"
+                        ToolTip.Tip="Search" Background="Transparent" VerticalAlignment="Center">
+                    <Canvas Width="14" Height="14">
+                        <Ellipse Width="8" Height="8" Canvas.Left="1" Canvas.Top="1"
+                                 Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"/>
+                        <Line StartPoint="7.6,7.6" EndPoint="12.2,12.2"
+                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                              StrokeLineCap="Round"/>
+                    </Canvas>
+                </Button>
+            </Grid>
+            <TextBlock Text="{Binding HistoryCaption}" IsVisible="{Binding HasHistoryFilter}" Opacity="0.75" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <Grid x:Name="Columns" Grid.Row="5" Margin="4,0,4,4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="220" MinWidth="140"/>
                 <ColumnDefinition Width="4"/>
@@ -233,14 +251,6 @@
             <GridSplitter Grid.Column="1" ResizeDirection="Columns" IsVisible="{Binding ShowLocations}"/>
 
             <DockPanel Grid.Column="2">
-                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,4" Spacing="4" IsVisible="{Binding ShowHistoryChrome}">
-                    <Grid ColumnDefinitions="*,Auto,Auto" IsVisible="{Binding ShowHistorySearch}">
-                        <TextBox x:Name="HistorySearchBox" PlaceholderText="Search subject, author, sha, branch:name, *.fbx, or MyFile.cs" Text="{Binding HistoryText}" KeyDown="OnHistoryKeyDown"/>
-                        <Button Grid.Column="1" Classes="flat" Content="Search" Command="{Binding SearchHistoryCommand}" Margin="4,0,0,0"/>
-                        <Button Grid.Column="2" Classes="flat" Content="Clear" Command="{Binding ClearHistoryCommand}" Margin="4,0,0,0"/>
-                    </Grid>
-                    <TextBlock Text="{Binding HistoryCaption}" IsVisible="{Binding HasHistoryFilter}" Opacity="0.75" TextWrapping="Wrap"/>
-                </StackPanel>
                 <Button Classes="flat" DockPanel.Dock="Bottom" Content="{Binding LoadMoreText}" Command="{Binding LoadMoreCommand}"
                         IsVisible="{Binding ShowLoadMore}" HorizontalAlignment="Stretch" Margin="0,4,0,0"/>
                 <ListBox x:Name="GraphList" Classes="graph" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedGraphRow}"
@@ -582,7 +592,7 @@
             </Grid>
         </Grid>
 
-        <Border Grid.Row="5" IsVisible="{Binding CommandsOpen}" HorizontalAlignment="Stretch"
+        <Border Grid.Row="6" IsVisible="{Binding CommandsOpen}" HorizontalAlignment="Stretch"
                 Height="168" Padding="8,4,8,8" Margin="0" ClipToBounds="True"
                 BorderThickness="0,1,0,0"
                 BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"

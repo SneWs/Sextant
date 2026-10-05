@@ -210,10 +210,20 @@ public partial class RepositoryViewModel
         return RunAsync("Searching…", ct => _session!.SetHistoryAsync(query.IsEmpty ? null : query, ct));
     }
 
+    /// <summary>
+    /// Escape in the search box hides that row and drops the text. An applied search is cleared too,
+    /// so the graph returns and the caption does not stay up.
+    /// </summary>
     [RelayCommand]
-    private Task ClearHistory()
+    private Task DismissHistorySearch()
     {
+        ShowHistorySearch = false;
         HistoryText = "";
+        var reload = HasHistoryFilter && _session is not null;
+        HasHistoryFilter = false;
+        HistoryCaption = "";
+        if (!reload)
+            return Task.CompletedTask;
         return RunAsync("Loading history…", ct => _session!.SetHistoryAsync(null, ct));
     }
 
