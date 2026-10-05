@@ -142,6 +142,43 @@ public class WorkspaceStoreTests
             var older = RepoLayouts.Resolve(store.LoadWorkspace(), @"C:\repos\old");
             Assert.Equal(250, older.LocationsWidth);
             Assert.True(older.ShowLocations);
+            Assert.Empty(older.HiddenBranches);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Hidden_branches_are_stored_per_repository()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-ws-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new WorkspaceStore(directory);
+            var state = store.LoadWorkspace();
+            RepoLayouts.Remember(
+                state,
+                @"C:\repos\sextant",
+                220,
+                520,
+                180,
+                hiddenBranches: ["refs/tags/v1", "refs/heads/feature", "refs/remotes/origin/HEAD", "refs/remotes/origin/side"]);
+            RepoLayouts.Remember(state, @"C:\repos\sextant", 310, 520, 180);
+            RepoLayouts.Remember(state, @"C:\repos\other", 180, 640, 220, hiddenBranches: []);
+            store.SaveWorkspace(state);
+
+            var loaded = store.LoadWorkspace();
+            var sextant = RepoLayouts.Resolve(loaded, @"C:\repos\sextant");
+            var other = RepoLayouts.Resolve(loaded, @"C:\repos\other");
+            Assert.Equal(310, sextant.LocationsWidth);
+            Assert.Equal(["refs/heads/feature", "refs/remotes/origin/side"], sextant.HiddenBranches);
+            Assert.Empty(other.HiddenBranches);
+
+            RepoLayouts.Remember(loaded, @"C:\repos\sextant", 310, 520, 180, hiddenBranches: []);
+            Assert.Empty(RepoLayouts.Resolve(loaded, @"C:\repos\sextant").HiddenBranches);
         }
         finally
         {

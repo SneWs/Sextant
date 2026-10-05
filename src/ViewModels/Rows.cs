@@ -142,6 +142,14 @@ public partial class LocationItem : ObservableObject
 
     public bool ShowReveal { get; init; }
 
+    public bool ShowHide { get; init; }
+
+    public string HideLabel { get; init; } = "Hide branch";
+
+    public bool ShowAllBranches { get; init; }
+
+    public double LabelOpacity { get; init; } = 1;
+
     public bool ShowRename { get; init; }
 
     public bool ShowPop { get; init; }
@@ -175,6 +183,12 @@ public partial class LocationItem : ObservableObject
     public ICommand SetUpstreamCommand { get; init; } = UiCommands.Disabled;
 
     public ICommand RevealCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand HideCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand HideOthersCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand ShowAllBranchesCommand { get; init; } = UiCommands.Disabled;
 
     public ICommand RenameCommand { get; init; } = UiCommands.Disabled;
 

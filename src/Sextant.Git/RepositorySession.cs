@@ -30,6 +30,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
     private SequencerKind _sequencer;
     private string? _mergeMessage;
     private HistoryQuery? _historyQuery;
+    private readonly HashSet<string> _hiddenBranches = new(StringComparer.Ordinal);
     private bool _includeStash;
     private List<StashEntry> _stashes = [];
     private HashSet<string> _lfsPaths = new(StringComparer.Ordinal);
@@ -62,9 +63,19 @@ public sealed partial class RepositorySession : IAsyncDisposable
         GitProcessRunner runner,
         string executable,
         string path,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyCollection<string>? hiddenBranches = null)
     {
         var session = new RepositorySession(runner, executable);
+        if (hiddenBranches is not null)
+        {
+            foreach (var name in hiddenBranches)
+            {
+                if (BranchVisibility.IsGraphBranch(name))
+                    session._hiddenBranches.Add(name);
+            }
+        }
+
         await session.OpenCoreAsync(path, cancellationToken).ConfigureAwait(false);
         return session;
     }
@@ -85,7 +96,8 @@ public sealed partial class RepositorySession : IAsyncDisposable
                 MergeInProgress = _merge,
                 Sequencer = _sequencer,
                 MergeMessage = _mergeMessage,
-                HistoryLabel = _historyQuery is { IsEmpty: false } query ? query.Describe() : null,
+                HistoryLabel = BranchVisibility.Caption(_historyQuery, _hiddenBranches),
+                HiddenBranches = new HashSet<string>(_hiddenBranches, StringComparer.Ordinal),
                 Stashes = _stashes.ToArray(),
                 LastStatusDuration = _statusDuration,
                 Config = new Dictionary<string, string>(_config, StringComparer.OrdinalIgnoreCase),
@@ -348,6 +360,64 @@ public sealed partial class RepositorySession : IAsyncDisposable
                 _historyQuery = query is null || query.IsEmpty ? null : query;
             await ReloadHistoryCoreAsync(ct).ConfigureAwait(false);
         }, cancellationToken);
+
+    public Task SetHiddenBranchesAsync(IReadOnlyCollection<string> hidden, CancellationToken cancellationToken) =>
+        RunAsync(async ct =>
+        {
+            string[] previous;
+            lock (_stateLock)
+            {
+                previous = _hiddenBranches.ToArray();
+                if (!ReplaceHidden(hidden))
+                    return;
+            }
+
+            try
+            {
+                await ReloadHistoryCoreAsync(ct).ConfigureAwait(false);
+            }
+            catch
+            {
+                lock (_stateLock)
+                    RestoreHidden(previous);
+                throw;
+            }
+        }, cancellationToken);
+
+    private bool ReplaceHidden(IReadOnlyCollection<string> hidden)
+    {
+        var next = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var name in hidden)
+        {
+            if (BranchVisibility.IsGraphBranch(name))
+                next.Add(name);
+        }
+
+        if (next.Count == _hiddenBranches.Count && next.All(_hiddenBranches.Contains))
+            return false;
+        _hiddenBranches.Clear();
+        foreach (var name in next)
+            _hiddenBranches.Add(name);
+        return true;
+    }
+
+    private void RestoreHidden(IReadOnlyList<string> names)
+    {
+        _hiddenBranches.Clear();
+        foreach (var name in names)
+            _hiddenBranches.Add(name);
+    }
+
+    /// <summary>
+    /// The checked-out branch is a hidden tip. Passing HEAD would walk that branch anyway.
+    /// A detached HEAD stays, because it is not a branch ref.
+    /// </summary>
+    private bool CurrentBranchHidden()
+    {
+        if (_branch.Detached || _branch.Unborn || string.IsNullOrEmpty(_branch.HeadName))
+            return false;
+        return _hiddenBranches.Contains("refs/heads/" + _branch.HeadName);
+    }
 
     public Task StashPushAsync(string? message, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.StashPush(_toplevel, message), null, cancellationToken);
@@ -1093,10 +1163,14 @@ public sealed partial class RepositorySession : IAsyncDisposable
     {
         HistoryQuery? query;
         bool includeStash;
+        bool currentHidden;
+        string[]? hidden;
         lock (_stateLock)
         {
             query = _historyQuery;
             includeStash = _includeStash && query?.Revision is null && query?.ShaLookup != true;
+            currentHidden = CurrentBranchHidden();
+            hidden = _hiddenBranches.Count == 0 ? null : _hiddenBranches.ToArray();
         }
 
         var path = query?.LogPath;
@@ -1113,15 +1187,16 @@ public sealed partial class RepositorySession : IAsyncDisposable
 
                 var sha = _encoding.GetString(resolved.Stdout).Trim();
                 Track(resolved);
-                var found = await ReadLogAsync(token, 0, 1, includeHead: false, includeStash: false, sha, null, null, path).ConfigureAwait(false);
+                var found = await ReadLogAsync(token, 0, 1, includeHead: false, includeStash: false, sha, null, null, path, null).ConfigureAwait(false);
                 return new LogLoad(found.Commits, true);
             }
 
             if (query is { MatchSubjectOrAuthor: true })
             {
                 var take = skip + count;
-                var bySubject = await ReadLogAsync(token, 0, take, query.Revision is null, includeStash, query.Revision, query.Grep, null, path).ConfigureAwait(false);
-                var byAuthor = await ReadLogAsync(token, 0, take, query.Revision is null, includeStash, query.Revision, null, query.Author, path).ConfigureAwait(false);
+                var head = query.Revision is null && !currentHidden;
+                var bySubject = await ReadLogAsync(token, 0, take, head, includeStash, query.Revision, query.Grep, null, path, hidden).ConfigureAwait(false);
+                var byAuthor = await ReadLogAsync(token, 0, take, head, includeStash, query.Revision, null, query.Author, path, hidden).ConfigureAwait(false);
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var merged = new List<CommitRecord>();
                 foreach (var commit in bySubject.Commits.Concat(byAuthor.Commits).OrderByDescending(commit => commit.AuthorUnixSeconds))
@@ -1135,17 +1210,18 @@ public sealed partial class RepositorySession : IAsyncDisposable
                 return new LogLoad(page, ended);
             }
 
-            var includeHead = query?.Revision is null;
+            var includeHead = query?.Revision is null && !currentHidden;
             return await ReadLogAsync(
                 token,
                 skip,
                 count,
                 includeHead,
-                includeStash && includeHead,
+                includeStash,
                 query?.Revision,
                 query is { MatchSubjectOrAuthor: false } ? query.Grep : null,
                 query is { MatchSubjectOrAuthor: false } ? query.Author : null,
-                path).ConfigureAwait(false);
+                path,
+                hidden).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
     }
 
@@ -1158,16 +1234,17 @@ public sealed partial class RepositorySession : IAsyncDisposable
         string? revision,
         string? grep,
         string? author,
-        string? path)
+        string? path,
+        IReadOnlyCollection<string>? hiddenBranches)
     {
         var output = await ExecuteAsync(
-            GitCommands.Log(_toplevel, skip, count, includeHead, includeStash, revision, grep, author, path),
+            GitCommands.Log(_toplevel, skip, count, includeHead, includeStash, revision, grep, author, path, hiddenBranches),
             null,
             token).ConfigureAwait(false);
         if (output.ExitCode != 0 && includeHead && LogParser.IsUnborn(output.StandardError))
         {
             output = await ExecuteAsync(
-                GitCommands.Log(_toplevel, skip, count, includeHead: false, includeStash, revision, grep, author, path),
+                GitCommands.Log(_toplevel, skip, count, includeHead: false, includeStash, revision, grep, author, path, hiddenBranches),
                 null,
                 token).ConfigureAwait(false);
         }

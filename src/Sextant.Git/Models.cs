@@ -204,6 +204,9 @@ public sealed class SessionState
 
     public required string? HistoryLabel { get; init; }
 
+    /// <summary>Full ref names left out of the commit graph. Empty shows every branch.</summary>
+    public required IReadOnlySet<string> HiddenBranches { get; init; }
+
     public required IReadOnlyList<StashEntry> Stashes { get; init; }
 
     public required TimeSpan LastStatusDuration { get; init; }

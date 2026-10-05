@@ -73,6 +73,21 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public string RequestedPath { get; }
 
+    public void UseHiddenBranches(IEnumerable<string>? names)
+    {
+        _hiddenBranches.Clear();
+        if (names is null)
+            return;
+        foreach (var name in names)
+        {
+            if (BranchVisibility.IsGraphBranch(name))
+                _hiddenBranches.Add(name);
+        }
+    }
+
+    public IReadOnlyList<string> HiddenBranchNames =>
+        _hiddenBranches.OrderBy(name => name, StringComparer.Ordinal).ToArray();
+
     private double _locationsWidth = 220;
 
     private double _graphWidth = 520;
@@ -138,6 +153,8 @@ public partial class RepositoryViewModel : ViewModelBase
     private readonly List<LocationItem> _locationRoots = [];
 
     private readonly HashSet<string> _collapsedLocations = new(StringComparer.Ordinal);
+
+    private readonly HashSet<string> _hiddenBranches = new(StringComparer.Ordinal);
 
     public ResetCollection<FileRowViewModel> Files { get; } = [];
 
@@ -684,7 +701,7 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         try
         {
-            return await RepositorySession.OpenAsync(_host.Runner, _host.GitExecutable!, path, _lifetime.Token);
+            return await RepositorySession.OpenAsync(_host.Runner, _host.GitExecutable!, path, _lifetime.Token, _hiddenBranches);
         }
         catch (GitCommandFailedException exception) when (exception.IsDubiousOwnership)
         {
@@ -704,7 +721,7 @@ public partial class RepositoryViewModel : ViewModelBase
             try
             {
                 await RepositoryAdmin.AddSafeDirectoryAsync(_host.Runner, _host.GitExecutable!, path, _lifetime.Token);
-                return await RepositorySession.OpenAsync(_host.Runner, _host.GitExecutable!, path, _lifetime.Token);
+                return await RepositorySession.OpenAsync(_host.Runner, _host.GitExecutable!, path, _lifetime.Token, _hiddenBranches);
             }
             catch (GitCommandFailedException again)
             {
@@ -1087,7 +1104,7 @@ public partial class RepositoryViewModel : ViewModelBase
             Author = commit.Commit.AuthorName,
             When = Relative(commit.Commit.AuthorUnixSeconds),
             IsHead = head,
-            Detail = CommitDetail(commit.Commit, RefLabel(commit.Commit.Sha, state.Refs), head),
+            Detail = CommitDetail(commit.Commit, RefLabel(commit.Commit.Sha, state.Refs, state.HiddenBranches), head),
             ShowCheckout = checkout,
             ShowRewrite = true,
             CheckoutCommand = checkout
@@ -1283,12 +1300,19 @@ public partial class RepositoryViewModel : ViewModelBase
                 ShowDelete = !current,
                 ShowSetUpstream = true,
                 ShowReveal = true,
+                ShowHide = true,
+                HideLabel = state.HiddenBranches.Contains(branch.Name) ? "Show branch" : "Hide branch",
+                ShowAllBranches = state.HiddenBranches.Count > 0,
+                LabelOpacity = state.HiddenBranches.Contains(branch.Name) ? 0.45 : 1,
                 CheckoutCommand = new AsyncRelayCommand(() => RunAsync("Checking out…", ct => Session.SwitchAsync(name, ct))),
                 MergeCommand = new AsyncRelayCommand(() => MergeNamedAsync(name)),
                 RebaseCommand = new AsyncRelayCommand(() => RebaseOntoAsync(name)),
                 DeleteCommand = new AsyncRelayCommand(() => DeleteNamedAsync(name)),
                 SetUpstreamCommand = new AsyncRelayCommand(() => SetUpstreamNamedAsync(name)),
                 RevealCommand = new AsyncRelayCommand(() => RevealAsync(branch.Oid)),
+                HideCommand = new AsyncRelayCommand(() => ToggleHiddenAsync(branch.Name)),
+                HideOthersCommand = new AsyncRelayCommand(() => HideOthersAsync(branch.Name)),
+                ShowAllBranchesCommand = new AsyncRelayCommand(ShowAllBranchesAsync),
             });
         }
 
@@ -1313,9 +1337,16 @@ public partial class RepositoryViewModel : ViewModelBase
                     ShowCheckout = true,
                     ShowDelete = true,
                     ShowReveal = true,
+                    ShowHide = true,
+                    HideLabel = state.HiddenBranches.Contains(remote.Name) ? "Show branch" : "Hide branch",
+                    ShowAllBranches = state.HiddenBranches.Count > 0,
+                    LabelOpacity = state.HiddenBranches.Contains(remote.Name) ? 0.45 : 1,
                     CheckoutCommand = new AsyncRelayCommand(() => RunAsync("Checking out…", ct => Session.SwitchTrackAsync(name, ct))),
                     DeleteCommand = new AsyncRelayCommand(() => DeleteRemoteBranchAsync(remoteName, branchName)),
                     RevealCommand = new AsyncRelayCommand(() => RevealAsync(remote.Oid)),
+                    HideCommand = new AsyncRelayCommand(() => ToggleHiddenAsync(remote.Name)),
+                    HideOthersCommand = new AsyncRelayCommand(() => HideOthersAsync(remote.Name)),
+                    ShowAllBranchesCommand = new AsyncRelayCommand(ShowAllBranchesAsync),
                 });
             }
 
@@ -2633,11 +2664,43 @@ public partial class RepositoryViewModel : ViewModelBase
         return branch.HeadName;
     }
 
-    private static string RefLabel(string sha, IReadOnlyList<GitRef> refs)
+    private Task ToggleHiddenAsync(string refName)
+    {
+        if (_session is null)
+            return Task.CompletedTask;
+        var next = new HashSet<string>(_session.Snapshot().HiddenBranches, StringComparer.Ordinal);
+        if (!next.Remove(refName))
+            next.Add(refName);
+        return CommitHiddenAsync(next);
+    }
+
+    private Task HideOthersAsync(string refName)
+    {
+        if (_session is null)
+            return Task.CompletedTask;
+        return CommitHiddenAsync(BranchVisibility.HiddenExcept(_session.Snapshot().Refs, refName));
+    }
+
+    private Task ShowAllBranchesAsync() => CommitHiddenAsync([]);
+
+    private async Task CommitHiddenAsync(IReadOnlyCollection<string> hidden)
+    {
+        if (_session is null)
+            return;
+        var ok = await RunAsync("Loading history…", ct => _session.SetHiddenBranchesAsync(hidden, ct));
+        if (!ok || _session is null)
+            return;
+        UseHiddenBranches(_session.Snapshot().HiddenBranches);
+        _host.Save();
+    }
+
+    private static string RefLabel(string sha, IReadOnlyList<GitRef> refs, IReadOnlySet<string> hidden)
     {
         var names = new List<string>();
         foreach (var reference in refs)
         {
+            if (hidden.Contains(reference.Name))
+                continue;
             if (!string.Equals(reference.Oid, sha, StringComparison.OrdinalIgnoreCase))
                 continue;
             if (reference.Name.StartsWith("refs/remotes/", StringComparison.Ordinal)
@@ -2731,6 +2794,8 @@ public partial class RepositoryViewModel : ViewModelBase
             builder.Append('u').Append(module.Path).Append(module.Sha).Append((int)module.State).Append(module.Describe).Append('|');
         foreach (var tree in state.Worktrees)
             builder.Append('w').Append(tree.Path).Append(tree.Head).Append(tree.Branch).Append(tree.Detached ? 'd' : ' ').Append('|');
+        foreach (var name in state.HiddenBranches.OrderBy(name => name, StringComparer.Ordinal))
+            builder.Append('h').Append(name).Append('|');
         return builder.ToString();
     }
 

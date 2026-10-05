@@ -38,6 +38,9 @@ public sealed class RepoLayout
 
     /// <summary>False hides the locations column. Missing values in older files stay visible.</summary>
     public bool ShowLocations { get; set; } = true;
+
+    /// <summary>Full ref names left out of the commit graph. Missing values in older files show every branch.</summary>
+    public List<string> HiddenBranches { get; set; } = [];
 }
 
 public static class RepoLayouts
@@ -62,15 +65,26 @@ public static class RepoLayouts
                 GraphWidth = pair.Value.GraphWidth,
                 FilesHeight = pair.Value.FilesHeight,
                 ShowLocations = pair.Value.ShowLocations,
+                HiddenBranches = CopyHidden(pair.Value.HiddenBranches),
             };
         }
 
         return null;
     }
 
-    public static void Remember(WorkspaceState state, string path, double locations, double graph, double files, bool showLocations = true)
+    public static void Remember(
+        WorkspaceState state,
+        string path,
+        double locations,
+        double graph,
+        double files,
+        bool showLocations = true,
+        IReadOnlyList<string>? hiddenBranches = null)
     {
         var match = FindKey(state, path);
+        var hidden = hiddenBranches is null
+            ? CopyHidden(match is null ? null : state.RepoLayouts[match].HiddenBranches)
+            : CopyHidden(hiddenBranches);
         if (match is not null && !string.Equals(match, path, StringComparison.Ordinal))
             state.RepoLayouts.Remove(match);
         state.RepoLayouts[path] = new RepoLayout
@@ -79,7 +93,18 @@ public static class RepoLayouts
             GraphWidth = graph,
             FilesHeight = files,
             ShowLocations = showLocations,
+            HiddenBranches = hidden,
         };
+    }
+
+    private static List<string> CopyHidden(IEnumerable<string>? names)
+    {
+        if (names is null)
+            return [];
+        return names.Where(BranchVisibility.IsGraphBranch)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
     }
 
     public static void Forget(WorkspaceState state, string path)

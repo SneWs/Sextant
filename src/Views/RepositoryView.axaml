@@ -157,6 +157,10 @@
                                     <MenuItem Header="Delete" Command="{Binding DeleteCommand}" IsVisible="{Binding ShowDelete}"/>
                                     <MenuItem Header="Set upstream" Command="{Binding SetUpstreamCommand}" IsVisible="{Binding ShowSetUpstream}"/>
                                     <MenuItem Header="Show in graph" Command="{Binding RevealCommand}" IsVisible="{Binding ShowReveal}"/>
+                                    <Separator IsVisible="{Binding ShowHide}"/>
+                                    <MenuItem Header="{Binding HideLabel}" Command="{Binding HideCommand}" IsVisible="{Binding ShowHide}"/>
+                                    <MenuItem Header="Hide all other branches" Command="{Binding HideOthersCommand}" IsVisible="{Binding ShowHide}"/>
+                                    <MenuItem Header="Show all branches" Command="{Binding ShowAllBranchesCommand}" IsVisible="{Binding ShowAllBranches}"/>
                                     <MenuItem Header="Rename" Command="{Binding RenameCommand}" IsVisible="{Binding ShowRename}"/>
                                     <MenuItem Header="Pop" Command="{Binding PopCommand}" IsVisible="{Binding ShowPop}"/>
                                     <MenuItem Header="Apply" Command="{Binding ApplyCommand}" IsVisible="{Binding ShowApply}"/>
@@ -176,7 +180,7 @@
                                         </Path.RenderTransform>
                                     </Path>
                                 </Button>
-                                <TextBlock Grid.Column="1" Text="{Binding Label}" FontWeight="{Binding Weight}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Label}" FontWeight="{Binding Weight}" Opacity="{Binding LabelOpacity}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                             </Grid>
                         </Border>
                     </DataTemplate>
