@@ -362,37 +362,44 @@
                     </ListBox.ItemsPanel>
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:FileRowViewModel">
-                            <Border Background="Transparent" Padding="6,2">
-                                <Border.ContextMenu>
-                                    <ContextMenu Opening="OnMenuOpening">
-                                        <MenuItem Header="Stage" Command="{Binding StageCommand}" IsVisible="{Binding ShowStage}"/>
-                                        <MenuItem Header="Unstage" Command="{Binding UnstageCommand}" IsVisible="{Binding ShowUnstage}"/>
-                                        <MenuItem Header="Discard" Command="{Binding DiscardCommand}" IsVisible="{Binding ShowDiscard}"/>
-                                        <MenuItem Header="{Binding MergetoolMenu}" Command="{Binding MergetoolCommand}" IsVisible="{Binding ShowMergetool}"/>
-                                        <MenuItem Header="File history" Command="{Binding HistoryCommand}" IsVisible="{Binding ShowHistory}"/>
-                                        <Separator IsVisible="{Binding ShowLfsMenu}"/>
-                                        <MenuItem Header="Track with LFS" Command="{Binding LfsTrackCommand}" IsVisible="{Binding ShowLfsTrack}"/>
-                                        <MenuItem Header="Stop tracking with LFS" Command="{Binding LfsUntrackCommand}" IsVisible="{Binding ShowLfsUntrack}"/>
-                                        <MenuItem Header="Download" Command="{Binding LfsDownloadCommand}" IsVisible="{Binding ShowLfsDownload}"/>
-                                    </ContextMenu>
-                                </Border.ContextMenu>
-                                <Grid ColumnDefinitions="22,*,Auto,Auto">
-                                <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" VerticalAlignment="Center" IsVisible="{Binding IsFile}"/>
-                                <TextBlock Grid.Column="1" Text="{Binding Label}" FontWeight="SemiBold" Opacity="0.7" IsVisible="{Binding IsHeader}"/>
-                                <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" IsVisible="{Binding IsFile}" ToolTip.Tip="{Binding Tip}"/>
-                                <Border Grid.Column="2" IsVisible="{Binding LfsTracked}" Margin="8,0,0,0" Padding="5,0" CornerRadius="3"
-                                        VerticalAlignment="Center" Background="#3347C4C4" ToolTip.Tip="Tracked with Git LFS">
-                                    <TextBlock Text="LFS" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <Panel>
+                                <Border Classes="filehead" IsVisible="{Binding IsHeader}"
+                                        Margin="4,8,4,2" Padding="8,4" CornerRadius="4" BorderThickness="1"
+                                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                                        BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+                                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                 </Border>
-                                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" IsVisible="{Binding IsFile}">
-                                    <Button Classes="flat" Content="Stage" Command="{Binding StageCommand}" IsVisible="{Binding ShowStage}" Padding="6,0"/>
-                                    <Button Classes="flat" Content="Unstage" Command="{Binding UnstageCommand}" IsVisible="{Binding ShowUnstage}" Padding="6,0"/>
-                                    <Button Classes="flat" Content="Discard" Command="{Binding DiscardCommand}" IsVisible="{Binding ShowDiscard}" Padding="6,0"/>
-                                    <Button Classes="flat" Content="{Binding MergetoolLabel}" Command="{Binding MergetoolCommand}" IsVisible="{Binding ShowMergetool}" Padding="6,0"/>
-                                    <Button Classes="flat" Content="History" Command="{Binding HistoryCommand}" IsVisible="{Binding ShowHistory}" Padding="6,0"/>
-                                </StackPanel>
-                                </Grid>
-                            </Border>
+                                <Border Background="Transparent" Padding="6,2" IsVisible="{Binding IsFile}">
+                                    <Border.ContextMenu>
+                                        <ContextMenu Opening="OnMenuOpening">
+                                            <MenuItem Header="Stage" Command="{Binding StageCommand}" IsVisible="{Binding ShowStage}"/>
+                                            <MenuItem Header="Unstage" Command="{Binding UnstageCommand}" IsVisible="{Binding ShowUnstage}"/>
+                                            <MenuItem Header="Discard" Command="{Binding DiscardCommand}" IsVisible="{Binding ShowDiscard}"/>
+                                            <MenuItem Header="{Binding MergetoolMenu}" Command="{Binding MergetoolCommand}" IsVisible="{Binding ShowMergetool}"/>
+                                            <MenuItem Header="File history" Command="{Binding HistoryCommand}" IsVisible="{Binding ShowHistory}"/>
+                                            <Separator IsVisible="{Binding ShowLfsMenu}"/>
+                                            <MenuItem Header="Track with LFS" Command="{Binding LfsTrackCommand}" IsVisible="{Binding ShowLfsTrack}"/>
+                                            <MenuItem Header="Stop tracking with LFS" Command="{Binding LfsUntrackCommand}" IsVisible="{Binding ShowLfsUntrack}"/>
+                                            <MenuItem Header="Download" Command="{Binding LfsDownloadCommand}" IsVisible="{Binding ShowLfsDownload}"/>
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+                                    <Grid ColumnDefinitions="22,*,Auto,Auto">
+                                        <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Tip}"/>
+                                        <Border Grid.Column="2" IsVisible="{Binding LfsTracked}" Margin="8,0,0,0" Padding="5,0" CornerRadius="3"
+                                                VerticalAlignment="Center" Background="#3347C4C4" ToolTip.Tip="Tracked with Git LFS">
+                                            <TextBlock Text="LFS" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4">
+                                            <Button Classes="flat" Content="Stage" Command="{Binding StageCommand}" IsVisible="{Binding ShowStage}" Padding="6,0"/>
+                                            <Button Classes="flat" Content="Unstage" Command="{Binding UnstageCommand}" IsVisible="{Binding ShowUnstage}" Padding="6,0"/>
+                                            <Button Classes="flat" Content="Discard" Command="{Binding DiscardCommand}" IsVisible="{Binding ShowDiscard}" Padding="6,0"/>
+                                            <Button Classes="flat" Content="{Binding MergetoolLabel}" Command="{Binding MergetoolCommand}" IsVisible="{Binding ShowMergetool}" Padding="6,0"/>
+                                            <Button Classes="flat" Content="History" Command="{Binding HistoryCommand}" IsVisible="{Binding ShowHistory}" Padding="6,0"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Panel>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>

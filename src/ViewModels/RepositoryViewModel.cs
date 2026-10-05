@@ -39,6 +39,7 @@ public partial class RepositoryViewModel : ViewModelBase
     private string _commandSignature = "";
     private string? _rawPatch;
     private bool _viewingStaged;
+    private FileRowViewModel? _keptFile;
     private bool _diffReady;
     private bool _allFilesShown;
     private bool _armJump;
@@ -606,10 +607,28 @@ public partial class RepositoryViewModel : ViewModelBase
 
     partial void OnSelectedFileChanged(FileRowViewModel? value)
     {
+        if (value is { IsHeader: false })
+            _keptFile = value;
         if (_applying)
             return;
+        // A section title is not a file. Leave the open file selected so the bar does not take the row highlight.
         if (value is { IsHeader: true })
+        {
+            if (_keptFile is not null && Files.Contains(_keptFile))
+            {
+                _applying = true;
+                try
+                {
+                    SelectedFile = _keptFile;
+                }
+                finally
+                {
+                    _applying = false;
+                }
+            }
+
             return;
+        }
         if (TryRevealOpenFile(value))
             return;
         _allowLarge = false;
