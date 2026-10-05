@@ -40,7 +40,8 @@
 #
 # 1. APPLE_CERTIFICATE_BASE64 — the Developer ID Application .p12, one line:
 #    base64 < SigningCertificate.p12 | tr -d '\n'
-# 2. APPLE_CERTIFICATE_PASSWORD — the .p12 password.
+# 2. APPLE_CERTIFICATE_PASSWORD — the .p12 password. A trailing newline
+#    is ignored.
 # 3. APPLE_TEAM_ID — the 10-character Team ID.
 # 4. APPLE_API_KEY_ID — the App Store Connect API Key ID.
 # 5. APPLE_API_ISSUER — the Issuer ID.

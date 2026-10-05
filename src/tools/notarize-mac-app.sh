@@ -7,7 +7,7 @@
 # stamp-mac-app.sh is left in place and this script exits 0.
 #
 #   APPLE_CERTIFICATE_BASE64    Developer ID Application .p12, base64
-#   APPLE_CERTIFICATE_PASSWORD  .p12 password
+#   APPLE_CERTIFICATE_PASSWORD  .p12 password. A trailing newline is ignored.
 #   APPLE_TEAM_ID               10-character Team ID
 #   APPLE_API_KEY_ID            App Store Connect API Key ID
 #   APPLE_API_ISSUER            App Store Connect Issuer ID
@@ -90,12 +90,32 @@ if ! grep -q "BEGIN PRIVATE KEY" "$api_key"; then
   exit 1
 fi
 
+# GitHub keeps a trailing newline when a secret is pasted or piped in with
+# echo. security import then reports that the passphrase is wrong.
+password="${APPLE_CERTIFICATE_PASSWORD//$'\r'/}"
+while [[ "$password" == *$'\n' ]]; do
+  password="${password%$'\n'}"
+done
+while [[ "$password" == $'\n'* ]]; do
+  password="${password#$'\n'}"
+done
+
+import_p12() {
+  security import "$p12" -k "$keychain" -P "$1" -f pkcs12 -A -T /usr/bin/codesign
+}
+
 previous_default="$(security default-keychain | tr -d '"' | xargs)"
 previous_list="$(security list-keychains -d user | tr -d '"')"
 security create-keychain -p "$keychain_password" "$keychain"
 security set-keychain-settings -lut 21600 "$keychain"
 security unlock-keychain -p "$keychain_password" "$keychain"
-security import "$p12" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -f pkcs12 -A -T /usr/bin/codesign
+if ! import_p12 "$password"; then
+  if [[ "$password" == "$APPLE_CERTIFICATE_PASSWORD" ]] || ! import_p12 "$APPLE_CERTIFICATE_PASSWORD"; then
+    echo "notarize-mac-app: the .p12 passphrase was rejected." >&2
+    echo "APPLE_CERTIFICATE_PASSWORD does not open the certificate in APPLE_CERTIFICATE_BASE64. A line break around that password is already ignored. Use the password from the .p12 export. The certificate secret has to be that .p12: base64 < SigningCertificate.p12 | tr -d '\\n'" >&2
+    exit 1
+  fi
+fi
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
 security list-keychains -d user -s "$keychain" $previous_list >/dev/null
 security default-keychain -s "$keychain"
