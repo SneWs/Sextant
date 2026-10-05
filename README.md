@@ -7,130 +7,29 @@
 <p align="center"><strong>The Git UI I want to use.</strong></p>
 
 <p align="center">
-  A Git client for very large repositories.<br>
+  A Git client for very large repositories. 
   Fast where it counts, and a little help when the task gets fiddly.
 </p>
-
-Sextant is the day-to-day window: locations, the commit graph, the working copy, and the diff. Several big repos stay open as tabs. The active tab does the work. The others stay quiet until you select them.
-
 It talks only to the `git` already on your machine, so your config, hooks, attributes, and credential helper stay the ones you set up in the terminal.
 
-## Built for the size of the tree
+## Built with large git repos in mind
 
 Status, history, and the file list ask git for a slice and paint what is on screen. A slow status can offer two local settings, `feature.manyFiles` and `core.fsmonitor`, written to that repository only after you accept them.
 
-## The daily loop
+## Screenshots
+<img src="screenshots/screenshot-01.png" alt="Empty Sextant window with the logo, the name, and Open, Clone, and Init" width="900">
 
-- Open, clone, or init. Each repository is a tab, and open tabs come back the next time you launch.
-- Branches, remotes, tags, and stashes live in one tree. The graph is the history. Search by subject, author, sha, `branch:name`, or `file:*.cs`.
-- Stage files, hunks, and lines. Commit, or commit without hooks.
-- Fetch, pull with rebase, and push. Push can skip the pre-push hook for that one push.
-- Blame, file history, and a diff you can read side by side.
-- Image and model diffs, up to 8 MB. PNG, JPG, TIFF, SVG, and the other common image types (JPEG, GIF, BMP, WebP, and ICO) show the previous version and the new one side by side. SVG is drawn without running scripts, and TIFF shows the first page. An FBX file shows both versions as a model you can turn. Hold Ctrl or Cmd, then drag to rotate, scroll to zoom, and double-click to reset. A plain scroll moves the diff. Under each view are the mesh, vertex, and triangle counts, the material names, and the animation takes.
-- When a merge, rebase, cherry-pick, or revert conflicts, continue, abort, or edit a text file in the three-way view.
+<img src="screenshots/screenshot-02.png" alt="Three repository tabs, with branches, the commit graph, and the files in the selected commit" width="900">
 
-## In the window
+<img src="screenshots/screenshot-05.png" alt="Command palette for easily finding and executing commands and actions" width="900">
 
-<p align="center">
-  <img src="screenshots/screenshot-01.png" alt="Empty Sextant window with the logo, the name, and Open, Clone, and Init" width="900">
-</p>
+<img src="screenshots/screenshot-03.png" alt="Side-by-side diff of a C++ change, removed lines on the left and added lines on the right" width="900">
 
-<p align="center">
-  <img src="screenshots/screenshot-02.png" alt="Three repository tabs, with branches, the commit graph, and the files in the selected commit" width="900">
-</p>
+<img src="screenshots/screenshot-04.png" alt="Before and after FBX previews of a missile mesh, each with a mesh summary" width="900">
 
-<p align="center">
-  <img src="screenshots/screenshot-05.png" alt="Command palette for easily finding and executing commands and actions" width="900">
-</p>
+PNG, JPG, TIFF, SVG, and FBX changes open as a preview. An FBX diff shows both models. Hold Ctrl or Cmd to interact with FBX files such as rotating, zooming etc. Ctrl or Cmd + double click will restore the view to it's original.
 
-<p align="center">
-  <img src="screenshots/screenshot-03.png" alt="Side-by-side diff of a C++ change, removed lines on the left and added lines on the right" width="900">
-</p>
-
-<p align="center">
-  <img src="screenshots/screenshot-04.png" alt="Before and after FBX previews of a missile mesh, each with a mesh summary" width="900">
-</p>
-
-PNG, JPG, TIFF, SVG, and FBX changes open as a preview. An FBX diff shows both models. Hold Ctrl or Cmd to turn one.
-
-## Planned features
-
-Checked items are in the app. The rest are still ahead. [PLAN.md](PLAN.md) is the detail behind this list.
-
-### Daily loop
-
-- [x] One window, with each repository as a tab. Tabs are not torn off into their own windows.
-- [x] Open, clone, and init from the File menu and from an empty window. The menu uses the system menu bar. On macOS that is the menu at the top of the screen, and Settings is under the Sextant menu.
-- [x] One tab per repository. Opening a path that is already open focuses that tab.
-- [x] Opening a subdirectory, an existing worktree, or a submodule checkout opens that repository.
-- [x] Open tabs come back on the next launch. A tab you have not selected stays unloaded.
-- [x] Locations tree for branches, remotes, tags, and stashes, with folders for shared name prefixes. Folds survive a refresh.
-- [x] Checkout, create a branch, merge into HEAD, delete a branch, and set an upstream.
-- [x] Virtualized commit graph with lanes, and a first page of history instead of the whole log.
-- [x] Working copy with staged and unstaged files, stage all, unstage all, and whole-file stage and unstage.
-- [x] Discard a file only after a confirmation.
-- [x] Stage and unstage a hunk.
-- [x] Commit the index as it stands, or commit that same index without hooks. An empty index does not commit.
-- [x] The branch line shows the local name, ahead and behind, and the command that is running.
-- [x] Pull with rebase, with Fetch on that same button.
-- [x] Push, and push ignoring local checks for that push only.
-- [x] A branch with no upstream asks which remote to use, then pushes and sets the upstream.
-- [x] Fetch and push follow your git config, including `fetch.prune`, and do not force a prune.
-- [x] Continue, Abort, and Cancel sit on the toolbar while they apply.
-- [x] Branch, Stash, Add remote, and Command log are in the Repository menu.
-- [x] View → Toggle branch view hides and shows the branches, remotes, tags, and stashes column. The same command is in the command palette.
-- [x] History search stays hidden until Repository → Search or Ctrl/Cmd+F.
-- [x] Command palette on Ctrl/Cmd+P, plus Open, next tab, close tab, and Refresh.
-- [x] The running command, a failure banner you can copy, and a full-width command log with secrets stripped out.
-- [x] Progress while cloning, fetching, pulling, and pushing.
-- [x] Fluent compact theme. Light is Catppuccin Latte and dark is Catppuccin Mocha. Settings is split into Appearance, Diff, Git, and Merging. Appearance chooses light, dark, or follow the system.
-- [x] Watch the git directory, refresh when the window is focused, and refresh with F5.
-- [x] After a slow status, offer `feature.manyFiles` and `core.fsmonitor`, and write them only after you apply them.
-- [x] Ask before trusting a repository that git reports as dubious ownership.
-- [x] Use the system `git`, including its hooks, attributes, and credential helper. There is no password dialog.
-- [x] A repository with no commits still opens, and its other branches still show.
-- [x] A conflicted merge marks the files, can be aborted, can be handed to `git mergetool`, and can be concluded by a commit once the paths are staged.
-
-### History and local repair
-
-- [x] Search history by subject, author, a pasted sha, `branch:name`, or `file:*.cs`.
-- [x] File history from a path in the file list.
-- [x] Blame for the selected file at the selected commit.
-- [x] Stash: list, push, pop, apply, and drop.
-- [x] Reset soft and mixed.
-- [x] Hard reset only after a confirmation that names the commit that will be discarded.
-- [x] Cherry-pick and revert the selected commit.
-- [x] Apply a patch from the Repository menu and the command palette. The change stays in the working tree and is not staged.
-- [x] Create a tag, and delete a tag after a confirmation.
-- [x] Add, remove, and rename remotes.
-- [x] Side-by-side diff, and an ignore-whitespace toggle that applies to that view only.
-- [x] Stage and unstage individual lines.
-- [x] Hunk staging for added, untracked, and deleted text files.
-- [x] Select two commits and show the diff between them.
-- [x] An all-files diff from one `git diff`, as another way to read the change.
-
-### Rewriting and conflicts
-
-- [x] Three-way editor for an unmerged text file: ours, an editable result, and theirs, with the merge base on demand. Take ours and Take theirs fill the selected conflict. Previous and Next move between conflicts.
-- [x] Settings → Merging sets the external merge command. An empty command resolves a text conflict in the in-app editor, unless git already has `merge.tool`. The command is not written into git config.
-- [x] Save and stage when the conflict markers are gone. Markers that remain stay on disk and the path stays unmerged.
-- [x] A binary conflict stays on the external merge tool.
-- [x] Continue and abort for a merge, rebase, cherry-pick, and revert.
-- [x] Interactive rebase of the selected commits: reorder, squash, fixup, edit, drop, and reword, without opening an editor.
-- [x] Edit a commit message, amend the tip, and change an older commit through that rebase.
-- [x] Push with `--force-with-lease` as its own labeled action. A plain `--force` is not that button. A confirmation calls out commits that are already on a remote.
-
-### Scale and depth
-
-- [x] List submodules on the parent and open one as a tab.
-- [x] List worktrees, add one, and open it as a tab.
-- [x] When sparse checkout is on, say so, and do not try to materialize excluded paths.
-- [x] Show Git LFS pointers as pointers, and download a blob only when you ask.
-- [x] Mark a file Git LFS tracks in the file list and the diff. Fetch LFS objects, pull LFS files, and track, stop tracking, or download a working-copy file.
-- [x] Highlight syntax in the visible diff only.
-- [x] Diff images and FBX models, up to 8 MB. PNG, JPG, JPEG, GIF, BMP, WebP, ICO, SVG, and TIFF show before and after. An FBX file shows a clay view you can turn while holding Ctrl or Cmd, with the mesh summary underneath.
-
-## Run
+## Build & Run Locally
 
 You need the [.NET 10 SDK](https://dotnet.microsoft.com/download) and `git` on `PATH`. Sextant runs on Windows, Linux, and macOS, and the window follows the system light or dark theme.
 
@@ -143,6 +42,11 @@ dotnet test Sextant.slnx
 ```
 
 That command builds the shared tests and the tests for the operating system you are on. Windows tests compile on Windows, Linux tests on Linux, and macOS tests on macOS.
+
+To produce a _baked binary release_ you need to run (from the src folder):
+```bash
+dotnet publish
+```
 
 On macOS the build is a `Sextant.app` bundle.
 
