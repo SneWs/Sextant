@@ -19,14 +19,17 @@ public class BranchVisibilityTests
             10,
             hiddenBranches: ["refs/heads/feature/grass", "refs/remotes/origin/side", "refs/tags/v1", "refs/remotes/origin/HEAD"]);
         Assert.Equal(
-            ["--exclude=feature/grass", "--exclude=origin/side", "--exclude=feature/grass", "--exclude=origin/side"],
+            ["--exclude=feature/grass", "--exclude=origin/side", "--exclude=feature/grass", "--exclude=origin/side", "--exclude=*/HEAD"],
             hidden.Where(argument => argument.StartsWith("--exclude=", StringComparison.Ordinal)).ToArray());
         var hiddenList = hidden.ToList();
         Assert.Contains("HEAD", hiddenList);
         Assert.Contains("--branches", hiddenList);
         Assert.Contains("--remotes", hiddenList);
         Assert.DoesNotContain("--tags", hiddenList);
-        Assert.True(hiddenList.IndexOf("--branches") < hiddenList.LastIndexOf("--remotes"));
+        Assert.DoesNotContain("--first-parent", hiddenList);
+        Assert.True(hiddenList.IndexOf("--branches") < hiddenList.IndexOf("--exclude=*/HEAD"));
+        Assert.True(hiddenList.IndexOf("--exclude=*/HEAD") < hiddenList.LastIndexOf("--remotes"));
+        Assert.Contains("--first-parent", GitCommands.Log("repo", 0, 10, firstParent: true));
 
         var withoutHead = GitCommands.Log("repo", 0, 10, includeHead: false, includeStash: true, hiddenBranches: ["refs/heads/main"]);
         Assert.DoesNotContain(withoutHead, argument => argument == "HEAD");
@@ -81,6 +84,23 @@ public class BranchVisibilityTests
         Assert.Equal("\"feature-only\"  ·  hiding feature/grass", BranchVisibility.Caption(search, ["refs/heads/feature/grass"]));
         var pinned = HistoryQueryParser.Parse("branch:feature/grass");
         Assert.Equal("feature/grass", BranchVisibility.Caption(pinned, ["refs/heads/feature/grass"]));
+        Assert.False(BranchVisibility.OnlyOneBranch([], new HashSet<string>(StringComparer.Ordinal)));
+        Assert.True(BranchVisibility.OnlyOneBranch(
+            [new GitRef("aaa", "refs/heads/keep", true, null)],
+            new HashSet<string>(StringComparer.Ordinal)));
+        Assert.False(BranchVisibility.OnlyOneBranch(
+            [
+                new GitRef("aaa", "refs/heads/keep", true, null),
+                new GitRef("bbb", "refs/heads/other", false, null),
+            ],
+            new HashSet<string>(StringComparer.Ordinal)));
+        Assert.True(BranchVisibility.OnlyOneBranch(
+            [
+                new GitRef("aaa", "refs/heads/keep", true, null),
+                new GitRef("bbb", "refs/heads/other", false, null),
+                new GitRef("ccc", "refs/remotes/origin/HEAD", false, null),
+            ],
+            new HashSet<string>(["refs/heads/other"], StringComparer.Ordinal)));
         Assert.Equal(
             ["refs/heads/other", "refs/remotes/origin/side"],
             BranchVisibility.HiddenExcept(
@@ -133,6 +153,8 @@ public class BranchVisibilityTests
         Assert.Contains("--exclude=feature/grass", excluded);
         Assert.DoesNotContain("--tags", excluded);
         Assert.Contains("HEAD", excluded);
+        Assert.Contains("--exclude=*/HEAD", excluded);
+        Assert.DoesNotContain("--first-parent", excluded);
 
         await session.SetHistoryAsync(HistoryQueryParser.Parse("feature-only"), CancellationToken.None);
         Assert.Empty(session.Snapshot().Commits);
@@ -150,6 +172,8 @@ public class BranchVisibilityTests
             CancellationToken.None);
         Assert.Equal(["root", "trunk-only"], Subjects(session));
         Assert.Equal("Hiding feature/grass and origin/side", session.Snapshot().HistoryLabel);
+        Assert.Contains("--first-parent", LastLog(session));
+        Assert.Contains("--exclude=*/HEAD", LastLog(session));
 
         await session.SetHiddenBranchesAsync([trunkRef], CancellationToken.None);
         Assert.Equal(["feature-only", "root", "side-only"], Subjects(session));
@@ -160,6 +184,67 @@ public class BranchVisibilityTests
         Assert.Equal(["feature-only", "root", "side-only", "trunk-only"], Subjects(session));
         Assert.Null(session.Snapshot().HistoryLabel);
         Assert.Contains("--tags", LastLog(session));
+    }
+
+    [Fact]
+    public async Task Remote_head_does_not_bring_a_hidden_branch_back()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "root\n");
+        repo.CommitAll("root");
+        var trunk = repo.CurrentBranch();
+        repo.Run("switch", "-c", "feature/grass");
+        repo.WriteFile("c.txt", "feature\n");
+        repo.CommitAll("feature-only");
+        repo.Run("switch", trunk);
+        repo.WriteFile("a.txt", "trunk\n");
+        repo.CommitAll("trunk-only");
+        repo.Run("update-ref", "refs/remotes/origin/master", trunk);
+        repo.Run("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master");
+
+        await using var session = await Open(repo);
+        await session.SetHiddenBranchesAsync(
+            BranchVisibility.HiddenExcept(session.Snapshot().Refs, "refs/heads/feature/grass"),
+            CancellationToken.None);
+        Assert.Equal(["feature-only", "root"], Subjects(session));
+        Assert.DoesNotContain(Subjects(session), subject => subject == "trunk-only");
+        Assert.Contains("--exclude=*/HEAD", LastLog(session));
+        Assert.Contains("--first-parent", LastLog(session));
+    }
+
+    [Fact]
+    public async Task One_visible_branch_keeps_its_own_commits()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "root\n");
+        repo.CommitAll("root");
+        var trunk = repo.CurrentBranch();
+        repo.Run("switch", "-c", "feature/grass");
+        repo.WriteFile("c.txt", "feature\n");
+        repo.CommitAll("feature-only");
+        repo.Run("switch", trunk);
+        repo.WriteFile("a.txt", "trunk\n");
+        repo.CommitAll("trunk-only");
+        repo.Run("merge", "--no-edit", "feature/grass");
+        repo.WriteFile("a.txt", "after\n");
+        repo.CommitAll("after-merge");
+
+        await using var session = await Open(repo);
+        Assert.Contains(Subjects(session), subject => subject == "feature-only");
+        await session.SetHiddenBranchesAsync(
+            BranchVisibility.HiddenExcept(session.Snapshot().Refs, "refs/heads/" + trunk),
+            CancellationToken.None);
+        var subjects = Subjects(session);
+        Assert.Contains("root", subjects);
+        Assert.Contains("trunk-only", subjects);
+        Assert.Contains("after-merge", subjects);
+        Assert.Contains(subjects, subject => subject.StartsWith("Merge branch", StringComparison.Ordinal));
+        Assert.DoesNotContain("feature-only", subjects);
+        Assert.Contains("--first-parent", LastLog(session));
+        var rows = session.Snapshot().Commits;
+        Assert.All(rows, row => Assert.Equal(0, row.Lanes.NodeLane));
+        Assert.All(rows, row => Assert.True(row.Lanes.LaneCount <= 1));
+        Assert.All(rows, row => Assert.True(row.Commit.Parents.Count <= 1));
     }
 
     [Fact]

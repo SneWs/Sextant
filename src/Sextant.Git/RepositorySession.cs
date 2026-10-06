@@ -1165,6 +1165,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
         HistoryQuery? query;
         bool includeStash;
         bool currentHidden;
+        bool firstParent;
         string[]? hidden;
         IReadOnlyList<string>? visibleStashes;
         lock (_stateLock)
@@ -1174,6 +1175,9 @@ public sealed partial class RepositorySession : IAsyncDisposable
             currentHidden = CurrentBranchHidden();
             hidden = _hiddenBranches.Count == 0 ? null : _hiddenBranches.ToArray();
             visibleStashes = includeStash ? VisibleStashRevisions() : null;
+            // A pinned revision is its own walk. One visible branch otherwise follows that branch only.
+            firstParent = query?.Revision is null && query?.ShaLookup != true
+                && BranchVisibility.OnlyOneBranch(_refs, _hiddenBranches);
         }
 
         var path = query?.LogPath;
@@ -1198,8 +1202,8 @@ public sealed partial class RepositorySession : IAsyncDisposable
             {
                 var take = skip + count;
                 var head = query.Revision is null && !currentHidden;
-                var bySubject = await ReadLogAsync(token, 0, take, head, includeStash, query.Revision, query.Grep, null, path, hidden, visibleStashes).ConfigureAwait(false);
-                var byAuthor = await ReadLogAsync(token, 0, take, head, includeStash, query.Revision, null, query.Author, path, hidden, visibleStashes).ConfigureAwait(false);
+                var bySubject = await ReadLogAsync(token, 0, take, head, includeStash, query.Revision, query.Grep, null, path, hidden, visibleStashes, firstParent).ConfigureAwait(false);
+                var byAuthor = await ReadLogAsync(token, 0, take, head, includeStash, query.Revision, null, query.Author, path, hidden, visibleStashes, firstParent).ConfigureAwait(false);
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var merged = new List<CommitRecord>();
                 foreach (var commit in bySubject.Commits.Concat(byAuthor.Commits).OrderByDescending(commit => commit.AuthorUnixSeconds))
@@ -1225,7 +1229,8 @@ public sealed partial class RepositorySession : IAsyncDisposable
                 query is { MatchSubjectOrAuthor: false } ? query.Author : null,
                 path,
                 hidden,
-                visibleStashes).ConfigureAwait(false);
+                visibleStashes,
+                firstParent).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
     }
 
@@ -1258,16 +1263,17 @@ public sealed partial class RepositorySession : IAsyncDisposable
         string? author,
         string? path,
         IReadOnlyCollection<string>? hiddenBranches,
-        IReadOnlyList<string>? visibleStashes)
+        IReadOnlyList<string>? visibleStashes,
+        bool firstParent = false)
     {
         var output = await ExecuteAsync(
-            GitCommands.Log(_toplevel, skip, count, includeHead, includeStash, revision, grep, author, path, hiddenBranches, visibleStashes),
+            GitCommands.Log(_toplevel, skip, count, includeHead, includeStash, revision, grep, author, path, hiddenBranches, visibleStashes, firstParent),
             null,
             token).ConfigureAwait(false);
         if (output.ExitCode != 0 && includeHead && LogParser.IsUnborn(output.StandardError))
         {
             output = await ExecuteAsync(
-                GitCommands.Log(_toplevel, skip, count, includeHead: false, includeStash, revision, grep, author, path, hiddenBranches, visibleStashes),
+                GitCommands.Log(_toplevel, skip, count, includeHead: false, includeStash, revision, grep, author, path, hiddenBranches, visibleStashes, firstParent),
                 null,
                 token).ConfigureAwait(false);
         }
@@ -1282,8 +1288,17 @@ public sealed partial class RepositorySession : IAsyncDisposable
 
         Track(output);
         var commits = LogParser.Parse(output.Stdout, _encoding);
+        if (firstParent)
+            commits = commits.Select(FirstParent).ToList();
         return new LogLoad(commits, commits.Count < count);
     }
+
+    /// <summary>
+    /// <c>--first-parent</c> walks one parent, but the commit still records every parent.
+    /// Keeping the others draws a lane for a commit the walk left out.
+    /// </summary>
+    private static CommitRecord FirstParent(CommitRecord commit) =>
+        commit.Parents.Count <= 1 ? commit : commit with { Parents = [commit.Parents[0]] };
 
     private async Task ReloadConfigAsync(CancellationToken cancellationToken)
     {

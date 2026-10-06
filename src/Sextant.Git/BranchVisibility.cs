@@ -6,6 +6,7 @@ namespace Sextant.Git;
 /// <summary>
 /// Which branch and stash tips the commit graph walks. A hidden row stays in the locations list.
 /// Commits that no visible branch or stash reaches are left out of the graph.
+/// One visible branch is that branch's first-parent history, so merged commits from other branches stay out.
 /// </summary>
 public static class BranchVisibility
 {
@@ -39,6 +40,22 @@ public static class BranchVisibility
         if (refName.StartsWith("refs/heads/", StringComparison.Ordinal))
             return refName["refs/heads/".Length..];
         return refName["refs/remotes/".Length..];
+    }
+
+    /// <summary>True when exactly one local or remote-tracking branch is still visible.</summary>
+    public static bool OnlyOneBranch(IEnumerable<GitRef> refs, IReadOnlySet<string> hidden)
+    {
+        var seen = false;
+        foreach (var reference in refs)
+        {
+            if (!IsGraphBranch(reference.Name) || hidden.Contains(reference.Name))
+                continue;
+            if (seen)
+                return false;
+            seen = true;
+        }
+
+        return seen;
     }
 
     /// <summary>Every graph branch except <paramref name="keep"/>.</summary>

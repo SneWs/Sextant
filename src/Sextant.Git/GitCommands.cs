@@ -59,7 +59,8 @@ public static class GitCommands
         string? author = null,
         string? path = null,
         IReadOnlyCollection<string>? hiddenBranches = null,
-        IReadOnlyList<string>? visibleStashes = null)
+        IReadOnlyList<string>? visibleStashes = null,
+        bool firstParent = false)
     {
         // An unborn HEAD (fresh init, or an orphan branch) is not a revision. Passing it
         // makes log exit 128 with "ambiguous argument 'HEAD'" before --branches is considered.
@@ -67,6 +68,8 @@ public static class GitCommands
         {
             "-C", toplevel, "--no-optional-locks", "log", "-z", "--date-order",
         };
+        if (firstParent)
+            arguments.Add("--first-parent");
         if (!string.IsNullOrEmpty(revision))
         {
             arguments.Add(revision);
@@ -86,10 +89,12 @@ public static class GitCommands
             {
                 // --exclude applies only to the next --branches or --remotes, then git clears it.
                 // Tags stay out while a branch is hidden, or a tag would bring that branch's commits back.
+                // refs/remotes/*/HEAD is not a row the user can hide, and --remotes would walk it anyway.
                 // A stash revision is explicit, so its eye decides whether it is a root.
                 AddExcludes(arguments, excluded);
                 arguments.Add("--branches");
                 AddExcludes(arguments, excluded);
+                arguments.Add("--exclude=*/HEAD");
                 arguments.Add("--remotes");
             }
 
