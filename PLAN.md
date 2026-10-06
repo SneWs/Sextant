@@ -22,6 +22,8 @@ On 2026-10-01 Phase 4 is in the window. The locations list has a Submodules sect
 
 On 2026-10-06 the repository adds the Sextant License. Building from source is free, and so is installing a release published on GitHub. Official pre-built binaries for Windows and macOS are sold by Marcus Grenängen. The desktop window was not launched.
 
+On 2026-10-06 Help → About Sextant opens a dialog with the version, the copyright, and the license. Help is on the window menu, so macOS shows it in the screen menu bar. The desktop window was not launched.
+
 On 2026-10-05 a local or remote-tracking branch row offers Hide branch and Hide all other branches. Show branch and Show all branches bring them back. The commit graph then starts only from the branches still shown, so a commit no visible branch reaches is left out. A tag or a stash does not bring that commit back while a branch is hidden. The choice is saved with that repository. `Hidden_branches_drop_commits_reached_only_from_those_branches` passed against system git. The desktop window was not launched.
 
 On 2026-10-05 the locations list keeps a Stashes root and a Submodules root when those lists are empty. Each label includes the count, so an empty repository shows Stashes (0) and Submodules (0). A stash or a submodule is still a row under that root. `Stashes_and_submodules_stay_visible_when_empty` and `A_submodule_is_a_row_under_the_submodules_root` passed against system git. A headless window confirmed the empty labels, a stash row under Stashes, and a submodule row under Submodules. The desktop window was not launched.
@@ -63,6 +65,8 @@ On 2026-10-06 a file type tool that uses `$FILE` and does not read stdin is stil
 On 2026-10-06 the commit graph, diff colors, and syntax colors use immutable brushes. A solid color brush is owned by the thread that created it, and a later headless session draws the graph on a different thread. That was the Windows and macOS failure in `Commit_stays_disabled_until_a_file_is_staged`. The headless tests passed. The desktop window was not launched.
 
 On 2026-10-06 Settings → File types names an extension, a transform command, and a restore command. A diff of that extension runs the transform on each side and shows the diff of that text. A file over 8 MB is left as git showed it. An all-files diff formats at most 64 matching files; the rest stay on git's diff until opened alone. Saving a merge of that extension runs the restore command and writes its stdout. A formatted diff cannot be hunk-staged, because that patch is not the file git has. The DiffFormat tests passed 9/9 against system git. The desktop window was not launched.
+
+On 2026-10-06 Help → Get help opens https://github.com/SneWs/Sextant/blob/master/docs/README.md in the browser. It sits above About Sextant. The desktop window was not launched.
 
 Update this block at the end of any session that lands or revises a step.
 
@@ -372,7 +376,7 @@ Other keys: Ctrl/Cmd+O open repository, Ctrl+Tab next tab, Ctrl/Cmd+W close tab,
 
 Dialogs: open folder, clone (URL, parent directory, folder name, progress), init (pick a folder), create branch, confirmation for discard and for config writes.
 
-Open, clone, and init are in the File menu (Ctrl/Cmd+O opens a repository). View holds Toggle branch view. The menu is a `NativeMenu`. On macOS the platform shows it in the menu bar at the top of the screen, and Settings is the first item of the Sextant application menu. The window does not draw a second menu bar there. On Windows, and on a Linux desktop that does not export a global menu, `NativeMenuBar` draws that same menu at the top of the window. An empty window centers the application icon, the name Sextant, and the line "Open a repository to start." Below that, Open, Clone, and Init each sit in their own column, with a short explanation under the button. Open chooses an existing repository folder. Clone copies a remote repository into a new folder and opens it. Init creates a repository in a chosen folder. There is no list of recently opened repositories.
+Open, clone, and init are in the File menu (Ctrl/Cmd+O opens a repository). View holds Toggle branch view. Help holds Get help, which opens the documentation, and About Sextant, which shows the version, the copyright, and the license. The menu is a `NativeMenu`. On macOS the platform shows it in the menu bar at the top of the screen, including Help, and Settings is the first item of the Sextant application menu. The window does not draw a second menu bar there. On Windows, and on a Linux desktop that does not export a global menu, `NativeMenuBar` draws that same menu at the top of the window. An empty window centers the application icon, the name Sextant, and the line "Open a repository to start." Below that, Open, Clone, and Init each sit in their own column, with a short explanation under the button. Open chooses an existing repository folder. Clone copies a remote repository into a new folder and opens it. Init creates a repository in a chosen folder. There is no list of recently opened repositories.
 
 Operation feedback, per tab:
 

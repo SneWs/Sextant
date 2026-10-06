@@ -385,6 +385,12 @@ public sealed class AvaloniaDialogService : IDialogService
         return window.Result;
     }
 
+    public async Task ShowAboutAsync()
+    {
+        var window = new AboutWindow();
+        await window.ShowDialog(_owner);
+    }
+
     public async Task CopyAsync(string text)
     {
         var clipboard = _owner.Clipboard;

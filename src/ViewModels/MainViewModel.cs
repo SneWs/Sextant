@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Sextant;
 using Sextant.Git;
 using Sextant.Git.Parsing;
 using Sextant.Services;
@@ -606,6 +607,29 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             ApplyMergePreference();
         if (gitChanged)
             await ProbeAsync();
+    }
+
+    public const string DocumentationUrl = "https://github.com/SneWs/Sextant/blob/master/docs/README.md";
+
+    [RelayCommand]
+    private void GetHelp()
+    {
+        try
+        {
+            DesktopOpen.Start(DesktopOpen.OpenUrl(DesktopOpen.Current, DocumentationUrl));
+        }
+        catch (Exception)
+        {
+            StatusText = "The documentation could not be opened.";
+        }
+    }
+
+    [RelayCommand]
+    private async Task ShowAboutAsync()
+    {
+        if (Dialogs is null)
+            return;
+        await Dialogs.ShowAboutAsync();
     }
 
     private void ApplyDiffPreferences()

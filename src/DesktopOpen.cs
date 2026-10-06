@@ -94,6 +94,25 @@ public static class DesktopOpen
     private static ShellLaunch LinuxOpen(string path) =>
         new("xdg-open", null, [path], false);
 
+    /// <summary>Opens an http or https link in the registered browser. Other schemes are refused.</summary>
+    public static ShellLaunch OpenUrl(DesktopKind kind, string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            || url.Contains('"')
+            || url.Contains('\0')
+            || url.Contains('\r')
+            || url.Contains('\n'))
+            throw new InvalidOperationException("That link cannot be opened.");
+
+        return kind switch
+        {
+            DesktopKind.Windows => new ShellLaunch(url, null, [], true),
+            DesktopKind.Mac => new ShellLaunch("open", null, ["--", url], false),
+            _ => new ShellLaunch("xdg-open", null, [url], false),
+        };
+    }
+
     public static void Start(ShellLaunch launch)
     {
         var info = new ProcessStartInfo

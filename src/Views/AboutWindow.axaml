@@ -1,0 +1,26 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Sextant.Views.AboutWindow"
+        Title="About Sextant"
+        Width="420"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+    <Grid RowDefinitions="*,Auto" Margin="28,24,28,16">
+        <StackPanel Spacing="8">
+            <Image Width="72" Height="72" Stretch="Uniform" HorizontalAlignment="Center"
+                   RenderOptions.BitmapInterpolationMode="HighQuality"
+                   Source="avares://Sextant/Assets/sextant.png"/>
+            <TextBlock Text="Sextant" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="VersionText" HorizontalAlignment="Center" Opacity="0.75"/>
+            <TextBlock Text="A Git client for very large repositories."
+                       TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,0"/>
+            <TextBlock x:Name="CopyrightText" TextWrapping="Wrap" TextAlignment="Center" Opacity="0.75"/>
+            <TextBlock x:Name="LicenseText" TextWrapping="Wrap" TextAlignment="Center"/>
+        </StackPanel>
+        <Button Grid.Row="1" Content="Close" HorizontalAlignment="Right" HorizontalContentAlignment="Center"
+                VerticalContentAlignment="Center" Margin="0,20,0,0"
+                MinWidth="88" IsCancel="True" IsDefault="True" Click="OnClose"/>
+    </Grid>
+</Window>

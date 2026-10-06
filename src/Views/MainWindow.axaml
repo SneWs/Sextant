@@ -47,6 +47,13 @@
                     <NativeMenuItem Header="_Search" Command="{Binding ToggleHistorySearchCommand}" Gesture="{app:CommandGesture Key=F}"/>
                 </NativeMenu>
             </NativeMenuItem>
+            <!-- Same window menu macOS exports to the screen menu bar. Help stays visible there. -->
+            <NativeMenuItem Header="_Help">
+                <NativeMenu>
+                    <NativeMenuItem Header="_Get help" Command="{Binding GetHelpCommand}"/>
+                    <NativeMenuItem Header="_About Sextant" Command="{Binding ShowAboutCommand}"/>
+                </NativeMenu>
+            </NativeMenuItem>
         </NativeMenu>
     </NativeMenu.Menu>
 

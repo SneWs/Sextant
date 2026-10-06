@@ -27,6 +27,8 @@ public interface IDialogService
 
     Task<SettingsDraft?> EditSettingsAsync(SettingsDraft current);
 
+    Task ShowAboutAsync();
+
     Task CopyAsync(string text);
 }
 
