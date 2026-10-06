@@ -160,6 +160,32 @@ public sealed partial class RepositorySession : IAsyncDisposable
         }, cancellationToken);
     }
 
+    public Task<DiffStat> DiffStatAsync(string? older, string newer, CancellationToken cancellationToken) =>
+        RunAsync(async ct =>
+        {
+            var arguments = string.IsNullOrEmpty(older)
+                ? GitCommands.NumStatRoot(_toplevel, newer)
+                : GitCommands.NumStat(_toplevel, older, newer);
+            var output = await _scheduler.ReadAsync(
+                inner => ExecuteAsync(arguments, null, inner),
+                ct).ConfigureAwait(false);
+            Checked(output);
+            return NumStatParser.Parse(output.Stdout);
+        }, cancellationToken);
+
+    public Task<string> CommitMessageAsync(string sha, CancellationToken cancellationToken) =>
+        RunAsync(async ct =>
+        {
+            var output = await _scheduler.ReadAsync(
+                inner => ExecuteAsync(GitCommands.CommitMessage(_toplevel, sha), null, inner),
+                ct).ConfigureAwait(false);
+            Checked(output);
+            return _encoding.GetString(output.Stdout)
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace('\r', '\n')
+                .TrimEnd('\n');
+        }, cancellationToken);
+
     public Task<DiffDocument?> WorkingDiffAsync(
         string path,
         bool staged,

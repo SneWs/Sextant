@@ -162,6 +162,10 @@ public static class GitCommands
     public static IReadOnlyList<string> RevParseCommit(string toplevel, string revision) =>
         ["-C", toplevel, "--no-optional-locks", "rev-parse", "--verify", "--quiet", revision + "^{commit}"];
 
+    /// <summary>The full commit message, subject and body, without a patch.</summary>
+    public static IReadOnlyList<string> CommitMessage(string toplevel, string sha) =>
+        ["-C", toplevel, "--no-optional-locks", "log", "-1", "--format=%B", sha];
+
     public static IReadOnlyList<string> Blame(string toplevel, string? revision, string path)
     {
         var arguments = new List<string> { "-C", toplevel, "--no-optional-locks", "blame", "--no-textconv", "--line-porcelain" };
@@ -344,6 +348,28 @@ public static class GitCommands
 
     public static IReadOnlyList<string> RangeNameStatus(string toplevel, string older, string newer) =>
         ["-C", toplevel, "--no-optional-locks", "diff", "-z", "--name-status", older, newer];
+
+    /// <summary>Added and removed lines between two commits. Rename detection stays on, so a rename is not a full delete plus add.</summary>
+    public static IReadOnlyList<string> NumStat(string toplevel, string older, string newer)
+    {
+        var arguments = new List<string>
+        {
+            "-C", toplevel, "--no-optional-locks", "diff", "--no-textconv", "--numstat", "-z", older, newer,
+        };
+        KeepLfsPointers(arguments);
+        return arguments;
+    }
+
+    /// <summary>Added and removed lines for a commit with no parent.</summary>
+    public static IReadOnlyList<string> NumStatRoot(string toplevel, string sha)
+    {
+        var arguments = new List<string>
+        {
+            "-C", toplevel, "--no-optional-locks", "show", "--no-textconv", "--format=", "--numstat", "-z", sha,
+        };
+        KeepLfsPointers(arguments);
+        return arguments;
+    }
 
     public static IReadOnlyList<string> ShowPatch(string toplevel, string sha, string? path, bool ignoreWhitespace = false)
     {

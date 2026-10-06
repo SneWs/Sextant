@@ -7,6 +7,25 @@ public class GitCommandTests
     {
         Assert.Contains("--no-optional-locks", GitCommands.Status("repo"));
         Assert.Contains("--no-optional-locks", GitCommands.Log("repo", 0, 10));
+        Assert.Equal(
+            ["-C", "repo", "--no-optional-locks", "log", "-1", "--format=%B", "abc"],
+            GitCommands.CommitMessage("repo", "abc"));
+        Assert.Equal(
+            [
+                "-c", "filter.lfs.smudge=",
+                "-c", "filter.lfs.process=",
+                "-c", "filter.lfs.required=false",
+                "-C", "repo", "--no-optional-locks", "diff", "--no-textconv", "--numstat", "-z", "aaa", "bbb",
+            ],
+            GitCommands.NumStat("repo", "aaa", "bbb"));
+        Assert.Equal(
+            [
+                "-c", "filter.lfs.smudge=",
+                "-c", "filter.lfs.process=",
+                "-c", "filter.lfs.required=false",
+                "-C", "repo", "--no-optional-locks", "show", "--no-textconv", "--format=", "--numstat", "-z", "abc",
+            ],
+            GitCommands.NumStatRoot("repo", "abc"));
         Assert.DoesNotContain("--no-optional-locks", GitCommands.Commit("repo", "msg"));
         Assert.DoesNotContain("--no-verify", GitCommands.Commit("repo", "msg"));
         Assert.Contains("--no-verify", GitCommands.Commit("repo", "msg", noVerify: true));

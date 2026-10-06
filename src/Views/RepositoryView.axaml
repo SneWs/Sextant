@@ -351,8 +351,38 @@
                         </DockPanel>
                     </Border>
                     <StackPanel IsVisible="{Binding ShowingCommit}" Margin="8,6,8,4" Spacing="2">
-                        <TextBlock Text="{Binding CommitTitle}" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                        <TextBlock Text="{Binding CommitMeta}" Opacity="0.7" FontSize="12"/>
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto">
+                            <TextBlock Text="Hash" VerticalAlignment="Center" Opacity="0.7" Margin="0,0,8,0"/>
+                            <TextBox x:Name="CommitShaBox" Grid.Column="1" Classes="diff" IsReadOnly="True"
+                                     BorderThickness="0" Background="Transparent" Padding="0,1" MinHeight="0"
+                                     Text="{Binding CommitShaText, Mode=OneWay}"/>
+                            <TextBlock Grid.Row="1" Text="Author" VerticalAlignment="Center" Opacity="0.7" Margin="0,2,8,0"
+                                       IsVisible="{Binding ShowCommitIdentity}"/>
+                            <TextBox x:Name="CommitAuthorBox" Grid.Row="1" Grid.Column="1" IsReadOnly="True" Margin="0,2,0,0"
+                                     BorderThickness="0" Background="Transparent" Padding="0,1" MinHeight="0"
+                                     Text="{Binding CommitAuthorText, Mode=OneWay}" IsVisible="{Binding ShowCommitIdentity}"/>
+                            <TextBlock Grid.Row="2" Text="Date" VerticalAlignment="Center" Opacity="0.7" Margin="0,2,8,0"
+                                       IsVisible="{Binding ShowCommitIdentity}"/>
+                            <TextBox x:Name="CommitDateBox" Grid.Row="2" Grid.Column="1" IsReadOnly="True" Margin="0,2,0,0"
+                                     BorderThickness="0" Background="Transparent" Padding="0,1" MinHeight="0"
+                                     Text="{Binding CommitDateText, Mode=OneWay}" IsVisible="{Binding ShowCommitIdentity}"/>
+                        </Grid>
+                        <StackPanel x:Name="CommitStatsRow" Orientation="Horizontal" Spacing="6" Margin="0,6,0,2"
+                                    IsVisible="{Binding ShowCommitStats}">
+                            <TextBlock x:Name="CommitStatsFiles" Text="{Binding CommitStatsFiles}" VerticalAlignment="Center"/>
+                            <Border x:Name="CommitRemovedChip" Background="{DynamicResource CommitRemovedPillBrush}"
+                                    CornerRadius="9" Padding="7,1" VerticalAlignment="Center">
+                                <TextBlock x:Name="CommitRemovedPill" Text="{Binding CommitStatsRemoved}" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource CommitRemovedTextBrush}"/>
+                            </Border>
+                            <Border x:Name="CommitAddedChip" Background="{DynamicResource CommitAddedPillBrush}"
+                                    CornerRadius="9" Padding="7,1" VerticalAlignment="Center">
+                                <TextBlock x:Name="CommitAddedPill" Text="{Binding CommitStatsAdded}" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource CommitAddedTextBrush}"/>
+                            </Border>
+                        </StackPanel>
+                        <TextBox x:Name="CommitMessageBox" IsReadOnly="True" Text="{Binding CommitMessageText, Mode=OneWay}"
+                                 AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="168" MinHeight="28" Margin="0,4,0,0"/>
                     </StackPanel>
                 </StackPanel>
 

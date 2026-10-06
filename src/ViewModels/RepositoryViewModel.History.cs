@@ -519,8 +519,12 @@ public partial class RepositoryViewModel
         ShowingCommit = true;
         if (ShowingBlame)
             ShowingBlame = false;
-        CommitTitle = Short(_rangeOlder) + ".." + Short(_rangeNewer);
-        CommitMeta = _rangeOlderSubject + "  →  " + _rangeNewerSubject;
+        ShowCommitFields(
+            _rangeOlderSubject + "\n" + _rangeNewerSubject,
+            _rangeOlder + ".." + _rangeNewer,
+            "",
+            "");
+        ShowCommitStats = false;
         _shownSha = null;
         ReplaceDetails();
         var token = _details!.Token;
@@ -533,6 +537,7 @@ public partial class RepositoryViewModel
             if (token.IsCancellationRequested)
                 return;
             ShowCommitFiles(files, tracked);
+            await ApplyCommitStatsAsync(_rangeOlder, _rangeNewer, token);
             await LoadDiffAsync();
         }
         catch (OperationCanceledException)

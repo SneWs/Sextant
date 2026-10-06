@@ -13,9 +13,17 @@
                 <!-- Text on the accent fill. Catppuccin puts Base on top of Blue. -->
                 <ResourceDictionary x:Key="Light">
                     <SolidColorBrush x:Key="CatppuccinOnAccentBrush" Color="#EFF1F5"/>
+                    <SolidColorBrush x:Key="CommitAddedPillBrush" Color="#D8F5DC"/>
+                    <SolidColorBrush x:Key="CommitAddedTextBrush" Color="#2B8A3E"/>
+                    <SolidColorBrush x:Key="CommitRemovedPillBrush" Color="#FDE2E4"/>
+                    <SolidColorBrush x:Key="CommitRemovedTextBrush" Color="#C92A2A"/>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="CatppuccinOnAccentBrush" Color="#1E1E2E"/>
+                    <SolidColorBrush x:Key="CommitAddedPillBrush" Color="#244032"/>
+                    <SolidColorBrush x:Key="CommitAddedTextBrush" Color="#A6E3A1"/>
+                    <SolidColorBrush x:Key="CommitRemovedPillBrush" Color="#4A2C35"/>
+                    <SolidColorBrush x:Key="CommitRemovedTextBrush" Color="#F38BA8"/>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>

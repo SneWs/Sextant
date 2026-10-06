@@ -237,11 +237,35 @@ public partial class RepositoryViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool ShowingCommit { get; set; }
 
+    /// <summary>Full message of the selected commit, or the two subjects of a range.</summary>
     [ObservableProperty]
-    public partial string CommitTitle { get; set; } = "";
+    public partial string CommitMessageText { get; set; } = "";
+
+    /// <summary>Full sha of the selected commit, or <c>older..newer</c> for a range.</summary>
+    [ObservableProperty]
+    public partial string CommitShaText { get; set; } = "";
 
     [ObservableProperty]
-    public partial string CommitMeta { get; set; } = "";
+    public partial string CommitAuthorText { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string CommitDateText { get; set; } = "";
+
+    /// <summary>Author and date apply to one commit. A range only has the message and the two hashes.</summary>
+    [ObservableProperty]
+    public partial bool ShowCommitIdentity { get; set; }
+
+    [ObservableProperty]
+    public partial bool ShowCommitStats { get; set; }
+
+    [ObservableProperty]
+    public partial string CommitStatsFiles { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string CommitStatsRemoved { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string CommitStatsAdded { get; set; } = "";
 
     [ObservableProperty]
     public partial bool NothingStaged { get; set; } = true;
@@ -1915,8 +1939,7 @@ public partial class RepositoryViewModel : ViewModelBase
         {
             ShowingWorkingCopy = true;
             ShowingCommit = false;
-            CommitTitle = "";
-            CommitMeta = "";
+            ClearCommitFields();
             _shownSha = null;
             if (_showingCommitFiles)
                 RestoreWorkingFiles();
@@ -1926,13 +1949,20 @@ public partial class RepositoryViewModel : ViewModelBase
 
         ShowingWorkingCopy = false;
         ShowingCommit = true;
-        CommitTitle = row.Subject;
         var sha = row.Sha ?? "";
-        var shortSha = sha.Length <= 7 ? sha : sha[..7];
-        CommitMeta = string.Join("  ·  ", new[] { row.Author, row.When, shortSha }.Where(part => part.Length > 0));
-        if (_session is null)
-            return;
-        if (_shownSha == sha && _showingCommitFiles)
+        var same = _shownSha == sha && _showingCommitFiles;
+        CommitShaText = sha;
+        CommitAuthorText = AuthorLine(row.Commit);
+        CommitDateText = row.Commit is null ? "" : CommitStamp(row.Commit.AuthorUnixSeconds);
+        ShowCommitIdentity = CommitAuthorText.Length > 0 || CommitDateText.Length > 0;
+        // The body arrives after the subject. Selecting this commit again must not drop it.
+        if (!same)
+        {
+            CommitMessageText = row.Subject;
+            ShowCommitStats = false;
+        }
+
+        if (_session is null || sha.Length == 0 || same)
             return;
         ReplaceDetails();
         var token = _details!.Token;
@@ -1948,6 +1978,17 @@ public partial class RepositoryViewModel : ViewModelBase
             ShowCommitFiles(files, tracked);
             _shownSha = sha;
             _diffParent = parent;
+            await ApplyCommitStatsAsync(parent, sha, token);
+            try
+            {
+                var message = await _session.CommitMessageAsync(sha, token);
+                if (!token.IsCancellationRequested && message.Length > 0)
+                    CommitMessageText = message;
+            }
+            catch (GitCommandFailedException)
+            {
+            }
+
             await LoadDiffAsync();
         }
         catch (OperationCanceledException)
@@ -2738,6 +2779,62 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private static string CommitDate(long unixSeconds) =>
         DateTimeOffset.FromUnixTimeSeconds(unixSeconds).LocalDateTime.ToString("d MMM yyyy", CultureInfo.CurrentCulture);
+
+    private static string CommitStamp(long unixSeconds) =>
+        DateTimeOffset.FromUnixTimeSeconds(unixSeconds).LocalDateTime.ToString("d MMM yyyy HH:mm", CultureInfo.CurrentCulture);
+
+    private static string AuthorLine(CommitRecord? commit)
+    {
+        if (commit is null)
+            return "";
+        if (commit.AuthorName.Length == 0)
+            return commit.AuthorEmail;
+        if (commit.AuthorEmail.Length == 0)
+            return commit.AuthorName;
+        return commit.AuthorName + " <" + commit.AuthorEmail + ">";
+    }
+
+    private void ShowCommitFields(string message, string sha, string author, string date)
+    {
+        CommitMessageText = message;
+        CommitShaText = sha;
+        CommitAuthorText = author;
+        CommitDateText = date;
+        ShowCommitIdentity = author.Length > 0 || date.Length > 0;
+    }
+
+    private void ClearCommitFields()
+    {
+        CommitMessageText = "";
+        CommitShaText = "";
+        CommitAuthorText = "";
+        CommitDateText = "";
+        ShowCommitIdentity = false;
+        ShowCommitStats = false;
+        CommitStatsFiles = "";
+        CommitStatsRemoved = "";
+        CommitStatsAdded = "";
+    }
+
+    private async Task ApplyCommitStatsAsync(string? older, string newer, CancellationToken token)
+    {
+        if (_session is null)
+            return;
+        try
+        {
+            var stat = await _session.DiffStatAsync(older, newer, token);
+            if (!token.IsCancellationRequested)
+            {
+                CommitStatsFiles = DiffStatText.Files(stat.Files);
+                CommitStatsRemoved = DiffStatText.Removed(stat.Removed);
+                CommitStatsAdded = DiffStatText.Added(stat.Added);
+                ShowCommitStats = true;
+            }
+        }
+        catch (GitCommandFailedException)
+        {
+        }
+    }
 
     private static string WorkingDetail(SessionState state)
     {
