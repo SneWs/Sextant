@@ -10,9 +10,14 @@
   A Git client for very large repositories. 
   Fast where it counts, and a little help when the task gets fiddly.
 </p>
+<p>
 It talks only to the `git` already on your machine, so your config, hooks, attributes, and credential helper stay the ones you set up in the terminal.
+</p>
 
-The guides are in the [documentation](docs/README.md): installing and updating, settings (including formatted JSON diffs), and day-to-day use.
+The guides are in the [documentation](docs/README.md):
+- [Getting started](docs/getting-started.md) covers download, install, and update on each platform.
+- [Configuration](docs/configuration.md) covers settings, including formatted JSON diffs with `jq`.
+- [Working with Sextant](docs/working-with-sextant.md) covers tabs, history, commits, diffs, and sync.
 
 ## Built with large git repos in mind
 
