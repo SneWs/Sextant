@@ -134,10 +134,19 @@
                 </Button>
             </Grid>
             <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding HasHistoryFilter}">
-                <Button x:Name="HistoryBackButton" Content="Back" Command="{Binding ShowAllCommitsCommand}"
+                <Button x:Name="HistoryCloseButton" Command="{Binding ShowAllCommitsCommand}"
                         IsVisible="{Binding HasHistoryQuery}" IsEnabled="{Binding CanRunCommands}"
-                        Classes="flat" Padding="8,2" MinWidth="0" Margin="0,0,8,0" VerticalAlignment="Center"
-                        ToolTip.Tip="Show the commit graph"/>
+                        Classes="accent" Width="28" Height="28" Padding="0" MinWidth="0" CornerRadius="8"
+                        Margin="0,0,10,0" VerticalAlignment="Center"
+                        AutomationProperties.Name="Close history"
+                        ToolTip.Tip="Show the commit graph">
+                    <Canvas Width="12" Height="12">
+                        <Line StartPoint="1,1" EndPoint="11,11"
+                              Stroke="{DynamicResource CatppuccinOnAccentBrush}" StrokeThickness="2" StrokeLineCap="Round"/>
+                        <Line StartPoint="11,1" EndPoint="1,11"
+                              Stroke="{DynamicResource CatppuccinOnAccentBrush}" StrokeThickness="2" StrokeLineCap="Round"/>
+                    </Canvas>
+                </Button>
                 <TextBlock Grid.Column="1" Text="{Binding HistoryCaption}" Opacity="0.75" TextWrapping="Wrap" VerticalAlignment="Center"/>
             </Grid>
         </StackPanel>

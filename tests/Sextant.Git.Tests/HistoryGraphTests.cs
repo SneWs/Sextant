@@ -166,9 +166,9 @@ public class HistoryGraphTests
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
 
-            var back = view.FindControl<Button>("HistoryBackButton");
-            Assert.NotNull(back);
-            Assert.False(back.IsEffectivelyVisible);
+            var close = view.FindControl<Button>("HistoryCloseButton");
+            Assert.NotNull(close);
+            Assert.False(close.IsEffectivelyVisible);
             Assert.False(vm.ShowHistorySearch);
 
             await ((IAsyncRelayCommand)file.HistoryCommand).ExecuteAsync(null);
@@ -177,8 +177,12 @@ public class HistoryGraphTests
 
             Assert.True(vm.HasHistoryQuery);
             Assert.Equal("File a.txt", vm.HistoryCaption);
-            Assert.True(back.IsEffectivelyVisible);
-            Assert.Equal(vm.ShowAllCommitsCommand, back.Command);
+            Assert.True(close.IsEffectivelyVisible);
+            Assert.Contains("accent", close.Classes);
+            Assert.True(close.Bounds.Width >= 26, $"close width {close.Bounds.Width}");
+            Assert.True(close.Bounds.Height >= 26, $"close height {close.Bounds.Height}");
+            Assert.Equal(2, close.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Line>().Count());
+            Assert.Equal(vm.ShowAllCommitsCommand, close.Command);
             Assert.Contains(vm.Rows, row => row.Subject == "touch a");
             Assert.Contains(vm.Rows, row => row.Subject == "touch a again");
             Assert.DoesNotContain(vm.Rows, row => row.Subject == "touch b");
@@ -186,7 +190,7 @@ public class HistoryGraphTests
             Assert.NotNull(search);
             Assert.False(search.IsEffectivelyVisible);
 
-            back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            close.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Dispatcher.UIThread.RunJobs();
             await WaitUntilIdle(vm);
             view.UpdateLayout();
@@ -194,12 +198,12 @@ public class HistoryGraphTests
 
             Assert.False(vm.HasHistoryQuery);
             Assert.Equal("", vm.HistoryCaption);
-            Assert.False(back.IsEffectivelyVisible);
+            Assert.False(close.IsEffectivelyVisible);
             Assert.Contains(vm.Rows, row => row.Subject == "touch b");
 
             await ((IAsyncRelayCommand)file.HistoryCommand).ExecuteAsync(null);
             view.UpdateLayout();
-            Assert.True(back.IsEffectivelyVisible);
+            Assert.True(close.IsEffectivelyVisible);
             var graph = view.FindControl<ListBox>("GraphList");
             Assert.NotNull(graph);
             Assert.True(graph.Focus());
@@ -210,7 +214,7 @@ public class HistoryGraphTests
 
             Assert.False(vm.ShowHistorySearch);
             Assert.False(vm.HasHistoryQuery);
-            Assert.False(back.IsEffectivelyVisible);
+            Assert.False(close.IsEffectivelyVisible);
             Assert.Contains(vm.Rows, row => row.Subject == "touch b");
 
             vm.HasHistoryFilter = true;
@@ -218,7 +222,7 @@ public class HistoryGraphTests
             vm.HistoryCaption = "Hiding side";
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
-            Assert.False(back.IsEffectivelyVisible);
+            Assert.False(close.IsEffectivelyVisible);
             Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Hiding side" && text.IsEffectivelyVisible);
 
             window.Close();
