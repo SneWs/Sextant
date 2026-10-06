@@ -342,13 +342,7 @@ public static class DiffFormatTool
             var stderr = ReadTextAsync(process.StandardError.BaseStream);
             try
             {
-                if (input.Length > 0)
-                {
-                    await process.StandardInput.BaseStream.WriteAsync(input, cancellationToken).ConfigureAwait(false);
-                    await process.StandardInput.BaseStream.FlushAsync(cancellationToken).ConfigureAwait(false);
-                }
-
-                process.StandardInput.Close();
+                await WriteInputAsync(process, input, cancellationToken).ConfigureAwait(false);
                 await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
@@ -385,6 +379,35 @@ public static class DiffFormatTool
             }
 
             return new DiffFormatRun(true, output, "", display, 0, started.Elapsed);
+        }
+    }
+
+    private static async Task WriteInputAsync(Process process, byte[] input, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // A $FILE tool often never reads stdin and exits first. That close is a broken pipe, not a failed run.
+            if (input.Length > 0)
+            {
+                await process.StandardInput.BaseStream.WriteAsync(input, cancellationToken).ConfigureAwait(false);
+                await process.StandardInput.BaseStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (IOException)
+        {
+        }
+        finally
+        {
+            try
+            {
+                process.StandardInput.Close();
+            }
+            catch (IOException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
         }
     }
 
