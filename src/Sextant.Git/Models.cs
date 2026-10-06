@@ -204,6 +204,9 @@ public sealed class SessionState
 
     public required string? HistoryLabel { get; init; }
 
+    /// <summary>A file history or a search is limiting the graph. Hidden branches alone leave this false.</summary>
+    public required bool HasHistoryQuery { get; init; }
+
     /// <summary>Search results are a flat list. A branch pin and the normal graph keep their lanes.</summary>
     public required bool FlatHistory { get; init; }
 

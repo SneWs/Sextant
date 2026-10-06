@@ -145,6 +145,7 @@ public class BranchVisibilityTests
         await session.SetHiddenBranchesAsync(["refs/remotes/origin/side"], CancellationToken.None);
         Assert.Equal(["feature-only", "root", "trunk-only"], Subjects(session));
         Assert.Equal("Hiding origin/side", session.Snapshot().HistoryLabel);
+        Assert.False(session.Snapshot().HasHistoryQuery);
 
         await session.SetHiddenBranchesAsync(["refs/heads/feature/grass"], CancellationToken.None);
         Assert.Equal(["root", "side-only", "trunk-only"], Subjects(session));
@@ -159,6 +160,7 @@ public class BranchVisibilityTests
         await session.SetHistoryAsync(HistoryQueryParser.Parse("feature-only"), CancellationToken.None);
         Assert.Empty(session.Snapshot().Commits);
         Assert.Equal("\"feature-only\"  ·  hiding feature/grass", session.Snapshot().HistoryLabel);
+        Assert.True(session.Snapshot().HasHistoryQuery);
 
         await session.SetHistoryAsync(HistoryQueryParser.Parse("branch:feature/grass"), CancellationToken.None);
         Assert.Contains(session.Snapshot().Commits, row => row.Commit.Subject == "feature-only");
@@ -166,6 +168,8 @@ public class BranchVisibilityTests
 
         await session.SetHistoryAsync(null, CancellationToken.None);
         Assert.Equal(["root", "side-only", "trunk-only"], Subjects(session));
+        Assert.False(session.Snapshot().HasHistoryQuery);
+        Assert.Equal("Hiding feature/grass", session.Snapshot().HistoryLabel);
 
         await session.SetHiddenBranchesAsync(
             BranchVisibility.HiddenExcept(session.Snapshot().Refs, trunkRef),

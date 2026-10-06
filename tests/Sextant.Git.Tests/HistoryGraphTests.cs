@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
@@ -137,6 +138,100 @@ public class HistoryGraphTests
             window.Close();
             await vm.DisposeAsync();
         }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task File_history_back_restores_the_graph()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("touch a");
+        repo.WriteFile("b.txt", "other\n");
+        repo.CommitAll("touch b");
+        repo.WriteFile("a.txt", "two\n");
+        repo.CommitAll("touch a again");
+        repo.WriteFile("a.txt", "three\n");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new GraphHost(repo.Git), repo.Directory);
+            await vm.EnsureLoadedAsync();
+            var file = vm.Files.First(row => row.Path == "a.txt");
+            Assert.Contains(vm.Rows, row => row.Subject == "touch b");
+
+            var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 700 };
+            var window = new Window { Content = view, Width = 1100, Height = 700 };
+            window.Show();
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            var back = view.FindControl<Button>("HistoryBackButton");
+            Assert.NotNull(back);
+            Assert.False(back.IsEffectivelyVisible);
+            Assert.False(vm.ShowHistorySearch);
+
+            await ((IAsyncRelayCommand)file.HistoryCommand).ExecuteAsync(null);
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(vm.HasHistoryQuery);
+            Assert.Equal("File a.txt", vm.HistoryCaption);
+            Assert.True(back.IsEffectivelyVisible);
+            Assert.Equal(vm.ShowAllCommitsCommand, back.Command);
+            Assert.Contains(vm.Rows, row => row.Subject == "touch a");
+            Assert.Contains(vm.Rows, row => row.Subject == "touch a again");
+            Assert.DoesNotContain(vm.Rows, row => row.Subject == "touch b");
+            var search = view.FindControl<TextBox>("HistorySearchBox");
+            Assert.NotNull(search);
+            Assert.False(search.IsEffectivelyVisible);
+
+            back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+            await WaitUntilIdle(vm);
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.False(vm.HasHistoryQuery);
+            Assert.Equal("", vm.HistoryCaption);
+            Assert.False(back.IsEffectivelyVisible);
+            Assert.Contains(vm.Rows, row => row.Subject == "touch b");
+
+            await ((IAsyncRelayCommand)file.HistoryCommand).ExecuteAsync(null);
+            view.UpdateLayout();
+            Assert.True(back.IsEffectivelyVisible);
+            var graph = view.FindControl<ListBox>("GraphList");
+            Assert.NotNull(graph);
+            Assert.True(graph.Focus());
+            window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            Dispatcher.UIThread.RunJobs();
+            await WaitUntilIdle(vm);
+            view.UpdateLayout();
+
+            Assert.False(vm.ShowHistorySearch);
+            Assert.False(vm.HasHistoryQuery);
+            Assert.False(back.IsEffectivelyVisible);
+            Assert.Contains(vm.Rows, row => row.Subject == "touch b");
+
+            vm.HasHistoryFilter = true;
+            vm.HasHistoryQuery = false;
+            vm.HistoryCaption = "Hiding side";
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(back.IsEffectivelyVisible);
+            Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Hiding side" && text.IsEffectivelyVisible);
+
+            window.Close();
+            await vm.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
+    private static async Task WaitUntilIdle(RepositoryViewModel vm)
+    {
+        var until = DateTime.UtcNow.AddSeconds(5);
+        while (vm.IsBusy && DateTime.UtcNow < until)
+            await Task.Delay(30);
+        Assert.False(vm.IsBusy);
     }
 
     [Fact]

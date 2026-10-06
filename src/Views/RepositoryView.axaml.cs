@@ -723,6 +723,18 @@ public partial class RepositoryView : UserControl
         }
     }
 
+    private void OnViewKeyDown(object? sender, KeyEventArgs e)
+    {
+        // Tunnel visits this control before the search box. Only the bubble may leave history,
+        // and only when that box did not already take Escape.
+        if (e.Handled || e.Route != RoutingStrategies.Bubble || e.Key != Key.Escape)
+            return;
+        if (DataContext is not RepositoryViewModel vm || !vm.HasHistoryQuery)
+            return;
+        vm.ShowAllCommitsCommand.Execute(null);
+        e.Handled = true;
+    }
+
     private void OnHistoryKeyDown(object? sender, KeyEventArgs e)
     {
         if (DataContext is not RepositoryViewModel vm)

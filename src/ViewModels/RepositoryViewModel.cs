@@ -1040,6 +1040,7 @@ public partial class RepositoryViewModel : ViewModelBase
             };
             HistoryCaption = state.HistoryLabel ?? "";
             HasHistoryFilter = state.HistoryLabel is { Length: > 0 };
+            HasHistoryQuery = state.HasHistoryQuery;
             if (state.Sequencer != SequencerKind.None && !_wasMerge && string.IsNullOrWhiteSpace(CommitMessage) && !string.IsNullOrWhiteSpace(state.MergeMessage))
                 CommitMessage = state.MergeMessage.Trim();
             _wasMerge = state.Sequencer != SequencerKind.None;

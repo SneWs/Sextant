@@ -7,7 +7,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="640"
              x:Class="Sextant.Views.RepositoryView"
-             x:DataType="vm:RepositoryViewModel">
+             x:DataType="vm:RepositoryViewModel"
+             KeyDown="OnViewKeyDown">
     <UserControl.Styles>
         <Style Selector="Button.locationsearch.pressed">
             <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}"/>
@@ -132,7 +133,13 @@
                     </Canvas>
                 </Button>
             </Grid>
-            <TextBlock Text="{Binding HistoryCaption}" IsVisible="{Binding HasHistoryFilter}" Opacity="0.75" TextWrapping="Wrap"/>
+            <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding HasHistoryFilter}">
+                <Button x:Name="HistoryBackButton" Content="Back" Command="{Binding ShowAllCommitsCommand}"
+                        IsVisible="{Binding HasHistoryQuery}" IsEnabled="{Binding CanRunCommands}"
+                        Classes="flat" Padding="8,2" MinWidth="0" Margin="0,0,8,0" VerticalAlignment="Center"
+                        ToolTip.Tip="Show the commit graph"/>
+                <TextBlock Grid.Column="1" Text="{Binding HistoryCaption}" Opacity="0.75" TextWrapping="Wrap" VerticalAlignment="Center"/>
+            </Grid>
         </StackPanel>
 
         <Grid x:Name="Columns" Grid.Row="5" Margin="4,0,4,4">

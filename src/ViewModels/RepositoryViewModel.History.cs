@@ -24,6 +24,10 @@ public partial class RepositoryViewModel
     [ObservableProperty]
     public partial bool HasHistoryFilter { get; set; }
 
+    /// <summary>File history or a search is applied. Hidden branches alone do not set this.</summary>
+    [ObservableProperty]
+    public partial bool HasHistoryQuery { get; set; }
+
     [ObservableProperty]
     public partial bool ShowHistorySearch { get; set; }
 
@@ -219,12 +223,21 @@ public partial class RepositoryViewModel
     {
         ShowHistorySearch = false;
         HistoryText = "";
-        var reload = HasHistoryFilter && _session is not null;
+        if (!HasHistoryQuery || _session is null)
+            return Task.CompletedTask;
+        HasHistoryQuery = false;
         HasHistoryFilter = false;
         HistoryCaption = "";
-        if (!reload)
+        return RunAsync("Loading history…", ct => _session.SetHistoryAsync(null, ct));
+    }
+
+    /// <summary>Leaves file history or a search. Hidden branches stay hidden.</summary>
+    [RelayCommand]
+    private Task ShowAllCommits()
+    {
+        if (_session is null || !HasHistoryQuery)
             return Task.CompletedTask;
-        return RunAsync("Loading history…", ct => _session!.SetHistoryAsync(null, ct));
+        return RunAsync("Loading history…", ct => _session.SetHistoryAsync(null, ct));
     }
 
     [RelayCommand]

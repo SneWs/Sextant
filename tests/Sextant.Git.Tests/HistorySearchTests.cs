@@ -55,6 +55,13 @@ public class HistorySearchTests
         Assert.Contains(state.Commits, row => row.Commit.Subject == "touch a");
         Assert.Contains(state.Commits, row => row.Commit.Subject == "touch a again");
         Assert.Equal("File a.txt", state.HistoryLabel);
+        Assert.True(state.HasHistoryQuery);
+
+        await session.SetHistoryAsync(null, CancellationToken.None);
+        var cleared = session.Snapshot();
+        Assert.False(cleared.HasHistoryQuery);
+        Assert.Null(cleared.HistoryLabel);
+        Assert.Equal(3, cleared.Commits.Count);
     }
 
     [Fact]
