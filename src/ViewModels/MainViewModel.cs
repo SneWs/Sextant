@@ -126,11 +126,16 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     {
         if (!Tabs.Contains(tab))
             return;
+        var switching = ActiveTab != tab;
         foreach (var other in Tabs)
             other.IsActive = other == tab;
         ActiveTab = tab;
         TitleText = $"Sextant — {tab.Title}";
         _ = tab.EnsureLoadedAsync();
+        // The first selection loads the repository. A later switch refreshes it
+        // the same way focusing the window does, so commits and files stay current.
+        if (switching && tab.IsReady)
+            _ = tab.RefreshFromFocusAsync();
         Save();
     }
 
