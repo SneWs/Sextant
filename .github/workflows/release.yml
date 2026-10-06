@@ -1,7 +1,8 @@
-# Publishes a GitHub release when a tag named like v0.1.1 is pushed.
+# Publishes a GitHub release when a tag named like v0.1.1 or v0.1.3-beta is pushed.
 # The Windows and macOS builds stay in dotnet-desktop.yml. This workflow
-# calls that file, then attaches Sextant-osx-arm64.tar and Sextant-win-x64.zip.
-# Branch pushes and pull requests do not run this workflow.
+# passes that tag as the version. The leading v only selects the workflow;
+# the build imprints the rest. It then attaches Sextant-osx-arm64.tar and
+# Sextant-win-x64.zip. Branch pushes and pull requests do not run this workflow.
 
 name: Release
 
@@ -16,6 +17,8 @@ permissions:
 jobs:
   build:
     uses: ./.github/workflows/dotnet-desktop.yml
+    with:
+      version: ${{ github.ref_name }}
     secrets: inherit
 
   publish:

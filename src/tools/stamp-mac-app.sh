@@ -24,6 +24,11 @@ stamp_contents() {
   local contents="$1"
   mkdir -p "$contents/Resources" "$contents/MacOS"
   cp "$plist" "$contents/Info.plist"
+  # The leading v on a tag only selects the workflow. SEXTANT_VERSION is already without it.
+  if [[ -n "${SEXTANT_VERSION:-}" ]]; then
+    plutil -replace CFBundleShortVersionString -string "$SEXTANT_VERSION" "$contents/Info.plist"
+    plutil -replace CFBundleVersion -string "$SEXTANT_VERSION" "$contents/Info.plist"
+  fi
   cp "$icns" "$contents/Resources/sextant.icns"
   if [[ -f "$contents/MacOS/Sextant" ]]; then
     chmod +x "$contents/MacOS/Sextant"

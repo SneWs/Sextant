@@ -68,6 +68,8 @@ On 2026-10-06 Settings → File types names an extension, a transform command, a
 
 On 2026-10-06 Help → Get help opens https://github.com/SneWs/Sextant/blob/master/docs/README.md in the browser. It sits above About Sextant. The desktop window was not launched.
 
+On 2026-10-06 a tag such as v0.1.3-beta is the build version. The leading v only selects the release workflow. The published app imprints 0.1.3-beta, and About shows that on its own line. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

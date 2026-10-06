@@ -20,8 +20,23 @@ public static class AppInfo
             if (string.IsNullOrWhiteSpace(info))
                 return "1.0.0";
 
-            var plus = info.IndexOf('+', StringComparison.Ordinal);
-            return plus >= 0 ? info[..plus] : info;
+            return DisplayVersion(info);
         }
+    }
+
+    /// <summary>
+    /// The version shown in About. A leading <c>v</c> is only the workflow tag prefix and is not part of the version.
+    /// A <c>+</c> source revision is not shown.
+    /// </summary>
+    internal static string DisplayVersion(string informational)
+    {
+        var plus = informational.IndexOf('+', StringComparison.Ordinal);
+        if (plus >= 0)
+            informational = informational[..plus];
+        if (informational.Length > 1
+            && (informational[0] == 'v' || informational[0] == 'V')
+            && char.IsDigit(informational[1]))
+            informational = informational[1..];
+        return informational;
     }
 }

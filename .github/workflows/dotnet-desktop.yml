@@ -50,11 +50,13 @@
 # When APPLE_CERTIFICATE_BASE64 is empty, build-macos keeps the ad-hoc
 # signature. When it is set, the other five are required.
 #
-# Tag releases live in release.yml. That workflow calls this one, so the
-# jobs below stay the only build definition. This file also accepts
-# workflow_call for that reason. A push or a pull request to master runs
-# only when src/ or tests/ changes. workflow_dispatch still starts a build
-# by hand, and a tag release is not limited to those folders.
+# Tag releases live in release.yml. That workflow calls this one and passes
+# the tag, such as v0.1.3-beta. The leading v only selects this workflow.
+# Every imprint uses the rest: 0.1.3-beta. A branch build uses the nearest
+# v* tag the same way. This file also accepts workflow_call for that reason.
+# A push or a pull request to master runs only when src/ or tests/ changes.
+# workflow_dispatch still starts a build by hand, and a tag release is not
+# limited to those folders.
 
 name: Build all Platforms
 
@@ -71,6 +73,12 @@ on:
       - 'tests/**'
   workflow_dispatch:
   workflow_call:
+    inputs:
+      version:
+        description: Release tag, such as v0.1.3-beta. The leading v is removed before it is imprinted.
+        required: false
+        type: string
+        default: ""
 
 permissions:
   actions: write
@@ -90,6 +98,15 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Resolve the version from the tag
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+      run: bash src/tools/resolve-version.sh
 
     - name: Install .NET
       uses: actions/setup-dotnet@v4
@@ -100,7 +117,7 @@ jobs:
       run: dotnet test $env:Solution_Name --configuration Release --verbosity normal
 
     - name: Publish the application
-      run: dotnet publish $env:Project_Path --configuration Release --runtime $env:Runtime --self-contained true --output $env:Publish_Directory
+      run: dotnet publish $env:Project_Path --configuration Release --runtime $env:Runtime --self-contained true --output $env:Publish_Directory "-p:Version=$env:SEXTANT_VERSION" "-p:InformationalVersion=$env:SEXTANT_VERSION" "-p:IncludeSourceRevisionInInformationalVersion=false"
 
     - name: Sign the application
       shell: pwsh
@@ -158,6 +175,14 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Resolve the version from the tag
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+      run: bash src/tools/resolve-version.sh
 
     - name: Install .NET
       uses: actions/setup-dotnet@v4
@@ -168,7 +193,7 @@ jobs:
       run: dotnet test "$Solution_Name" --configuration Release --verbosity normal
 
     - name: Publish the application
-      run: dotnet publish "$Project_Path" --configuration Release --runtime "$Runtime" --self-contained true --output "$Publish_Directory"
+      run: dotnet publish "$Project_Path" --configuration Release --runtime "$Runtime" --self-contained true --output "$Publish_Directory" -p:Version="$SEXTANT_VERSION" -p:InformationalVersion="$SEXTANT_VERSION" -p:IncludeSourceRevisionInInformationalVersion=false
 
     - name: Sign and notarize the application
       env:

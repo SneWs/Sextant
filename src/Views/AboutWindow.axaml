@@ -13,7 +13,7 @@
                    RenderOptions.BitmapInterpolationMode="HighQuality"
                    Source="avares://Sextant/Assets/sextant.png"/>
             <TextBlock Text="Sextant" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center"/>
-            <TextBlock x:Name="VersionText" HorizontalAlignment="Center" Opacity="0.75"/>
+            <TextBlock x:Name="VersionText" HorizontalAlignment="Center" Opacity="0.75" TextAlignment="Center"/>
             <TextBlock Text="A Git client for very large repositories."
                        TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,0"/>
             <TextBlock x:Name="CopyrightText" TextWrapping="Wrap" TextAlignment="Center" Opacity="0.75"/>
