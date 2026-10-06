@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.Documents;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using Avalonia.Styling;
 using Sextant;
 
@@ -15,14 +16,14 @@ public class HighlightedText : CopyableText
         AvaloniaProperty.Register<HighlightedText, string?>(nameof(Language));
 
     // Catppuccin Mocha on a dark diff, Latte on a light one: mauve, green, overlay, peach.
-    private static readonly IBrush DarkKeyword = Freeze(Color.Parse("#CBA6F7"));
-    private static readonly IBrush LightKeyword = Freeze(Color.Parse("#8839EF"));
-    private static readonly IBrush DarkString = Freeze(Color.Parse("#A6E3A1"));
-    private static readonly IBrush LightString = Freeze(Color.Parse("#40A02B"));
-    private static readonly IBrush DarkComment = Freeze(Color.Parse("#9399B2"));
-    private static readonly IBrush LightComment = Freeze(Color.Parse("#7C7F93"));
-    private static readonly IBrush DarkNumber = Freeze(Color.Parse("#FAB387"));
-    private static readonly IBrush LightNumber = Freeze(Color.Parse("#FE640B"));
+    private static readonly IBrush DarkKeyword = new ImmutableSolidColorBrush(Color.Parse("#CBA6F7"));
+    private static readonly IBrush LightKeyword = new ImmutableSolidColorBrush(Color.Parse("#8839EF"));
+    private static readonly IBrush DarkString = new ImmutableSolidColorBrush(Color.Parse("#A6E3A1"));
+    private static readonly IBrush LightString = new ImmutableSolidColorBrush(Color.Parse("#40A02B"));
+    private static readonly IBrush DarkComment = new ImmutableSolidColorBrush(Color.Parse("#9399B2"));
+    private static readonly IBrush LightComment = new ImmutableSolidColorBrush(Color.Parse("#7C7F93"));
+    private static readonly IBrush DarkNumber = new ImmutableSolidColorBrush(Color.Parse("#FAB387"));
+    private static readonly IBrush LightNumber = new ImmutableSolidColorBrush(Color.Parse("#FE640B"));
     private int _paint;
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -119,10 +120,4 @@ public class HighlightedText : CopyableText
         SyntaxKind.Number => dark ? DarkNumber : LightNumber,
         _ => null,
     };
-
-    private static SolidColorBrush Freeze(Color color)
-    {
-        var brush = new SolidColorBrush(color);
-        return brush;
-    }
 }

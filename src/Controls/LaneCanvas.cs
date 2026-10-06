@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using Sextant.Git;
 
 namespace Sextant.Controls;
@@ -8,16 +9,30 @@ namespace Sextant.Controls;
 public sealed class LaneCanvas : Control
 {
     private const double Pitch = 10;
-    private static readonly IBrush[] Palette =
+    // Immutable brushes have no dispatcher. A SolidColorBrush is owned by the thread that created it,
+    // and a later headless session renders this canvas on a different thread.
+    private static readonly ImmutableSolidColorBrush[] Palette =
     [
-        Brush("#4C78A8"),
-        Brush("#F58518"),
-        Brush("#54A24B"),
-        Brush("#E45756"),
-        Brush("#72B7B2"),
-        Brush("#B279A2"),
-        Brush("#EECA3B"),
-        Brush("#FF9DA6"),
+        new(Color.Parse("#4C78A8")),
+        new(Color.Parse("#F58518")),
+        new(Color.Parse("#54A24B")),
+        new(Color.Parse("#E45756")),
+        new(Color.Parse("#72B7B2")),
+        new(Color.Parse("#B279A2")),
+        new(Color.Parse("#EECA3B")),
+        new(Color.Parse("#FF9DA6")),
+    ];
+
+    private static readonly ImmutablePen[] Pens =
+    [
+        new(Palette[0], 1.4),
+        new(Palette[1], 1.4),
+        new(Palette[2], 1.4),
+        new(Palette[3], 1.4),
+        new(Palette[4], 1.4),
+        new(Palette[5], 1.4),
+        new(Palette[6], 1.4),
+        new(Palette[7], 1.4),
     ];
 
     public static readonly StyledProperty<LaneGeometry?> GeometryProperty =
@@ -60,9 +75,9 @@ public sealed class LaneCanvas : Control
 
     private static double X(int lane) => 6 + (lane * Pitch);
 
-    private static IPen Pen(int lane) => new Pen(Fill(lane), 1.4);
+    private static int Index(int lane) => Math.Abs(lane) % Palette.Length;
 
-    private static IBrush Fill(int lane) => Palette[Math.Abs(lane) % Palette.Length];
+    private static IPen Pen(int lane) => Pens[Index(lane)];
 
-    private static SolidColorBrush Brush(string hex) => new(Color.Parse(hex));
+    private static IBrush Fill(int lane) => Palette[Index(lane)];
 }

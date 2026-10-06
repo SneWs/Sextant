@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Styling;
 using Avalonia.Data;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using AvaloniaEdit;
 using AvaloniaEdit.Document;
 using AvaloniaEdit.Rendering;
@@ -520,8 +521,8 @@ public sealed class MergeEditor : Grid
 
     private sealed class RangeBackground : IBackgroundRenderer
     {
-        private static readonly IBrush CurrentBrush = new SolidColorBrush(Color.FromArgb(64, 224, 161, 0));
-        private static readonly IBrush OtherBrush = new SolidColorBrush(Color.FromArgb(28, 224, 161, 0));
+        private static readonly IBrush CurrentBrush = new ImmutableSolidColorBrush(Color.FromArgb(64, 224, 161, 0));
+        private static readonly IBrush OtherBrush = new ImmutableSolidColorBrush(Color.FromArgb(28, 224, 161, 0));
         private readonly IReadOnlyList<Mark> _marks;
 
         public RangeBackground(IReadOnlyList<Mark> marks) => _marks = marks;

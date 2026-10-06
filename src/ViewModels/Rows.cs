@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -18,9 +19,9 @@ public static class UiCommands
 
 public static class DiffColors
 {
-    public static IBrush Added { get; } = new SolidColorBrush(Color.FromArgb(48, 61, 184, 107));
+    public static IBrush Added { get; } = new ImmutableSolidColorBrush(Color.FromArgb(48, 61, 184, 107));
 
-    public static IBrush Removed { get; } = new SolidColorBrush(Color.FromArgb(48, 220, 70, 70));
+    public static IBrush Removed { get; } = new ImmutableSolidColorBrush(Color.FromArgb(48, 220, 70, 70));
 
     public static IBrush Clear { get; } = Brushes.Transparent;
 }
