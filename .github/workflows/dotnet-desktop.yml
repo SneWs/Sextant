@@ -52,15 +52,23 @@
 #
 # Tag releases live in release.yml. That workflow calls this one, so the
 # jobs below stay the only build definition. This file also accepts
-# workflow_call for that reason.
+# workflow_call for that reason. A push or a pull request to master runs
+# only when src/ or tests/ changes. workflow_dispatch still starts a build
+# by hand, and a tag release is not limited to those folders.
 
 name: Build all Platforms
 
 on:
   push:
     branches: [master]
+    paths:
+      - 'src/**'
+      - 'tests/**'
   pull_request:
     branches: [master]
+    paths:
+      - 'src/**'
+      - 'tests/**'
   workflow_dispatch:
   workflow_call:
 

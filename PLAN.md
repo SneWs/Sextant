@@ -52,6 +52,8 @@ On 2026-10-05 the working-copy file list puts staged files above unstaged files.
 
 On 2026-10-05 a tag is a label on the right of its commit in the history. The label is a rounded bar with an amber fill and a border. The subject and the author line stay on the left, and the tag name is no longer repeated in that line. A lightweight tag and an annotated tag both use the commit the tag points at. A click on that tag in Locations selects the commit. `Tag_labels_sit_on_the_right_and_a_location_click_selects_that_commit` passed. A headless window confirmed the label sits to the right of the subject and that clicking the tag selects its commit. The desktop window was not launched.
 
+On 2026-10-06 a push or a pull request to master runs `.github/workflows/dotnet-desktop.yml` only when `src/` or `tests/` changes. A manual run still starts that build, and a `v*` tag still runs `release.yml`, which calls the same jobs. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
