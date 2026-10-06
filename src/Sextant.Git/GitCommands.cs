@@ -306,6 +306,20 @@ public static class GitCommands
         return arguments;
     }
 
+    public static IReadOnlyList<string> DiffNoIndex(string toplevel, string before, string after, bool ignoreWhitespace, bool forceText = false)
+    {
+        var arguments = new List<string> { "-C", toplevel, "--no-optional-locks", "diff", "--no-textconv", "--no-index" };
+        if (forceText)
+            arguments.Add("--text");
+        if (ignoreWhitespace)
+            arguments.Add("-w");
+        arguments.Add("--");
+        arguments.Add(before);
+        arguments.Add(after);
+        KeepLfsPointers(arguments);
+        return arguments;
+    }
+
     public static IReadOnlyList<string> DiffStaged(string toplevel, string path, bool ignoreWhitespace = false) =>
         DiffWorktree(toplevel, staged: true, ignoreWhitespace, path);
 

@@ -255,6 +255,13 @@ public partial class RepositoryViewModel
             _ = ReloadDiffViewAsync();
     }
 
+    public void ApplyDiffFormats(IReadOnlyList<DiffFormatRule> rules)
+    {
+        _session?.UseDiffFormats(rules);
+        if (_session is not null)
+            _ = ReloadDiffViewAsync();
+    }
+
     [RelayCommand]
     private Task ToggleWhitespace()
     {

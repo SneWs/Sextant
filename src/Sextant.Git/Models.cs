@@ -102,7 +102,14 @@ public sealed record DiffDocument(
     public static DiffDocument Binary { get; } = new(true, false, false, false, false, [], "");
 
     public IReadOnlyList<LfsFileNote> LfsFiles { get; init; } = [];
+
+    /// <summary>Paths whose diff is the tool output, not the file git has. Those hunks must not be staged.</summary>
+    public IReadOnlyList<string> FormattedPaths { get; init; } = [];
+
+    public IReadOnlyList<DiffFormatNote> FormatNotes { get; init; } = [];
 }
+
+public sealed record DiffFormatNote(string Path, string Message);
 
 public enum SequencerKind
 {

@@ -2,8 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Sextant.Views.SettingsWindow"
         Title="Settings"
-        Width="720" Height="520"
-        MinWidth="640" MinHeight="420"
+        Width="840" Height="640"
+        MinWidth="720" MinHeight="480"
         CanResize="True"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
@@ -13,6 +13,7 @@
             <ListBox x:Name="Sections" SelectedIndex="0" SelectionChanged="OnSection">
                 <ListBoxItem>Appearance</ListBoxItem>
                 <ListBoxItem>Diff</ListBoxItem>
+                <ListBoxItem>File types</ListBoxItem>
                 <ListBoxItem>Git</ListBoxItem>
                 <ListBoxItem>Merging</ListBoxItem>
             </ListBox>
@@ -36,6 +37,19 @@
                     <CheckBox x:Name="IgnoreWhitespace" Content="Ignore whitespace"/>
                     <TextBlock TextWrapping="Wrap" Opacity="0.75"
                                Text="Inline or side by side applies to every repository. Ignore whitespace passes -w for that diff only."/>
+                </StackPanel>
+
+                <StackPanel x:Name="FormatsPage" Spacing="8" IsVisible="False">
+                    <TextBlock Text="File types" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock TextWrapping="Wrap" Opacity="0.75"
+                               Text="A matching extension is converted before the diff is shown. The transform command reads the file on stdin and writes the text to compare to stdout. $FILE is a temporary copy when the tool needs a path. The command is not a shell pipeline. Saving a merge runs the restore command, and its stdout is written back. Example: .json, transform jq ., restore jq -c ."/>
+                    <Grid ColumnDefinitions="96,*,*,Auto" ColumnSpacing="8">
+                        <TextBlock Text="Extension" Opacity="0.75"/>
+                        <TextBlock Grid.Column="1" Text="Transform" Opacity="0.75"/>
+                        <TextBlock Grid.Column="2" Text="Restore" Opacity="0.75"/>
+                    </Grid>
+                    <StackPanel x:Name="FormatRows" Spacing="8"/>
+                    <Button Content="Add file type" HorizontalAlignment="Left" Click="OnAddFormat"/>
                 </StackPanel>
 
                 <StackPanel x:Name="GitPage" Spacing="8" IsVisible="False">

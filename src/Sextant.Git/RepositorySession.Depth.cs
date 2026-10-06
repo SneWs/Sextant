@@ -252,7 +252,9 @@ public sealed partial class RepositorySession
         string? beforeRevision,
         string? afterRevision,
         bool afterIsWorktree,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool ignoreWhitespace = false,
+        bool allowLarge = true)
     {
         if (document.IsTooLarge)
             return document;
@@ -283,7 +285,17 @@ public sealed partial class RepositorySession
             }
         }
 
-        return notes.Count == 0 ? document : document with { LfsFiles = notes };
+        if (notes.Count > 0)
+            document = document with { LfsFiles = notes };
+        return await ApplyFormatsAsync(
+            document,
+            path,
+            beforeRevision,
+            afterRevision,
+            afterIsWorktree,
+            ignoreWhitespace,
+            allowLarge,
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<LfsFileNote?> NoteAsync(

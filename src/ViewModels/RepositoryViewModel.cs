@@ -752,6 +752,7 @@ public partial class RepositoryViewModel : ViewModelBase
             _session = await OpenSessionAsync(RequestedPath);
             if (_session is null || _lifetime.IsCancellationRequested)
                 return;
+            _session.UseDiffFormats(_host.DiffFormats);
             Toplevel = _session.Toplevel;
             Title = _session.DisplayName;
             Apply(_session.Snapshot());
@@ -2216,6 +2217,11 @@ public partial class RepositoryViewModel : ViewModelBase
         ShowingMerge = true;
         _allFilesShown = false;
         _diffReady = true;
+        if (document.Formatted && document.FormatNotice.Length > 0)
+        {
+            HasDiffNotice = true;
+            DiffNotice = document.FormatNotice;
+        }
     }
 
     private void ClearMerge()
@@ -2277,7 +2283,14 @@ public partial class RepositoryViewModel : ViewModelBase
                 _rowSink = section.Body;
                 try
                 {
-                    AppendFileDiff(entry.Document, workingCopy, KindForDiff(entry.Document), path: entry.Path, notes: document.LfsFiles);
+                    NoteFormat(document, entry.Path, banner: false);
+                    AppendFileDiff(
+                        entry.Document,
+                        workingCopy,
+                        KindForDiff(entry.Document),
+                        path: entry.Path,
+                        notes: document.LfsFiles,
+                        formatted: IsFormatted(document, entry.Path));
                 }
                 finally
                 {
@@ -2299,7 +2312,15 @@ public partial class RepositoryViewModel : ViewModelBase
         }
 
         _allFilesShown = false;
-        AppendFileDiff(document, workingCopy, file?.Kind ?? ChangeKind.Modified, notice: true, path: file?.Path, notes: document.LfsFiles);
+        AppendFileDiff(
+            document,
+            workingCopy,
+            file?.Kind ?? ChangeKind.Modified,
+            notice: true,
+            path: file?.Path,
+            notes: document.LfsFiles,
+            formatted: IsFormatted(document, file?.Path));
+        NoteFormat(document, file?.Path, banner: true);
         _diffReady = true;
     }
 
@@ -2309,7 +2330,8 @@ public partial class RepositoryViewModel : ViewModelBase
         ChangeKind kind,
         bool notice = false,
         string? path = null,
-        IReadOnlyList<LfsFileNote>? notes = null)
+        IReadOnlyList<LfsFileNote>? notes = null,
+        bool formatted = false)
     {
         _linePath = path;
         if (document.IsBinary)
@@ -2335,8 +2357,8 @@ public partial class RepositoryViewModel : ViewModelBase
             DiffNotice = "";
         }
 
-        var parts = CanStageParts(workingCopy, kind, document);
-        var patch = document.RawPatch;
+        var parts = !formatted && CanStageParts(workingCopy, kind, document);
+        var patch = formatted ? "" : document.RawPatch;
         var hunkLabel = _viewingStaged ? "Unstage hunk" : "Stage hunk";
         var lineLabel = _viewingStaged ? "Unstage line" : "Stage line";
         for (var index = 0; index < document.Hunks.Count; index++)
@@ -2357,6 +2379,47 @@ public partial class RepositoryViewModel : ViewModelBase
             else
                 AppendInline(hunk, parts, patch, hunkIndex, lineLabel);
         }
+    }
+
+    private void NoteFormat(DiffDocument document, string? path, bool banner)
+    {
+        var message = FormatMessage(document, path);
+        if (message is null)
+            return;
+        if (banner)
+        {
+            HasDiffNotice = true;
+            DiffNotice = message;
+            return;
+        }
+
+        AddRow(new DiffLineRow { Text = message, Background = DiffColors.Clear });
+    }
+
+    private static string? FormatMessage(DiffDocument document, string? path)
+    {
+        foreach (var note in document.FormatNotes)
+        {
+            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(note.Path) || DiffParser.SameFile(note.Path, path))
+                return note.Message;
+        }
+
+        return null;
+    }
+
+    private static bool IsFormatted(DiffDocument document, string? path)
+    {
+        if (document.FormattedPaths.Count == 0)
+            return false;
+        if (string.IsNullOrEmpty(path))
+            return true;
+        foreach (var formatted in document.FormattedPaths)
+        {
+            if (DiffParser.SameFile(formatted, path) || string.Equals(formatted, path, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
     }
 
     private void NoteFile(bool notice, string message)

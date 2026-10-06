@@ -49,6 +49,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     public string? MergeTool => MergeToolCommand.Normalize(_settings.MergeTool);
 
+    public IReadOnlyList<DiffFormatRule> DiffFormats => DiffFormatRules.Normalize(_settings.DiffFormats);
+
     [ObservableProperty]
     public partial bool GitReady { get; set; }
 
@@ -575,7 +577,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _settings.SideBySide,
             _settings.IgnoreWhitespace,
             _settings.Theme,
-            _settings.MergeTool ?? ""));
+            _settings.MergeTool ?? "",
+            DiffFormatRules.Normalize(_settings.DiffFormats)));
         if (edit is null)
             return;
         var path = string.IsNullOrWhiteSpace(edit.GitExecutable) ? null : edit.GitExecutable.Trim();
@@ -586,15 +589,19 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             MergeToolCommand.Normalize(edit.MergeTool),
             MergeToolCommand.Normalize(_settings.MergeTool),
             StringComparison.Ordinal);
+        var formatsChanged = !DiffFormatRules.Same(_settings.DiffFormats, edit.DiffFormats);
         _settings.GitExecutable = path;
         _settings.SideBySide = edit.SideBySide;
         _settings.IgnoreWhitespace = edit.IgnoreWhitespace;
         _settings.Theme = ThemePreference.Normalize(edit.Theme);
         _settings.MergeTool = MergeToolCommand.Normalize(edit.MergeTool);
+        _settings.DiffFormats = DiffFormatRules.Normalize(edit.DiffFormats);
         _store.SaveSettings(_settings);
         AppTheme.Apply(_settings.Theme);
         if (diffChanged)
             ApplyDiffPreferences();
+        if (formatsChanged)
+            ApplyDiffFormats();
         if (mergeChanged)
             ApplyMergePreference();
         if (gitChanged)
@@ -605,6 +612,12 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     {
         foreach (var tab in Tabs)
             tab.ApplyDiffPreferences(_settings.SideBySide, _settings.IgnoreWhitespace);
+    }
+
+    private void ApplyDiffFormats()
+    {
+        foreach (var tab in Tabs)
+            tab.ApplyDiffFormats(DiffFormats);
     }
 
     private void ApplyMergePreference()

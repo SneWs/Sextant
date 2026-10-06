@@ -12,6 +12,11 @@ public sealed record ConflictDocument(bool IsBinary, bool IsTooLarge, bool Synth
     public static ConflictDocument Binary { get; } = new(true, false, false, []);
 
     public static ConflictDocument TooLarge { get; } = new(false, true, false, []);
+
+    /// <summary>The columns are the transform command's text. Saving runs the restore command.</summary>
+    public bool Formatted { get; init; }
+
+    public string FormatNotice { get; init; } = "";
 }
 
 /// <summary>

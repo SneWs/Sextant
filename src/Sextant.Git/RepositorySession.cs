@@ -203,7 +203,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
                 if (untracked && !staged)
                 {
                     var untrackedDiff = await DiffUntrackedAsync(path, allowLarge, ignoreWhitespace, inner).ConfigureAwait(false);
-                    return await AnnotateAsync(untrackedDiff, path, null, null, true, inner).ConfigureAwait(false);
+                    return await AnnotateAsync(untrackedDiff, path, null, null, true, inner, ignoreWhitespace, allowLarge).ConfigureAwait(false);
                 }
 
                 var arguments = staged
@@ -213,7 +213,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
                 Checked(output);
                 var before = staged ? "HEAD" : "";
                 string? after = staged ? "" : null;
-                return await AnnotateAsync(ToDiff(output, allowLarge), path, before, after, !staged, inner).ConfigureAwait(false);
+                return await AnnotateAsync(ToDiff(output, allowLarge), path, before, after, !staged, inner, ignoreWhitespace, allowLarge).ConfigureAwait(false);
             }, ct).ConfigureAwait(false);
             return _diffGate.IsCurrent(token) ? document : null;
         }, cancellationToken);
@@ -232,7 +232,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
                 // change is a new file has an empty diff, and the view falls through to history.
                 if (!staged)
                     document = await AppendUntrackedAsync(document, allowLarge, ignoreWhitespace, inner).ConfigureAwait(false);
-                return await AnnotateAsync(document, null, before, after, !staged, inner).ConfigureAwait(false);
+                return await AnnotateAsync(document, null, before, after, !staged, inner, ignoreWhitespace, allowLarge).ConfigureAwait(false);
             });
     }
 
@@ -252,7 +252,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
                 : GitCommands.DiffRange(_toplevel, firstParent, sha, path, ignoreWhitespace);
             return ExecuteAsync(arguments, null, inner);
         },
-        (document, inner) => AnnotateAsync(document, path, firstParent, sha, false, inner));
+        (document, inner) => AnnotateAsync(document, path, firstParent, sha, false, inner, ignoreWhitespace, allowLarge));
     }
 
     public Task<DiffDocument?> RangeDiffAsync(
@@ -266,7 +266,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
         var token = _diffGate.Next();
         return ReadDiffAsync(token, allowLarge, cancellationToken, inner =>
             ExecuteAsync(GitCommands.DiffRange(_toplevel, older, newer, path, ignoreWhitespace), null, inner),
-            (document, inner) => AnnotateAsync(document, path, older, newer, false, inner));
+            (document, inner) => AnnotateAsync(document, path, older, newer, false, inner, ignoreWhitespace, allowLarge));
     }
 
     public Task<IReadOnlyList<CommitFileChange>?> RangeFilesAsync(string older, string newer, CancellationToken cancellationToken)
@@ -350,14 +350,17 @@ public sealed partial class RepositorySession : IAsyncDisposable
                     throw new RepositoryActionException("Could not read the conflicted file. " + exception.Message);
                 }
 
+                var ours = await ReadStageAsync(2, path, inner).ConfigureAwait(false);
+                var theirs = await ReadStageAsync(3, path, inner).ConfigureAwait(false);
+                var baseBytes = await ReadStageAsync(1, path, inner).ConfigureAwait(false);
+                var format = DiffFormatRules.Match(Formats(), path);
+                if (format is { Transform.Length: > 0 })
+                    return await FormattedConflictAsync(path, worktree, ours, theirs, baseBytes, format, inner).ConfigureAwait(false);
                 if (ContainsNul(worktree))
                     return ConflictDocument.Binary;
                 if (!allowLarge && worktree.Length > HistoryLimits.MaxDiffBytes)
                     return ConflictDocument.TooLarge;
 
-                var ours = await ReadStageAsync(2, path, inner).ConfigureAwait(false);
-                var theirs = await ReadStageAsync(3, path, inner).ConfigureAwait(false);
-                var baseBytes = await ReadStageAsync(1, path, inner).ConfigureAwait(false);
                 if (ContainsNul(ours) || ContainsNul(theirs) || ContainsNul(baseBytes))
                     return ConflictDocument.Binary;
                 if (!allowLarge && (ours.Length > HistoryLimits.MaxDiffBytes || theirs.Length > HistoryLimits.MaxDiffBytes || baseBytes.Length > HistoryLimits.MaxDiffBytes))
@@ -931,7 +934,11 @@ public sealed partial class RepositorySession : IAsyncDisposable
                         var parent = Path.GetDirectoryName(full);
                         if (!string.IsNullOrEmpty(parent))
                             Directory.CreateDirectory(parent);
-                        await File.WriteAllTextAsync(full, text, new UTF8Encoding(false), token).ConfigureAwait(false);
+                        var restored = await RestoreAsync(path, text, token).ConfigureAwait(false);
+                        if (restored is null)
+                            await File.WriteAllTextAsync(full, text, new UTF8Encoding(false), token).ConfigureAwait(false);
+                        else
+                            await File.WriteAllBytesAsync(full, restored, token).ConfigureAwait(false);
                     }
                     catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
                     {

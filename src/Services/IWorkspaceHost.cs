@@ -30,7 +30,13 @@ public interface IDialogService
     Task CopyAsync(string text);
 }
 
-public sealed record SettingsDraft(string GitExecutable, bool SideBySide, bool IgnoreWhitespace, string Theme, string MergeTool);
+public sealed record SettingsDraft(
+    string GitExecutable,
+    bool SideBySide,
+    bool IgnoreWhitespace,
+    string Theme,
+    string MergeTool,
+    IReadOnlyList<DiffFormatRule>? DiffFormats = null);
 
 public sealed record CloneRequest(string Url, string Destination);
 
@@ -46,6 +52,9 @@ public interface IWorkspaceHost
 
     /// <summary>Shell command for git mergetool. Null uses the in-app editor unless git has merge.tool.</summary>
     string? MergeTool { get; }
+
+    /// <summary>File type tools. Empty when the host has none.</summary>
+    IReadOnlyList<DiffFormatRule> DiffFormats => [];
 
     bool GitReady { get; }
 

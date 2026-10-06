@@ -169,6 +169,9 @@ public sealed class AppSettings
 
     /// <summary>Command git mergetool runs for a conflict. Empty uses the in-app editor unless git has merge.tool.</summary>
     public string? MergeTool { get; set; }
+
+    /// <summary>Extension tools that convert a file before a diff and restore it when a merge is saved.</summary>
+    public List<DiffFormatRule> DiffFormats { get; set; } = [];
 }
 
 public static class AppPaths
