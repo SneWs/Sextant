@@ -110,12 +110,6 @@ public sealed class DiffTextHost : Grid
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        if (this.FindAncestorOfType<ListBoxItem>() is { } item)
-        {
-            item.Padding = new Thickness(0);
-            item.VerticalContentAlignment = Avalonia.Layout.VerticalAlignment.Stretch;
-        }
-
         ActualThemeVariantChanged += OnTheme;
         if (_editors.Count == 0)
             Rebuild();

@@ -27,6 +27,8 @@ public class CopyListBox : ListBox
 
     public CopyListBox()
     {
+        // The ListBox style key keeps the Fluent template. The class is how app styles find this list.
+        Classes.Add("difflist");
         ContainerPrepared += (_, e) => ApplyContainer(e.Container);
         ContainerIndexChanged += (_, e) => ApplyContainer(e.Container);
     }

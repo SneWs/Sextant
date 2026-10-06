@@ -513,8 +513,13 @@
                                            ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                             <views:CopyListBox.Styles>
                                 <Style Selector="ListBoxItem">
+                                    <Setter Property="Padding" Value="0"/>
                                     <Setter Property="HorizontalAlignment" Value="Stretch"/>
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                                </Style>
+                                <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+                                    <Setter Property="Background" Value="Transparent"/>
                                 </Style>
                             </views:CopyListBox.Styles>
                             <views:CopyListBox.ItemsPanel>
@@ -617,7 +622,7 @@
                                                 <MenuItem Header="Download" Command="{Binding FileMenu.LfsDownloadCommand}" IsVisible="{Binding FileMenu.ShowLfsDownload}"/>
                                             </ContextMenu>
                                         </Border.ContextMenu>
-                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <Grid ColumnDefinitions="16,*,Auto">
                                             <Button Classes="flat" Width="16" Height="16" Padding="0" MinWidth="0"
                                                     Command="{Binding ToggleCommand}" IsVisible="{Binding CanFold}"
                                                     Background="Transparent" VerticalAlignment="Center"

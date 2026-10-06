@@ -145,10 +145,12 @@
             <Setter Property="Cursor" Value="Ibeam"/>
             <Setter Property="FocusAdorner" Value="{x:Null}"/>
         </Style>
-        <Style Selector=":is(views|CopyListBox) ListBoxItem">
+        <!-- CopyListBox uses the ListBox style key, so a CopyListBox type selector never matches. -->
+        <Style Selector="ListBox.difflist ListBoxItem">
             <Setter Property="Padding" Value="0"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
         </Style>
-        <Style Selector=":is(views|CopyListBox) ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Style Selector="ListBox.difflist ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="Transparent"/>
         </Style>
         <Style Selector="TextBox.diff">
