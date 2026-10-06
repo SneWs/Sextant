@@ -58,3 +58,7 @@ dotnet publish
 On macOS the build is a `Sextant.app` bundle.
 
 On Linux a published build includes `sextant.desktop` and the sextant mark beside the executable. The first launch copies that desktop file into `~/.local/share/applications` (or `$XDG_DATA_HOME/applications`) when it is not already there, and sets the executable to the path that was launched.
+
+## License
+
+Sextant is free to use when you build it from source, and when you install a release from GitHub. Marcus Grenängen also sells official pre-built binaries for Windows and macOS. The terms are in [LICENSE](LICENSE).

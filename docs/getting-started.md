@@ -11,6 +11,8 @@ Published builds are on the [releases page](https://github.com/SneWs/Sextant/rel
 
 There is no Intel macOS build and no Windows ARM build. Linux has no download on that page. Build it from source, described at the end of this page.
 
+Installing a release from that page is free, and so is a build you make from source. The terms are in the [license](../LICENSE).
+
 Sextant has no updater. A newer release is a new download. Settings and open tabs stay on disk when you replace the app.
 
 ## macOS

@@ -1,0 +1,78 @@
+Sextant License
+Version 1.0, 6 October 2026
+
+Copyright (c) 2026 Marcus Grenängen. All rights reserved.
+
+This license covers the Sextant material in this repository: the source,
+the documentation, and the project assets. Libraries and other components
+that Sextant includes under their own terms keep those terms. The Assimp
+notices shipped with the app are one example.
+
+1. Free use
+
+You may use Sextant at no charge, including in work you are paid to do,
+when either of these is true:
+
+a. You build it from this source yourself, and that build is run by you
+   or inside the organization that built it.
+
+b. You install a build that Marcus Grenängen publishes on GitHub at
+   https://github.com/SneWs/Sextant, including a Windows or macOS file
+   on the releases page. An installer or package that only downloads
+   that file from GitHub is the same kind of install.
+
+You may be paid for your time to help someone build Sextant from source
+for their own use. The build that results stays with that person or
+organization under section 1.a.
+
+2. Paid binaries
+
+Marcus Grenängen sells official pre-built binaries for Windows and macOS.
+A purchase gives the buyer the right to use that copy. Terms supplied
+with the sale apply to that copy together with this license. Where the
+sale terms and this license disagree about the purchased copy, the sale
+terms control.
+
+3. Source
+
+You may read, copy, and modify the source. You may share the source,
+including your modifications, when this license and the copyright notice
+stay with the copy.
+
+A person who receives only the source uses it under section 1. Sharing
+the source does not include a right to hand on a compiled build.
+
+4. Limits
+
+The permissions above do not allow you to sell Sextant or to charge for
+a copy of it. They do not allow you to distribute a compiled build, an
+installer, an app bundle, or a package that contains one, except by the
+GitHub install in section 1.b.
+
+They do not allow you to present your build as an official Sextant
+download. The name Sextant and the Sextant logo identify the official
+app. They are not licensed for another product.
+
+5. Contributions
+
+When you submit a change to this repository, you license that change
+under this license. You also give Marcus Grenängen a permanent,
+royalty-free right to use, modify, and distribute that change, including
+in binaries he sells and in builds he publishes on GitHub.
+
+6. No warranty
+
+The source and the GitHub builds are provided as is, without warranty of
+any kind, express or implied, including warranties of merchantability,
+fitness for a particular purpose, and non-infringement. You bear the
+risk of using them.
+
+The copyright holder is not liable for any claim, damages, or other
+liability arising from this license or from the use of Sextant, whether
+in contract, tort, or otherwise.
+
+7. Rights that remain
+
+Rights that this license does not grant stay with the copyright holder.
+If you do not agree to this license, do not use, copy, modify, or
+distribute the Sextant material in this repository.

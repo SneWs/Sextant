@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <Product>Sextant</Product>
+    <Authors>Marcus Grenängen</Authors>
+    <Copyright>Copyright © 2026 Marcus Grenängen</Copyright>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>Sextant.Git</RootNamespace>
