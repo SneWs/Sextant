@@ -12,6 +12,8 @@
 </p>
 It talks only to the `git` already on your machine, so your config, hooks, attributes, and credential helper stay the ones you set up in the terminal.
 
+The guides are in the [documentation](docs/README.md): installing and updating, settings (including formatted JSON diffs), and day-to-day use.
+
 ## Built with large git repos in mind
 
 Status, history, and the file list ask git for a slice and paint what is on screen. A slow status can offer two local settings, `feature.manyFiles` and `core.fsmonitor`, written to that repository only after you accept them.

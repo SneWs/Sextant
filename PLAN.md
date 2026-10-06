@@ -54,6 +54,8 @@ On 2026-10-05 a tag is a label on the right of its commit in the history. The la
 
 On 2026-10-06 a push or a pull request to master runs `.github/workflows/dotnet-desktop.yml` only when `src/` or `tests/` changes. A manual run still starts that build, and a `v*` tag still runs `release.yml`, which calls the same jobs. The desktop window was not launched.
 
+On 2026-10-06 the user guides live in `docs/`: getting started, configuration (including a `jq` file-type example), and working with Sextant. The README links to `docs/README.md`. The desktop window was not launched.
+
 On 2026-10-06 a file type tool that uses `$FILE` and does not read stdin is still a success. Closing that pipe is a broken pipe on macOS, not a failed temporary file. The desktop window was not launched.
 
 On 2026-10-06 the commit graph, diff colors, and syntax colors use immutable brushes. A solid color brush is owned by the thread that created it, and a later headless session draws the graph on a different thread. That was the Windows and macOS failure in `Commit_stays_disabled_until_a_file_is_staged`. The headless tests passed. The desktop window was not launched.
