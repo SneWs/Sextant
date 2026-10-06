@@ -101,6 +101,12 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     /// <summary>macOS shows Settings in the application menu, so the window does not repeat it.</summary>
     public bool ShowWindowSettingsMenu => !OperatingSystem.IsMacOS();
 
+    /// <summary>macOS shows About in the application menu, before Settings. Windows and Linux keep it under About.</summary>
+    public bool ShowWindowAboutMenu => !OperatingSystem.IsMacOS();
+
+    /// <summary>macOS keeps Get help under Help. About itself is in the application menu.</summary>
+    public bool ShowMacHelpMenu => OperatingSystem.IsMacOS();
+
     public bool ShowEmpty => ActiveTab is null;
 
     public void Attach(IDialogService dialogs) => Dialogs = dialogs;

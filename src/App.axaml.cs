@@ -36,6 +36,12 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
+    private void OnShowAbout(object? sender, EventArgs e)
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime { MainWindow.DataContext: MainViewModel vm })
+            vm.ShowAboutCommand.Execute(null);
+    }
+
     private void OnOpenSettings(object? sender, EventArgs e)
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime { MainWindow.DataContext: MainViewModel vm })

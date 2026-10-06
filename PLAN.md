@@ -70,6 +70,8 @@ On 2026-10-06 Help → Get help opens https://github.com/SneWs/Sextant/blob/mast
 
 On 2026-10-06 a tag such as v0.1.3-beta is the build version. The leading v only selects the release workflow. The published app imprints 0.1.3-beta, and About shows that on its own line. The desktop window was not launched.
 
+On 2026-10-06 About Sextant is the first item of the macOS application menu, before Settings. Windows and Linux keep it under About, above which Get help still sits. macOS keeps Get help under Help. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
@@ -378,7 +380,7 @@ Other keys: Ctrl/Cmd+O open repository, Ctrl+Tab next tab, Ctrl/Cmd+W close tab,
 
 Dialogs: open folder, clone (URL, parent directory, folder name, progress), init (pick a folder), create branch, confirmation for discard and for config writes.
 
-Open, clone, and init are in the File menu (Ctrl/Cmd+O opens a repository). View holds Toggle branch view. Help holds Get help, which opens the documentation, and About Sextant, which shows the version, the copyright, and the license. The menu is a `NativeMenu`. On macOS the platform shows it in the menu bar at the top of the screen, including Help, and Settings is the first item of the Sextant application menu. The window does not draw a second menu bar there. On Windows, and on a Linux desktop that does not export a global menu, `NativeMenuBar` draws that same menu at the top of the window. An empty window centers the application icon, the name Sextant, and the line "Open a repository to start." Below that, Open, Clone, and Init each sit in their own column, with a short explanation under the button. Open chooses an existing repository folder. Clone copies a remote repository into a new folder and opens it. Init creates a repository in a chosen folder. There is no list of recently opened repositories.
+Open, clone, and init are in the File menu (Ctrl/Cmd+O opens a repository). View holds Toggle branch view. On Windows and Linux, About holds Get help, which opens the documentation, and About Sextant, which shows the version, the copyright, and the license. On macOS, Help holds Get help, and About Sextant is the first item of the Sextant application menu, before Settings. The menu is a `NativeMenu`. On macOS the platform shows the window menu in the menu bar at the top of the screen. The window does not draw a second menu bar there. On Windows, and on a Linux desktop that does not export a global menu, `NativeMenuBar` draws that same menu at the top of the window. An empty window centers the application icon, the name Sextant, and the line "Open a repository to start." Below that, Open, Clone, and Init each sit in their own column, with a short explanation under the button. Open chooses an existing repository folder. Clone copies a remote repository into a new folder and opens it. Init creates a repository in a chosen folder. There is no list of recently opened repositories.
 
 Operation feedback, per tab:
 

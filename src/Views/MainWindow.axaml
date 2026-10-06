@@ -47,8 +47,14 @@
                     <NativeMenuItem Header="_Search" Command="{Binding ToggleHistorySearchCommand}" Gesture="{app:CommandGesture Key=F}"/>
                 </NativeMenu>
             </NativeMenuItem>
-            <!-- Same window menu macOS exports to the screen menu bar. Help stays visible there. -->
-            <NativeMenuItem Header="_Help">
+            <!-- macOS: Get help stays in the screen menu bar. About is in the Sextant application menu. -->
+            <NativeMenuItem Header="_Help" IsVisible="{Binding ShowMacHelpMenu}">
+                <NativeMenu>
+                    <NativeMenuItem Header="_Get help" Command="{Binding GetHelpCommand}"/>
+                </NativeMenu>
+            </NativeMenuItem>
+            <!-- Windows and Linux keep About Sextant under About. -->
+            <NativeMenuItem Header="_About" IsVisible="{Binding ShowWindowAboutMenu}">
                 <NativeMenu>
                     <NativeMenuItem Header="_Get help" Command="{Binding GetHelpCommand}"/>
                     <NativeMenuItem Header="_About Sextant" Command="{Binding ShowAboutCommand}"/>
