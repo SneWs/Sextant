@@ -58,6 +58,13 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public bool ShowSectionFolds => AllFiles && ShowingDiff && _sections.Count > 0;
 
+    private void NoteSectionFolds()
+    {
+        OnPropertyChanged(nameof(ShowSectionFolds));
+        ExpandAllSectionsCommand.NotifyCanExecuteChanged();
+        CollapseAllSectionsCommand.NotifyCanExecuteChanged();
+    }
+
     /// <summary>The all-files diff should move this file's header to the top of the diff.</summary>
     public event Action<string, string?>? JumpToFile;
     private bool _wasMerge;
@@ -2282,7 +2289,7 @@ public partial class RepositoryViewModel : ViewModelBase
             }
 
             _diffReady = true;
-            OnPropertyChanged(nameof(ShowSectionFolds));
+            NoteSectionFolds();
             return;
         }
 
@@ -2569,7 +2576,10 @@ public partial class RepositoryViewModel : ViewModelBase
         || (original is { Length: > 0 } old
             && (DiffParser.SameFile(section.Key, old) || DiffParser.SameFile(section.Header.Path, old)));
 
-    [RelayCommand]
+    // The hotkey stays registered while the command bar is hidden, so this is what keeps the keys from running.
+    private bool CanFoldSections() => ShowSectionFolds;
+
+    [RelayCommand(CanExecute = nameof(CanFoldSections))]
     private void ExpandAllSections()
     {
         if (_sections.Count == 0)
@@ -2586,7 +2596,7 @@ public partial class RepositoryViewModel : ViewModelBase
             RequestBlame(section, showLoading: false);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanFoldSections))]
     private void CollapseAllSections()
     {
         if (_sections.Count == 0)
@@ -2620,7 +2630,7 @@ public partial class RepositoryViewModel : ViewModelBase
         if (_sections.Count == 0)
             return;
         _sections.Clear();
-        OnPropertyChanged(nameof(ShowSectionFolds));
+        NoteSectionFolds();
     }
 
     private void ApplyImageFolds()

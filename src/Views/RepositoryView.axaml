@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Sextant.ViewModels"
              xmlns:views="using:Sextant.Views"
+             xmlns:app="using:Sextant"
              xmlns:controls="using:Sextant.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -478,12 +479,12 @@
                     </Border>
                     <CommandBar DockPanel.Dock="Top" Margin="0,4,0,0" IsVisible="{Binding ShowSectionFolds}"
                                 DefaultLabelPosition="Right" OverflowButtonVisibility="Collapsed">
-                        <CommandBarButton Label="Expand all" Command="{Binding ExpandAllSectionsCommand}">
+                        <CommandBarButton Label="Expand all" Command="{Binding ExpandAllSectionsCommand}" HotKey="{app:CommandGesture Key=E, Shift=True}">
                             <CommandBarButton.Icon>
                                 <PathIcon Width="14" Height="14" Data="M2,3 L8,9 L14,3 L12,3 L8,7 L4,3 Z M2,8 L8,14 L14,8 L12,8 L8,12 L4,8 Z"/>
                             </CommandBarButton.Icon>
                         </CommandBarButton>
-                        <CommandBarButton Label="Collapse all" Command="{Binding CollapseAllSectionsCommand}">
+                        <CommandBarButton Label="Collapse all" Command="{Binding CollapseAllSectionsCommand}" HotKey="{app:CommandGesture Key=C, Shift=True}">
                             <CommandBarButton.Icon>
                                 <PathIcon Width="14" Height="14" Data="M2,7 L8,1 L14,7 L12,7 L8,3 L4,7 Z M2,13 L8,7 L14,13 L12,13 L8,9 L4,13 Z"/>
                             </CommandBarButton.Icon>

@@ -89,21 +89,21 @@ public partial class RepositoryViewModel
     partial void OnAllFilesChanged(bool value)
     {
         OnPropertyChanged(nameof(FilesModeLabel));
-        OnPropertyChanged(nameof(ShowSectionFolds));
+        NoteSectionFolds();
     }
 
     partial void OnShowingBlameChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowingDiff));
         OnPropertyChanged(nameof(DiffTabOn));
-        OnPropertyChanged(nameof(ShowSectionFolds));
+        NoteSectionFolds();
     }
 
     partial void OnShowingMergeChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowingDiff));
         OnPropertyChanged(nameof(ShowingRows));
-        OnPropertyChanged(nameof(ShowSectionFolds));
+        NoteSectionFolds();
     }
 
     partial void OnHasHistoryFilterChanged(bool value) => OnPropertyChanged(nameof(ShowHistoryChrome));
@@ -615,7 +615,7 @@ public partial class RepositoryViewModel
 
         _allFilesShown = AllFiles;
         _diffReady = true;
-        OnPropertyChanged(nameof(ShowSectionFolds));
+        NoteSectionFolds();
         foreach (var section in _sections)
         {
             if (section.Header.Expanded)

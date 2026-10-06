@@ -839,7 +839,7 @@ public partial class RepositoryViewModel
         header.ToggleCommand = new RelayCommand(() => SetExpanded(section, !header.Expanded));
         _sections.Add(section);
         DiffRows.Add(header);
-        OnPropertyChanged(nameof(ShowSectionFolds));
+        NoteSectionFolds();
         return section;
     }
 
