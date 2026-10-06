@@ -14,6 +14,9 @@
         <Style Selector="Button.locationsearch.pressed">
             <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}"/>
         </Style>
+        <Style Selector="SplitButton.commit /template/ Button#PART_PrimaryButton">
+            <Setter Property="IsEnabled" Value="{Binding CanCommit}"/>
+        </Style>
         <Style Selector="Button.viewtab">
             <Setter Property="Theme" Value="{StaticResource FlatButton}"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -354,7 +357,7 @@
                         <DockPanel>
                             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
                                 <TextBlock Text="Nothing staged." IsVisible="{Binding NothingStaged}" VerticalAlignment="Center" Opacity="0.7"/>
-                                <SplitButton Content="Commit" Command="{Binding CommitCommand}" IsEnabled="{Binding CanCommitOrAmend}">
+                                <SplitButton Classes="commit" Content="Commit" Command="{Binding CommitCommand}" IsEnabled="{Binding CanCommitOrAmend}">
                                     <SplitButton.Flyout>
                                         <MenuFlyout>
                                             <MenuItem Header="Commit without hooks" Command="{Binding CommitWithoutHooksCommand}" IsEnabled="{Binding CanCommit}"/>

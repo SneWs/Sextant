@@ -8,7 +8,7 @@ public partial class RepositoryViewModel
     private readonly List<string> _selectedShas = [];
     private bool _amendAllowed;
 
-    public bool CanAmend => !IsBusy && ShowingWorkingCopy && _amendAllowed;
+    public bool CanAmend => !IsBusy && ShowingWorkingCopy && _amendAllowed && !NothingStaged;
 
     public bool CanCommitOrAmend => CanCommit || CanAmend;
 

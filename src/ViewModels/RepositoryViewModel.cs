@@ -309,7 +309,7 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public bool IsReady => _session is not null;
 
-    public bool CanCommit => !IsBusy && ShowingWorkingCopy && !string.IsNullOrWhiteSpace(CommitMessage);
+    public bool CanCommit => !IsBusy && ShowingWorkingCopy && !NothingStaged && !string.IsNullOrWhiteSpace(CommitMessage);
 
     public bool CanStageAll => !IsBusy && ShowingWorkingCopy && _hasUnstagedWork;
 
@@ -419,7 +419,7 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private async Task CommitCoreAsync(bool noVerify)
     {
-        if (_session is null || IsBusy || !ShowingWorkingCopy)
+        if (_session is null || IsBusy || !ShowingWorkingCopy || NothingStaged)
             return;
         if (string.IsNullOrWhiteSpace(CommitMessage))
         {
@@ -609,7 +609,12 @@ public partial class RepositoryViewModel : ViewModelBase
         NotifyBulkStage();
     }
 
-    partial void OnNothingStagedChanged(bool value) => OnPropertyChanged(nameof(CanCommit));
+    partial void OnNothingStagedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanCommit));
+        OnPropertyChanged(nameof(CanAmend));
+        OnPropertyChanged(nameof(CanCommitOrAmend));
+    }
 
     partial void OnIsDirtyChanged(bool value)
     {
