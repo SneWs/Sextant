@@ -101,7 +101,7 @@ public class LfsTests
     [Fact]
     public async Task Clean_lfs_worktree_is_not_a_pointer_diff()
     {
-        if (!GitLfsInstalled())
+        if (!await GitLfsAvailability.IsInstalledAsync())
             return;
         using var repo = new TempRepo();
         repo.Run("config", "core.autocrlf", "false");
@@ -171,7 +171,7 @@ public class LfsTests
     [Fact]
     public async Task Track_with_lfs_stores_a_pointer_and_download_restores_the_file()
     {
-        if (!GitLfsInstalled())
+        if (!await GitLfsAvailability.IsInstalledAsync())
             return;
         using var repo = new TempRepo();
         repo.WriteFile("a.bin", "hello-lfs\n");
@@ -201,7 +201,7 @@ public class LfsTests
     [Fact]
     public async Task Download_of_a_comma_name_restores_that_file_only()
     {
-        if (!GitLfsInstalled())
+        if (!await GitLfsAvailability.IsInstalledAsync())
             return;
         using var repo = new TempRepo();
         repo.WriteFile("a,b.bin", "hello-comma\n");
@@ -220,7 +220,7 @@ public class LfsTests
     [Fact]
     public async Task Remote_checkout_keeps_a_cached_lfs_file_and_leaves_a_missing_one()
     {
-        if (!GitLfsInstalled())
+        if (!await GitLfsAvailability.IsInstalledAsync())
             return;
         using var origin = new TempRepo();
         origin.Run("config", "core.autocrlf", "false");
@@ -376,27 +376,6 @@ public class LfsTests
 
     private static string ReadText(TempRepo repo, string path) =>
         File.ReadAllText(Path.Combine(repo.Directory, path)).Replace("\r\n", "\n", StringComparison.Ordinal);
-
-    private static bool GitLfsInstalled()
-    {
-        try
-        {
-            using var process = Process.Start(new ProcessStartInfo("git", "lfs version")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-            });
-            if (process is null)
-                return false;
-            process.WaitForExit(5000);
-            return process.ExitCode == 0;
-        }
-        catch (Exception exception) when (exception is IOException or System.ComponentModel.Win32Exception)
-        {
-            return false;
-        }
-    }
 
     private static Task<RepositorySession> Open(TempRepo repo) =>
         RepositorySession.OpenAsync(new GitProcessRunner(), repo.Git, repo.Directory, CancellationToken.None);

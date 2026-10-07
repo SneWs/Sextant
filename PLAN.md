@@ -86,6 +86,8 @@ On 2026-10-07 the Files pane's inline lock-error and refresh-guidance messages w
 
 On 2026-10-07 a repository file's menu gained Open in editor and the platform's Open in Finder, File Explorer, or File Manager action, reusing the worktree file-menu helpers. Remove file asks before deleting a file from disk and removing it from the index. A tracked deletion is staged, including a sparse-excluded file without materializing it; an untracked file is removed with git clean. Both operations use literal pathspecs, and the current index is read under the exclusive write scheduler before choosing one. Directories, submodules, paths outside the repository, and files no longer listed are refused. The confirmation warns about losing uncommitted changes. Commit history and LFS locks remain unchanged. The file tree and staged changes reload after removal.
 
+On 2026-10-07 the LFS tests share one cached asynchronous availability probe through the existing GitProcessRunner. The Windows runner had waited five seconds for git lfs version, ignored the timeout result, then read ExitCode before the process exited. The shared probe allows 30 seconds, waits for process completion, and cancels and drains the process through the runner on timeout. A timeout is a clear test failure, not a false report that LFS is missing.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

@@ -231,7 +231,7 @@ public class RepositoryFileTreeTests
     [Fact]
     public async Task File_commands_refresh_locks_and_force_unlock_requires_confirmation()
     {
-        if (!LfsLockTests.GitLfsInstalled())
+        if (!await GitLfsAvailability.IsInstalledAsync())
             return;
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
         await using var server = new LocalLfsLockServer([new LfsLock("other-1", "other.bin", "Teammate")]);
@@ -309,7 +309,7 @@ public class RepositoryFileTreeTests
     [Fact]
     public async Task Repository_with_only_ordinary_git_files_loads_locks_and_can_lock_and_unlock()
     {
-        if (!LfsLockTests.GitLfsInstalled())
+        if (!await GitLfsAvailability.IsInstalledAsync())
             return;
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
         await using var server = new LocalLfsLockServer([new LfsLock("own-1", "locked.txt", "Test")]);
@@ -349,7 +349,7 @@ public class RepositoryFileTreeTests
     [Fact]
     public async Task Lock_loading_message_appears_in_the_branch_bar_not_above_the_file_tree()
     {
-        if (!LfsLockTests.GitLfsInstalled())
+        if (!await GitLfsAvailability.IsInstalledAsync())
             return;
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
         await using var server = new LocalLfsLockServer([]);
@@ -401,7 +401,7 @@ public class RepositoryFileTreeTests
     [Fact]
     public async Task Returning_to_repository_files_or_the_window_refreshes_files_and_remote_locks()
     {
-        if (!LfsLockTests.GitLfsInstalled())
+        if (!await GitLfsAvailability.IsInstalledAsync())
             return;
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
         await using var server = new LocalLfsLockServer([]);

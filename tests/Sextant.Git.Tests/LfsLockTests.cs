@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 using Sextant.Git.Parsing;
 
@@ -166,7 +165,7 @@ public class LfsLockTests
     [Fact]
     public async Task Actual_lfs_lists_all_pages_and_roundtrips_literal_locks_and_normal_unlocks()
     {
-        if (!GitLfsInstalled())
+        if (!await GitLfsAvailability.IsInstalledAsync())
             return;
         LfsLock[] existing =
         [
@@ -208,7 +207,7 @@ public class LfsLockTests
     [Fact]
     public async Task Actual_lfs_refuses_somebody_elses_lock_until_force_is_requested()
     {
-        if (!GitLfsInstalled())
+        if (!await GitLfsAvailability.IsInstalledAsync())
             return;
         var other = new LfsLock("other-1", "other person's 雪.bin", "Other Person");
         await using var server = new LocalLfsLockServer([other]);
@@ -235,7 +234,7 @@ public class LfsLockTests
     [Fact]
     public async Task Actual_lfs_propagates_server_lock_rejection_without_changing_locks()
     {
-        if (!GitLfsInstalled())
+        if (!await GitLfsAvailability.IsInstalledAsync())
             return;
         var existing = new LfsLock("other-1", "already locked.bin", "Other Person");
         await using var server = new LocalLfsLockServer([existing]);
@@ -255,7 +254,7 @@ public class LfsLockTests
     [Fact]
     public async Task Actual_lfs_does_not_treat_a_server_error_as_an_empty_lock_list()
     {
-        if (!GitLfsInstalled())
+        if (!await GitLfsAvailability.IsInstalledAsync())
             return;
         var existing = new LfsLock("other-1", "locked.bin", "Other Person");
         await using var server = new LocalLfsLockServer([existing]);
@@ -312,36 +311,6 @@ public class LfsLockTests
         {
             repo.Dispose();
             throw;
-        }
-    }
-
-    internal static bool GitLfsInstalled()
-    {
-        try
-        {
-            var info = new ProcessStartInfo(GitLocator.FindOnPath() ?? "git")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            info.ArgumentList.Add("lfs");
-            info.ArgumentList.Add("version");
-            using var process = Process.Start(info);
-            if (process is null)
-                return false;
-            if (!process.WaitForExit(5000))
-            {
-                process.Kill(entireProcessTree: true);
-                process.WaitForExit();
-                return false;
-            }
-            return process.ExitCode == 0;
-        }
-        catch (Exception exception) when (exception is IOException or System.ComponentModel.Win32Exception)
-        {
-            return false;
         }
     }
 
