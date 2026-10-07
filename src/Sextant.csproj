@@ -95,17 +95,19 @@
           AfterTargets="Publish"
           Condition="$([MSBuild]::IsOSPlatform('Windows')) and $(RuntimeIdentifier.StartsWith('win'))">
     <PropertyGroup>
+      <!-- A separate dotnet process is required. The Build above restores this project
+           without a RID, and an in-process Restore then reuses that assets file and
+           fails with NETSDK1047. Deleting the assets file makes the new process restore
+           for this RID. Do not redirect BaseIntermediateOutputPath: that stops excluding
+           the project's own obj and compiles generated files twice. -->
       <_AskPassStage>$(MSBuildProjectDirectory)\obj\askpass-publish\$(RuntimeIdentifier)\</_AskPassStage>
+      <_AskPassStageCmd>$(_AskPassStage.Replace('\', '/'))</_AskPassStageCmd>
       <_AskPassDest>$([System.IO.Path]::GetFullPath('$(PublishDir)'))</_AskPassDest>
     </PropertyGroup>
     <RemoveDir Directories="$(_AskPassStage)" />
     <MakeDir Directories="$(_AskPassStage)" />
-    <MSBuild Projects="$(MSBuildThisFileDirectory)Sextant.AskPass\Sextant.AskPass.csproj"
-             Targets="Restore"
-             Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=true" />
-    <MSBuild Projects="$(MSBuildThisFileDirectory)Sextant.AskPass\Sextant.AskPass.csproj"
-             Targets="Publish"
-             Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=true;PublishSingleFile=false;PublishDir=$(_AskPassStage)" />
+    <Delete Files="$(MSBuildThisFileDirectory)Sextant.AskPass\obj\project.assets.json;$(MSBuildThisFileDirectory)Sextant.AskPass\obj\project.nuget.cache" />
+    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)Sextant.AskPass\Sextant.AskPass.csproj&quot; --configuration $(Configuration) --runtime $(RuntimeIdentifier) --self-contained true --output &quot;$(_AskPassStageCmd)&quot; -p:PublishSingleFile=false" />
     <Error Condition="!Exists('$(_AskPassStage)Sextant.AskPass.exe')" Text="Sextant.AskPass.exe was not published." />
     <ItemGroup>
       <_AskPassPublished Include="$(_AskPassStage)Sextant.AskPass.exe" />
