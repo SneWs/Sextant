@@ -47,8 +47,7 @@ public class AskPassTests
     public async Task Helper_prints_the_secret_without_a_carriage_return()
     {
         var exe = HelperExecutable();
-        if (exe is null)
-            return;
+        Assert.NotNull(exe);
 
         await using var server = new AskPassServer();
         server.Prompt = (_, _) => Task.FromResult<string?>("s3cret");
@@ -63,8 +62,7 @@ public class AskPassTests
     public async Task Helper_exits_when_the_prompt_is_cancelled()
     {
         var exe = HelperExecutable();
-        if (exe is null)
-            return;
+        Assert.NotNull(exe);
 
         await using var server = new AskPassServer();
         server.Prompt = (_, _) => Task.FromResult<string?>(null);
@@ -77,9 +75,7 @@ public class AskPassTests
 
     private static string? HelperExecutable()
     {
-        if (!OperatingSystem.IsWindows())
-            return null;
-        var configuration = Directory.GetParent(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar))?.Parent?.Name;
+        var configuration = Directory.GetParent(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar))?.Name;
         if (string.IsNullOrEmpty(configuration))
             return null;
         var exe = Path.GetFullPath(Path.Combine(
