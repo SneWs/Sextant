@@ -29,9 +29,9 @@ public partial class SettingsWindow : Window
             _choices.Add(new ThemeChoice(palette, palette, null));
         PaletteBox.ItemsSource = _choices;
         PaletteBox.SelectedItem = _choices.First(choice => choice.Id == palette);
-        ThemesFolder.Text = "Each theme has a light palette and a dark palette. Tokyo Night uses its day palette for light. Follow system uses the operating system's choice. A .xaml file in "
-            + AppPaths.ThemesDirectory()
-            + " is listed here. It needs a Light palette and a Dark palette.";
+        var themesDirectory = AppPaths.ThemesDirectory();
+        ThemesFolderPath.Text = themesDirectory;
+        ToolTip.SetTip(ThemesFolderLink, DesktopOpen.FolderLabel(DesktopOpen.Current));
         var theme = ThemePreference.Normalize(draft.Theme);
         FollowSystem.IsChecked = false;
         Light.IsChecked = false;
@@ -155,6 +155,20 @@ public partial class SettingsWindow : Window
         if (picked.Count == 0)
             return;
         MergeCommand.Text = ShellQuote(picked[0].Path.LocalPath) + " \"$LOCAL\" \"$MERGED\" \"$REMOTE\"";
+    }
+
+    private void OnOpenThemesFolder(object? sender, RoutedEventArgs e)
+    {
+        var directory = AppPaths.ThemesDirectory();
+        try
+        {
+            Directory.CreateDirectory(directory);
+            DesktopOpen.Start(DesktopOpen.OpenDirectory(DesktopOpen.Current, directory));
+        }
+        catch (Exception)
+        {
+            ErrorText.Text = "That folder could not be opened.";
+        }
     }
 
     private void OnClearMerge(object? sender, RoutedEventArgs e) => MergeCommand.Text = "";

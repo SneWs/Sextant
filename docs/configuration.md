@@ -34,7 +34,7 @@ Sextant stores them in `settings.json`. It does not write these choices into the
 
 The saved values are `palette` (`catppuccin` by default) and `theme` (`system`, `light`, or `dark`).
 
-A `.xaml` or `.axaml` file in the themes folder is listed with those themes. The folder is `themes` inside the configuration folder above. The file name, without the extension, is the saved id. `Solarized.axaml` is `solarized`. A file named `Catppuccin.axaml` replaces the built-in Catppuccin palette. Sextant loads the file with Avalonia's runtime XAML loader. The root must be a `ResourceDictionary` with a `Light` palette and a `Dark` palette. These brushes are optional: `OnAccentBrush`, `CommitAddedPillBrush`, `CommitAddedTextBrush`, `CommitRemovedPillBrush`, and `CommitRemovedTextBrush`.
+A `.xaml` or `.axaml` file in the themes folder is listed with those themes. The folder is `themes` inside the configuration folder above. The path under Color theme opens that folder in the file manager. The file name, without the extension, is the saved id. `Solarized.axaml` is `solarized`. A file named `Catppuccin.axaml` replaces the built-in Catppuccin palette. Sextant loads the file with Avalonia's runtime XAML loader. The root must be a `ResourceDictionary` with a `Light` palette and a `Dark` palette. These brushes are optional: `OnAccentBrush`, `CommitAddedPillBrush`, `CommitAddedTextBrush`, `CommitRemovedPillBrush`, and `CommitRemovedTextBrush`.
 
 ```xml
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
