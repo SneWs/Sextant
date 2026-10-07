@@ -20,7 +20,7 @@ public partial class App : Application
         {
             var store = new WorkspaceStore(AppPaths.ConfigDirectory());
             var settings = store.LoadSettings();
-            RequestedThemeVariant = AppTheme.Variant(settings.Theme);
+            AppTheme.Apply(settings.Theme, settings.Palette);
             var window = new MainWindow
             {
                 DataContext = new MainViewModel(store, store.LoadWorkspace(), settings, new GitProcessRunner()),

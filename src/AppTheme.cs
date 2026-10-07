@@ -1,5 +1,8 @@
 using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Styling;
+using Avalonia.VisualTree;
 using Sextant.Git;
 
 namespace Sextant;
@@ -14,9 +17,30 @@ public static class AppTheme
         _ => ThemeVariant.Default,
     };
 
-    public static void Apply(string? theme)
+    public static void Apply(string? theme, string? palette)
     {
-        if (Application.Current is { } app)
-            app.RequestedThemeVariant = Variant(theme);
+        var choices = ThemeFiles.Choices(AppPaths.ThemesDirectory());
+        var id = PalettePreference.Normalize(palette);
+        var choice = choices.FirstOrDefault(item => item.Id == id) ?? choices[0];
+        ThemeXaml.Install(choice);
+        if (Application.Current is not { } app)
+            return;
+        app.RequestedThemeVariant = Variant(theme);
+        if (app.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+            return;
+        foreach (var window in desktop.Windows)
+            Invalidate(window);
+    }
+
+    static void Invalidate(Visual visual)
+    {
+        visual.InvalidateVisual();
+        foreach (var child in visual.GetVisualChildren())
+            Invalidate(child);
+        if (visual is Window window)
+        {
+            foreach (var owned in window.OwnedWindows)
+                Invalidate(owned);
+        }
     }
 }

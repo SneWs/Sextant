@@ -23,11 +23,12 @@
             <Grid>
                 <StackPanel x:Name="AppearancePage" Spacing="8">
                     <TextBlock Text="Appearance" FontSize="18" FontWeight="SemiBold"/>
+                    <TextBlock Text="Color theme" Opacity="0.75"/>
+                    <ComboBox x:Name="PaletteBox" HorizontalAlignment="Left" MinWidth="240"/>
                     <RadioButton x:Name="FollowSystem" Content="Follow system" GroupName="SextantTheme"/>
                     <RadioButton x:Name="Light" Content="Light" GroupName="SextantTheme"/>
                     <RadioButton x:Name="Dark" Content="Dark" GroupName="SextantTheme"/>
-                    <TextBlock TextWrapping="Wrap" Opacity="0.75"
-                               Text="Light is Catppuccin Latte. Dark is Catppuccin Mocha. Follow system uses the operating system's palette."/>
+                    <TextBlock x:Name="ThemesFolder" TextWrapping="Wrap" Opacity="0.75"/>
                 </StackPanel>
 
                 <StackPanel x:Name="DiffPage" Spacing="8" IsVisible="False">

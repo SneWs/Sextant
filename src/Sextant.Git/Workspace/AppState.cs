@@ -167,6 +167,9 @@ public sealed class AppSettings
     /// <summary><see cref="ThemePreference.System"/>, <see cref="ThemePreference.Light"/>, or <see cref="ThemePreference.Dark"/>.</summary>
     public string Theme { get; set; } = ThemePreference.System;
 
+    /// <summary>Built-in palette id, or the file name of a theme in the themes folder.</summary>
+    public string Palette { get; set; } = PalettePreference.Catppuccin;
+
     /// <summary>Command git mergetool runs for a conflict. Empty uses the in-app editor unless git has merge.tool.</summary>
     public string? MergeTool { get; set; }
 
@@ -189,6 +192,8 @@ public static class AppPaths
             : xdg;
         return Path.Combine(root, "sextant");
     }
+
+    public static string ThemesDirectory() => Path.Combine(ConfigDirectory(), "themes");
 }
 
 public sealed class WorkspaceStore

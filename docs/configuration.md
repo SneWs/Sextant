@@ -14,11 +14,75 @@ Sextant stores them in `settings.json`. It does not write these choices into the
 
 ## Appearance
 
-- **Follow system** uses the operating system's light or dark palette.
-- **Light** is Catppuccin Latte.
-- **Dark** is Catppuccin Mocha.
+**Color theme** picks the palette. Each theme has a light palette and a dark palette.
 
-The saved value is `system`, `light`, or `dark`.
+| Theme | Light | Dark |
+| --- | --- | --- |
+| Catppuccin | Latte | Mocha |
+| Gruvbox | light | dark |
+| Monokai | light | dark |
+| Tokyo Night | day | night |
+| Dracula | light | dark |
+| GitHub | light default | dark default |
+| Black | light (derived) | dark |
+
+- **Follow system** uses the operating system's light or dark choice of that theme.
+- **Light** forces the light palette. For Tokyo Night, that is the day palette.
+- **Dark** forces the dark palette.
+- GitHub is the GitHub Theme light default and dark default. The accent is that theme's blue, not the green primary button.
+- Black is the Black theme. It publishes a dark palette only. The light palette uses the same mint and pink, darkened so they stay readable on white.
+
+The saved values are `palette` (`catppuccin` by default) and `theme` (`system`, `light`, or `dark`).
+
+A `.xaml` or `.axaml` file in the themes folder is listed with those themes. The folder is `themes` inside the configuration folder above. The file name, without the extension, is the saved id. `Solarized.axaml` is `solarized`. A file named `Catppuccin.axaml` replaces the built-in Catppuccin palette. Sextant loads the file with Avalonia's runtime XAML loader. The root must be a `ResourceDictionary` with a `Light` palette and a `Dark` palette. These brushes are optional: `OnAccentBrush`, `CommitAddedPillBrush`, `CommitAddedTextBrush`, `CommitRemovedPillBrush`, and `CommitRemovedTextBrush`.
+
+```xml
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ColorPaletteResources x:Key="Light"
+                           Accent="#076678" ErrorText="#9D0006" RegionColor="#FBF1C7"
+                           BaseHigh="#FF3C3836" BaseMediumHigh="#CC3C3836" BaseMedium="#993C3836"
+                           BaseMediumLow="#663C3836" BaseLow="#333C3836" ChromeAltLow="#FF3C3836"
+                           ChromeLow="#F9F5D7" ChromeMedium="#EBDBB2" ChromeMediumLow="#FBF1C7"
+                           ChromeHigh="#D5C4A1" ChromeGray="#928374"
+                           ChromeDisabledHigh="#D5C4A1" ChromeDisabledLow="#7C6F64"
+                           ChromeWhite="#FFFFFFFF"
+                           AltHigh="#FFFFFFFF" AltLow="#33FFFFFF" AltMedium="#99FFFFFF"
+                           AltMediumHigh="#CCFFFFFF" AltMediumLow="#66FFFFFF"
+                           ChromeBlackHigh="#FF000000" ChromeBlackLow="#33000000"
+                           ChromeBlackMediumLow="#66000000" ChromeBlackMedium="#CC000000"
+                           ListLow="#193C3836" ListMedium="#333C3836"/>
+    <ColorPaletteResources x:Key="Dark"
+                           Accent="#83A598" ErrorText="#FB4934" RegionColor="#282828"
+                           BaseHigh="#FFEBDBB2" BaseMediumHigh="#CCEBDBB2" BaseMedium="#99EBDBB2"
+                           BaseMediumLow="#66EBDBB2" BaseLow="#33EBDBB2" ChromeAltLow="#FFEBDBB2"
+                           ChromeLow="#1D2021" ChromeMedium="#3C3836" ChromeMediumLow="#282828"
+                           ChromeHigh="#504945" ChromeGray="#928374"
+                           ChromeDisabledHigh="#665C54" ChromeDisabledLow="#7C6F64"
+                           ChromeWhite="#FFFFFFFF"
+                           AltHigh="#FF000000" AltLow="#33000000" AltMedium="#99000000"
+                           AltMediumHigh="#CC000000" AltMediumLow="#66000000"
+                           ChromeBlackHigh="#FF000000" ChromeBlackLow="#33000000"
+                           ChromeBlackMediumLow="#66000000" ChromeBlackMedium="#CC000000"
+                           ListLow="#19EBDBB2" ListMedium="#33EBDBB2"/>
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <SolidColorBrush x:Key="OnAccentBrush" Color="#FBF1C7"/>
+            <SolidColorBrush x:Key="CommitAddedPillBrush" Color="#E6EDC5"/>
+            <SolidColorBrush x:Key="CommitAddedTextBrush" Color="#79740E"/>
+            <SolidColorBrush x:Key="CommitRemovedPillBrush" Color="#F5D5C8"/>
+            <SolidColorBrush x:Key="CommitRemovedTextBrush" Color="#9D0006"/>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+            <SolidColorBrush x:Key="OnAccentBrush" Color="#1D2021"/>
+            <SolidColorBrush x:Key="CommitAddedPillBrush" Color="#3A4428"/>
+            <SolidColorBrush x:Key="CommitAddedTextBrush" Color="#B8BB26"/>
+            <SolidColorBrush x:Key="CommitRemovedPillBrush" Color="#4A2C28"/>
+            <SolidColorBrush x:Key="CommitRemovedTextBrush" Color="#FB4934"/>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>
+```
 
 ## Diff
 
@@ -144,6 +208,7 @@ The same row in `settings.json` looks like this:
   "sideBySide": false,
   "ignoreWhitespace": false,
   "theme": "system",
+  "palette": "catppuccin",
   "reopenTabs": true,
   "diffFormats": [
     {

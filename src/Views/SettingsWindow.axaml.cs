@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Sextant;
 using Sextant.Git;
 using Sextant.Git.Parsing;
 using Sextant.Services;
@@ -22,6 +23,15 @@ public partial class SettingsWindow : Window
         IgnoreWhitespace.IsChecked = draft.IgnoreWhitespace;
         MergeCommand.Text = draft.MergeTool;
         LoadFormats(draft.DiffFormats);
+        _choices = ThemeFiles.Choices(AppPaths.ThemesDirectory());
+        var palette = PalettePreference.Normalize(draft.Palette);
+        if (_choices.All(choice => choice.Id != palette))
+            _choices.Add(new ThemeChoice(palette, palette, null));
+        PaletteBox.ItemsSource = _choices;
+        PaletteBox.SelectedItem = _choices.First(choice => choice.Id == palette);
+        ThemesFolder.Text = "Each theme has a light palette and a dark palette. Tokyo Night uses its day palette for light. Follow system uses the operating system's choice. A .xaml file in "
+            + AppPaths.ThemesDirectory()
+            + " is listed here. It needs a Light palette and a Dark palette.";
         var theme = ThemePreference.Normalize(draft.Theme);
         FollowSystem.IsChecked = false;
         Light.IsChecked = false;
@@ -32,6 +42,13 @@ public partial class SettingsWindow : Window
             Light.IsChecked = true;
         else
             FollowSystem.IsChecked = true;
+        _savedTheme = draft.Theme;
+        _savedPalette = draft.Palette;
+        PaletteBox.SelectionChanged += (_, _) => PreviewAppearance();
+        FollowSystem.IsCheckedChanged += (_, _) => PreviewAppearance();
+        Light.IsCheckedChanged += (_, _) => PreviewAppearance();
+        Dark.IsCheckedChanged += (_, _) => PreviewAppearance();
+        _ready = true;
         DialogFocus.WhenShown(this, CurrentPage);
     }
 
@@ -51,6 +68,44 @@ public partial class SettingsWindow : Window
     }
 
     public SettingsDraft? Result { get; private set; }
+
+    private List<ThemeChoice> _choices = [];
+
+    private string? _savedTheme;
+
+    private string? _savedPalette;
+
+    private bool _ready;
+
+    private bool _previewed;
+
+    protected override void OnClosed(EventArgs e)
+    {
+        if (Result is null && _previewed)
+            AppTheme.Apply(_savedTheme, _savedPalette);
+        base.OnClosed(e);
+    }
+
+    private void PreviewAppearance()
+    {
+        if (!_ready || PaletteBox is null || Dark is null || Light is null || ErrorText is null)
+            return;
+        var palette = PaletteBox.SelectedItem as ThemeChoice;
+        if (palette is null)
+            return;
+        if (!ThemeXaml.TryValidate(palette, out var error))
+        {
+            ErrorText.Text = error;
+            return;
+        }
+
+        ErrorText.Text = "";
+        var chosen = Dark.IsChecked == true ? ThemePreference.Dark
+            : Light.IsChecked == true ? ThemePreference.Light
+            : ThemePreference.System;
+        AppTheme.Apply(chosen, palette.Id);
+        _previewed = true;
+    }
 
     private void OnSection(object? sender, SelectionChangedEventArgs e)
     {
@@ -139,13 +194,22 @@ public partial class SettingsWindow : Window
         var chosen = Dark.IsChecked == true ? ThemePreference.Dark
             : Light.IsChecked == true ? ThemePreference.Light
             : ThemePreference.System;
+        var palette = PaletteBox.SelectedItem as ThemeChoice ?? _choices[0];
+        if (!ThemeXaml.TryValidate(palette, out var themeError))
+        {
+            Sections.SelectedIndex = 0;
+            ErrorText.Text = themeError;
+            return;
+        }
+
         Result = new SettingsDraft(
             path,
             SideBySide.IsChecked == true,
             IgnoreWhitespace.IsChecked == true,
             chosen,
             MergeToolCommand.Normalize(merge) ?? "",
-            formats);
+            formats,
+            palette.Id);
         Close();
     }
 

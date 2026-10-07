@@ -38,7 +38,8 @@ public sealed record SettingsDraft(
     bool IgnoreWhitespace,
     string Theme,
     string MergeTool,
-    IReadOnlyList<DiffFormatRule>? DiffFormats = null);
+    IReadOnlyList<DiffFormatRule>? DiffFormats = null,
+    string? Palette = null);
 
 public sealed record CloneRequest(string Url, string Destination);
 

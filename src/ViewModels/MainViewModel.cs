@@ -585,7 +585,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _settings.IgnoreWhitespace,
             _settings.Theme,
             _settings.MergeTool ?? "",
-            DiffFormatRules.Normalize(_settings.DiffFormats)));
+            DiffFormatRules.Normalize(_settings.DiffFormats),
+            _settings.Palette));
         if (edit is null)
             return;
         var path = string.IsNullOrWhiteSpace(edit.GitExecutable) ? null : edit.GitExecutable.Trim();
@@ -601,10 +602,11 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         _settings.SideBySide = edit.SideBySide;
         _settings.IgnoreWhitespace = edit.IgnoreWhitespace;
         _settings.Theme = ThemePreference.Normalize(edit.Theme);
+        _settings.Palette = PalettePreference.Normalize(edit.Palette);
         _settings.MergeTool = MergeToolCommand.Normalize(edit.MergeTool);
         _settings.DiffFormats = DiffFormatRules.Normalize(edit.DiffFormats);
         _store.SaveSettings(_settings);
-        AppTheme.Apply(_settings.Theme);
+        AppTheme.Apply(_settings.Theme, _settings.Palette);
         if (diffChanged)
             ApplyDiffPreferences();
         if (formatsChanged)

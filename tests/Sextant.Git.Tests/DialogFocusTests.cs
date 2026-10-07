@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using Sextant.Services;
 using Sextant.Views;
@@ -159,9 +160,9 @@ public class DialogFocusTests
             Dispatcher.UIThread.RunJobs();
 
             var focused = window.FocusManager?.GetFocusedElement();
-            var radio = Assert.IsType<RadioButton>(focused);
-            Assert.Equal("Dark", radio.Content);
-            Assert.True(radio.IsChecked);
+            Assert.IsType<ComboBox>(focused);
+            var dark = window.GetLogicalDescendants().OfType<RadioButton>().Single(radio => radio.Content as string == "Dark");
+            Assert.True(dark.IsChecked);
             window.Close();
         }, CancellationToken.None);
     }

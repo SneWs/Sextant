@@ -72,6 +72,8 @@ On 2026-10-06 a tag such as v0.1.3-beta is the build version. The leading v only
 
 On 2026-10-06 About Sextant is the first item of the macOS application menu, before Settings. Windows and Linux keep it under About, above which Get help still sits. macOS keeps Get help under Help. The desktop window was not launched.
 
+On 2026-10-07 Settings → Appearance lists Catppuccin, Gruvbox, Monokai, Tokyo Night, and Dracula. Each has a light palette and a dark palette. Tokyo Night's light palette is the day variant. A `.xaml` file in the config `themes` folder is loaded with Avalonia's runtime XAML loader and listed there. A headless test loaded a user file and checked that both Fluent palettes and the accent brush changed. A file without a Light palette is refused. Choosing a theme or light/dark paints the open window immediately; Cancel puts the previous theme back. The desktop window was not launched. On 2026-10-07 GitHub and Black were added. GitHub uses the GitHub Theme light default and dark default. Black uses the published dark palette; its light palette is derived from those colors. A headless install checked both accents. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
@@ -390,7 +392,7 @@ Operation feedback, per tab:
 
 Progress for clone, fetch, pull, and push: pass `--progress` and parse carriage-return progress on stderr. Progress lines are not failures.
 
-Theme: Avalonia's `FluentTheme` with `DensityStyle="Compact"`. The light palette is Catppuccin Latte and the dark palette is Catppuccin Mocha. Settings chooses light, dark, or follow the system. The default follows the system. Compact is the density for this desktop application: 14px content, 24px text controls, and the theme's tighter list and button padding. Graph, locations, and file rows stay dense enough to scan. Do not add a second theme beside Fluent.
+Theme: Avalonia's `FluentTheme` with `DensityStyle="Compact"`. Fluent stays the control theme. Color palettes are Catppuccin, Gruvbox, Monokai, Tokyo Night, and Dracula. Each has a light palette and a dark palette. Tokyo Night's light palette is the day variant. Settings chooses the palette, then light, dark, or follow the system. The default palette is Catppuccin and the default mode follows the system. A `.xaml` file in the config `themes` folder is loaded with Avalonia's runtime XAML loader and listed with the built-in palettes. Compact is the density for this desktop application: 14px content, 24px text controls, and the theme's tighter list and button padding. Graph, locations, and file rows stay dense enough to scan.
 
 Keyboard focus and contrast should be the Fluent defaults so the UI stays usable. Do not build a custom accessibility tree in Phase 1.
 
