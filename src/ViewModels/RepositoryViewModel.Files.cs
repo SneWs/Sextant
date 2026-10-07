@@ -127,6 +127,8 @@ public partial class RepositoryViewModel
                 UnlockAction = () => ChangeRepositoryLockAsync(file.Path, unlock: true, force: false),
                 ForceUnlockAction = () => ChangeRepositoryLockAsync(file.Path, unlock: true, force: true),
                 HistoryAction = () => ShowFileHistoryAsync(file.Path),
+                RemoveAction = () => RemoveRepositoryFileAsync(file.Path),
+                FileMenuFactory = () => FileMenuFor(file.Path, file.LfsTracked),
             });
         }
 
@@ -178,6 +180,26 @@ public partial class RepositoryViewModel
         else
             _expandedRepositoryDirectories.Remove(item.Path);
         PublishRepositoryFileTree();
+    }
+
+    private Task RemoveRepositoryFileAsync(string path)
+    {
+        if (_session is null || IsBusy)
+            return Task.CompletedTask;
+        if (_host.Dialogs is not { } dialogs)
+        {
+            Fail("Removing a file requires confirmation.");
+            return Task.CompletedTask;
+        }
+        return HoldFocus(async () =>
+        {
+            var confirmed = await dialogs.ConfirmAsync("Remove file",
+                $"Delete {path} from disk and remove it from Git tracking? Its deletion will be staged if it is tracked. Uncommitted changes will be lost; committed history stays unchanged.",
+                "Remove");
+            if (!confirmed || _session is null)
+                return;
+            await RunAsync("Removing file…", ct => _session.RemoveRepositoryFileAsync(path, ct));
+        });
     }
 
     private async Task ChangeRepositoryLockAsync(string path, bool unlock, bool force)

@@ -175,14 +175,17 @@ public class RepositoryFileTreeTests
             var vm = new RepositoryViewModel(new TreeHost(repo.Git), repo.Directory);
             await vm.EnsureLoadedAsync();
             await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
+            var desktopMenu = new WorktreeFileMenu { OpenFolderLabel = DesktopOpen.FolderLabel(DesktopOpen.Current) };
             var locked = new RepositoryFileTreeItem
             {
                 Path = "locked.bin", Label = "locked.bin", LfsTracked = true, LocksKnown = true,
                 Lock = new LfsLock("123", "locked.bin", "Teammate"),
+                FileMenuFactory = () => desktopMenu,
             };
             var unlocked = new RepositoryFileTreeItem
             {
                 Path = "unlocked.bin", Label = "unlocked.bin", LfsTracked = true, LocksKnown = true,
+                FileMenuFactory = () => desktopMenu,
             };
             var plain = new RepositoryFileTreeItem
             {
@@ -207,15 +210,17 @@ public class RepositoryFileTreeTests
             var menu = border.ContextMenu!;
             menu.Open(border);
             Dispatcher.UIThread.RunJobs();
-            Assert.Equal(["Unlock file", "Force Unlock file", "History"],
+            Assert.Equal(["Unlock file", "Force Unlock file", "History", desktopMenu.OpenFolderLabel, "Open in editor", "Remove file…"],
                 menu.Items.OfType<MenuItem>().Where(item => item.IsVisible).Select(item => item.Header as string));
+            Assert.Same(desktopMenu.OpenEditorCommand, menu.Items.OfType<MenuItem>().Single(item => item.Header as string == "Open in editor").Command);
+            Assert.Same(desktopMenu.OpenFolderCommand, menu.Items.OfType<MenuItem>().Single(item => item.Header as string == desktopMenu.OpenFolderLabel).Command);
             menu.Close();
             border = list.GetVisualDescendants().OfType<Border>()
                 .Single(item => item.DataContext == unlocked && item.ContextMenu is not null);
             menu = border.ContextMenu!;
             menu.Open(border);
             Dispatcher.UIThread.RunJobs();
-            Assert.Equal(["Lock file", "History"],
+            Assert.Equal(["Lock file", "History", desktopMenu.OpenFolderLabel, "Open in editor", "Remove file…"],
                 menu.Items.OfType<MenuItem>().Where(item => item.IsVisible).Select(item => item.Header as string));
             menu.Close();
             window.Close();
@@ -234,7 +239,7 @@ public class RepositoryFileTreeTests
 
         await session.Dispatch(async () =>
         {
-            var dialogs = new LockDialogs();
+            var dialogs = new FileActionDialogs();
             var vm = new RepositoryViewModel(new TreeHost(repo.Git, dialogs), repo.Directory);
             await vm.EnsureLoadedAsync();
             await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
@@ -474,6 +479,49 @@ public class RepositoryFileTreeTests
         Assert.False(tab.IsBusy);
     }
 
+    [Fact]
+    public async Task Remove_file_requires_confirmation_stages_deletion_and_refreshes_the_tree()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.Run("config", "lfs.url", "file://" + repo.Directory.Replace('\\', '/'));
+        repo.WriteFile("remove.txt", "committed\n");
+        repo.WriteFile("keep.txt", "keep\n");
+        repo.CommitAll("base");
+        repo.WriteFile("remove.txt", "uncommitted\n");
+
+        await session.Dispatch(async () =>
+        {
+            var dialogs = new FileActionDialogs("Remove file", "Remove");
+            var vm = new RepositoryViewModel(new TreeHost(repo.Git, dialogs), repo.Directory);
+            await vm.EnsureLoadedAsync();
+            await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
+            var row = vm.RepositoryFileTree.Single(item => item.Path == "remove.txt");
+            Assert.NotNull(row.FileMenu);
+            Assert.True(row.FileMenu.OpenEditorCommand.CanExecute(null));
+            Assert.True(row.FileMenu.OpenFolderCommand.CanExecute(null));
+            Assert.Equal(DesktopOpen.FolderLabel(DesktopOpen.Current), row.FileMenu.OpenFolderLabel);
+            dialogs.BeforeConfirm = vm.RefreshFromFocusAsync;
+            var before = vm.CommandLog;
+            await row.RemoveCommand.ExecuteAsync(null);
+            Assert.Equal(before, vm.CommandLog);
+            Assert.True(File.Exists(Path.Combine(repo.Directory, "remove.txt")));
+            Assert.Contains("remove.txt", repo.RunCapture("ls-files"), StringComparison.Ordinal);
+
+            dialogs.Accept = true;
+            await row.RemoveCommand.ExecuteAsync(null);
+            Assert.Contains("remove.txt", dialogs.Message, StringComparison.Ordinal);
+            Assert.Contains("Uncommitted changes will be lost", dialogs.Message, StringComparison.Ordinal);
+            Assert.False(vm.HasBanner, vm.Banner);
+            Assert.False(File.Exists(Path.Combine(repo.Directory, "remove.txt")));
+            Assert.True(File.Exists(Path.Combine(repo.Directory, "keep.txt")));
+            Assert.DoesNotContain(vm.RepositoryFileTree, item => item.Path == "remove.txt");
+            Assert.Contains(vm.Files, item => item.Path == "remove.txt" && item.Kind == ChangeKind.Deleted && item.FromStagedList);
+            Assert.Equal(2, dialogs.Confirmations);
+            await vm.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
     private sealed class TreeHost(string git, IDialogService? dialogs = null) : IWorkspaceHost
     {
         public IDialogService? Dialogs => dialogs;
@@ -488,7 +536,7 @@ public class RepositoryFileTreeTests
         public Task OpenRepositoryAsync(string path) => Task.CompletedTask;
     }
 
-    private sealed class LockDialogs : IDialogService
+    private sealed class FileActionDialogs(string expectedTitle = "Force Unlock file", string expectedConfirm = "Force Unlock") : IDialogService
     {
         public bool Accept { get; set; }
         public string Message { get; private set; } = "";
@@ -496,8 +544,8 @@ public class RepositoryFileTreeTests
         public Func<Task>? BeforeConfirm { get; set; }
         public async Task<bool> ConfirmAsync(string title, string message, string confirm = "OK")
         {
-            Assert.Equal("Force Unlock file", title);
-            Assert.Equal("Force Unlock", confirm);
+            Assert.Equal(expectedTitle, title);
+            Assert.Equal(expectedConfirm, confirm);
             Message = message;
             Confirmations++;
             if (BeforeConfirm is not null)

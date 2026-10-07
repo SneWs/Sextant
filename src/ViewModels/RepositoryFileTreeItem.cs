@@ -11,6 +11,8 @@ public partial class RepositoryFileTreeItem : ObservableObject
     private IAsyncRelayCommand? _unlockCommand;
     private IAsyncRelayCommand? _forceUnlockCommand;
     private IAsyncRelayCommand? _historyCommand;
+    private IAsyncRelayCommand? _removeCommand;
+    private WorktreeFileMenu? _fileMenu;
 
     public required string Path { get; init; }
     public required string Label { get; init; }
@@ -37,12 +39,17 @@ public partial class RepositoryFileTreeItem : ObservableObject
     public Func<Task> UnlockAction { get; init; } = () => Task.CompletedTask;
     public Func<Task> ForceUnlockAction { get; init; } = () => Task.CompletedTask;
     public Func<Task> HistoryAction { get; init; } = () => Task.CompletedTask;
+    public Func<Task> RemoveAction { get; init; } = () => Task.CompletedTask;
+    public Func<WorktreeFileMenu?>? FileMenuFactory { get; init; }
     public Func<bool> CanRun { get; init; } = () => false;
 
+    public WorktreeFileMenu? FileMenu => _fileMenu ??= FileMenuFactory?.Invoke();
+    public bool ShowOpen => FileMenu is not null;
     public IAsyncRelayCommand LockCommand => _lockCommand ??= new AsyncRelayCommand(LockAction, () => ShowLock && CanRun());
     public IAsyncRelayCommand UnlockCommand => _unlockCommand ??= new AsyncRelayCommand(UnlockAction, () => ShowUnlock && CanRun());
     public IAsyncRelayCommand ForceUnlockCommand => _forceUnlockCommand ??= new AsyncRelayCommand(ForceUnlockAction, () => ShowUnlock && CanRun());
     public IAsyncRelayCommand HistoryCommand => _historyCommand ??= new AsyncRelayCommand(HistoryAction, () => IsFile && CanRun());
+    public IAsyncRelayCommand RemoveCommand => _removeCommand ??= new AsyncRelayCommand(RemoveAction, () => IsFile && CanRun());
 
     public void NotifyCommands()
     {
@@ -50,6 +57,7 @@ public partial class RepositoryFileTreeItem : ObservableObject
         _unlockCommand?.NotifyCanExecuteChanged();
         _forceUnlockCommand?.NotifyCanExecuteChanged();
         _historyCommand?.NotifyCanExecuteChanged();
+        _removeCommand?.NotifyCanExecuteChanged();
     }
 
     [ObservableProperty]

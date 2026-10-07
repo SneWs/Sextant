@@ -34,14 +34,14 @@ public sealed partial class RepositorySession
     }
 
     public Task TrackWithLfsAsync(string path, CancellationToken cancellationToken) =>
-        ChangeLfsAsync(async token =>
+        ChangeWorktreeAsync(async token =>
         {
             Checked(await ExecuteAsync(GitCommands.LfsTrack(_toplevel, path), null, token).ConfigureAwait(false));
             Checked(await ExecuteAsync(GitCommands.StageLfsTrack(_toplevel, path), null, token).ConfigureAwait(false));
         }, cancellationToken);
 
     public Task UntrackLfsAsync(string path, CancellationToken cancellationToken) =>
-        ChangeLfsAsync(async token =>
+        ChangeWorktreeAsync(async token =>
         {
             Checked(await ExecuteAsync(GitCommands.LfsUntrack(_toplevel, path), null, token).ConfigureAwait(false));
             Checked(await ExecuteAsync(GitCommands.StageAttributes(_toplevel), null, token).ConfigureAwait(false));
@@ -58,7 +58,7 @@ public sealed partial class RepositorySession
         if (!GitCommands.LfsNameHasComma(path))
             return MutateAsync(GitCommands.LfsPullFile(_toplevel, path), null, cancellationToken);
         // --include splits on commas and cannot name this file. Fetch the commit, then check out only this path.
-        return ChangeLfsAsync(async token =>
+        return ChangeWorktreeAsync(async token =>
         {
             Checked(await ExecuteAsync(GitCommands.LfsFetch(_toplevel), null, token).ConfigureAwait(false));
             Checked(await ExecuteAsync(GitCommands.LfsCheckout(_toplevel, path), null, token).ConfigureAwait(false));
@@ -99,7 +99,7 @@ public sealed partial class RepositorySession
         return paths;
     }
 
-    private Task ChangeLfsAsync(Func<CancellationToken, Task> write, CancellationToken cancellationToken) =>
+    private Task ChangeWorktreeAsync(Func<CancellationToken, Task> write, CancellationToken cancellationToken) =>
         RunAsync(async ct =>
         {
             GitCommandFailedException? failure = null;

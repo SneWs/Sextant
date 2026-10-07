@@ -714,6 +714,18 @@ public static class GitCommands
     public static IReadOnlyList<string> RepositoryFiles(string toplevel) =>
         ["-C", toplevel, "--no-optional-locks", "ls-files", "--cached", "--others", "--exclude-standard", "--deduplicate", "-z"];
 
+    public static IReadOnlyList<string> RepositoryFileIndex(string toplevel, string path) =>
+        ["-C", toplevel, "--no-optional-locks", "--literal-pathspecs", "ls-files", "--stage", "-z", "--", path];
+
+    public static IReadOnlyList<string> RepositoryFileUntracked(string toplevel, string path) =>
+        ["-C", toplevel, "--no-optional-locks", "--literal-pathspecs", "ls-files", "--others", "--exclude-standard", "-z", "--", path];
+
+    public static IReadOnlyList<string> RemoveRepositoryFile(string toplevel, string path) =>
+        ["-C", toplevel, "--literal-pathspecs", "rm", "-f", "--sparse", "--", path];
+
+    public static IReadOnlyList<string> RemoveUntrackedRepositoryFile(string toplevel, string path) =>
+        ["-C", toplevel, "--literal-pathspecs", "clean", "-f", "--", path];
+
     public static IReadOnlyList<string> LfsLocks(string toplevel) =>
         ["-C", toplevel, "--no-optional-locks", "lfs", "locks"];
 

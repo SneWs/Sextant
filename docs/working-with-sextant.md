@@ -67,6 +67,8 @@ Each file has a Git or LFS badge. Only locked files show lock information, inclu
 
 Right-click any unlocked file for Lock file, or a locked file for Unlock file. A file does not need to be stored in LFS to use an LFS lock. Force Unlock file sits below Unlock file and asks for confirmation before removing a lock, including another user's lock. These actions use your installed Git LFS and its configured server and credentials. Server errors are shown in the window, rather than treating unknown locks as unlocked. Lock protection depends on the Git LFS lock checks; it does not prevent editing a local file. A file's History action returns to the History tab.
 
+The same menu offers Open in editor and Open in Finder, File Explorer, or File Manager, using the same desktop actions as the diff's file header. Remove file asks before deleting the file from disk and removing it from Git tracking. A tracked file's deletion is staged; an untracked file is only deleted from disk. Uncommitted changes are lost, but committed history and LFS locks remain unchanged. Directories and submodules cannot be removed with this file action.
+
 ## Files and commits
 
 The working-copy list is grouped into Conflicts, then Staged, then Unstaged. Empty groups are omitted. Each group title is a bar. The rows under it are the files, with a status letter and Stage, Unstage, Discard, or History.

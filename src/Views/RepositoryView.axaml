@@ -379,6 +379,13 @@
                                             <MenuItem Header="Force Unlock file" Command="{Binding ForceUnlockCommand}" IsVisible="{Binding ShowUnlock}"/>
                                             <Separator IsVisible="{Binding ShowLockActions}"/>
                                             <MenuItem Header="History" Command="{Binding HistoryCommand}"/>
+                                            <Separator IsVisible="{Binding ShowOpen}"/>
+                                            <MenuItem Header="{Binding FileMenu.OpenFolderLabel}" Command="{Binding FileMenu.OpenFolderCommand}"
+                                                      IsVisible="{Binding ShowOpen}"/>
+                                            <MenuItem Header="Open in editor" Command="{Binding FileMenu.OpenEditorCommand}"
+                                                      IsVisible="{Binding ShowOpen}"/>
+                                            <Separator/>
+                                            <MenuItem Header="Remove file…" Command="{Binding RemoveCommand}"/>
                                         </ContextMenu>
                                     </Border.ContextMenu>
                                     <Grid ColumnDefinitions="16,18,*,Auto,Auto" Margin="{Binding Indent}">
