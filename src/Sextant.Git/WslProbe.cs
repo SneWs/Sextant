@@ -252,6 +252,8 @@ public static class WslProbe
         CancellationToken cancellationToken,
         TimeSpan timeout)
     {
+        if (!OperatingSystem.IsWindows())
+            return new WslOutput(-1, "", "WSL is only available on Windows.");
         using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutSource.CancelAfter(timeout);
         var info = new ProcessStartInfo

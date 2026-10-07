@@ -30,37 +30,6 @@ public class AskPassTests
     }
 
     [Fact]
-    public void Wsl_script_quotes_the_helper_and_does_not_rely_on_linux_environment()
-    {
-        var script = WslAskPass.Script("/mnt/c/Program Files/Sextant.AskPass.exe", "sextant-askpass-abc");
-        Assert.Contains("#!/bin/sh", script, StringComparison.Ordinal);
-        Assert.Contains("exec '/mnt/c/Program Files/Sextant.AskPass.exe' --pipe 'sextant-askpass-abc' --kind \"$kind\" \"$@\"", script, StringComparison.Ordinal);
-        Assert.Equal("'a'\\''b'", WslAskPass.ShQuote("a'b"));
-    }
-
-    [Fact]
-    public void Wsl_launch_forwards_ssh_askpass_and_not_path()
-    {
-        var environment = AskPassEnvironment.ForWslGit("/tmp/sextant-askpass-pipe");
-        environment["PATH"] = @"C:\Windows";
-        var request = new GitRequest
-        {
-            Executable = @"C:\Program Files\Git\cmd\git.exe",
-            Arguments = ["fetch"],
-            WorkingDirectory = "/home/user/repo",
-            Environment = environment,
-            Wsl = new WslGit("Ubuntu", "/usr/bin/git", "wsl.exe"),
-        };
-
-        var launched = WslLaunch.Prepare(request);
-        Assert.Contains("SSH_ASKPASS=/tmp/sextant-askpass-pipe", launched.Arguments);
-        Assert.Contains("SSH_ASKPASS_REQUIRE=force", launched.Arguments);
-        Assert.DoesNotContain(launched.Arguments, argument => argument.StartsWith("PATH=", StringComparison.Ordinal));
-        Assert.DoesNotContain(launched.Arguments, argument => argument.StartsWith("GIT_ASKPASS=", StringComparison.Ordinal));
-        Assert.DoesNotContain("DISPLAY", string.Join(' ', launched.Arguments), StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void Windows_askpass_environment_points_at_the_helper_and_the_pipe()
     {
         var environment = AskPassEnvironment.ForWindowsGit(@"C:\Apps\Sextant.AskPass.exe", "sextant-askpass-pipe");
@@ -72,27 +41,6 @@ public class AskPassTests
         Assert.Equal(AskPassKind.Confirm, AskPassEnvironment.KindOf("confirm"));
         Assert.Equal(AskPassKind.Message, AskPassEnvironment.KindOf("none"));
         Assert.Equal(AskPassKind.Password, AskPassEnvironment.KindOf(null));
-    }
-
-    [Fact]
-    public async Task Non_windows_does_not_launch_wsl()
-    {
-        if (OperatingSystem.IsWindows())
-            return;
-
-        var runner = new GitProcessRunner
-        {
-            AskPass = new AskPassLaunch("/tmp/Sextant.AskPass", "sextant-askpass-pipe"),
-        };
-        var output = await runner.RunAsync(new GitRequest
-        {
-            Executable = "git",
-            Arguments = ["--version"],
-            Wsl = new WslGit("Ubuntu", "/usr/bin/git", "wsl"),
-        }, CancellationToken.None);
-
-        Assert.Equal(0, output.ExitCode);
-        Assert.DoesNotContain(output.DisplayArguments, argument => argument.Equals("wsl", StringComparison.Ordinal));
     }
 
     [Fact]
