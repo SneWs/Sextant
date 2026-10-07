@@ -21,6 +21,7 @@ public partial class App : Application
             var store = new WorkspaceStore(AppPaths.ConfigDirectory());
             var settings = store.LoadSettings();
             AppTheme.Apply(settings.Theme, settings.Palette);
+            DiffFont.Apply(settings.DiffFont, settings.DiffFontSize);
             var window = new MainWindow
             {
                 DataContext = new MainViewModel(store, store.LoadWorkspace(), settings, new GitProcessRunner()),

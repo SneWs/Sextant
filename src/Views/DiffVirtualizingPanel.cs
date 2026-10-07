@@ -34,6 +34,13 @@ public sealed class DiffVirtualizingPanel : VirtualizingPanel
 
     private readonly record struct Slot(int Index, Control Control);
 
+    public void ResetHeights()
+    {
+        _heights = [];
+        _editorLine = 18;
+        InvalidateMeasure();
+    }
+
     public DiffVirtualizingPanel()
     {
         EffectiveViewportChanged += (_, e) =>

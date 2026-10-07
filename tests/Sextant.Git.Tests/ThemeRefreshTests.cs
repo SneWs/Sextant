@@ -61,7 +61,7 @@ public class ThemeRefreshTests
             var app = Application.Current!;
             var window = new SettingsWindow(new SettingsDraft("", false, false, "dark", "", null, PalettePreference.Catppuccin));
             window.Show();
-            var combo = window.GetLogicalDescendants().OfType<ComboBox>().Single();
+            var combo = window.GetLogicalDescendants().OfType<ComboBox>().Single(box => box.Items.OfType<ThemeChoice>().Any());
             combo.SelectedItem = combo.Items.OfType<ThemeChoice>().Single(choice => choice.Id == PalettePreference.Gruvbox);
 
             Assert.Equal(Color.Parse("#EBDBB2"), Ink(app));

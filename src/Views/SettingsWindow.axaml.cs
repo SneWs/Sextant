@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Sextant;
 using Sextant.Git;
@@ -21,6 +22,7 @@ public partial class SettingsWindow : Window
         Inline.IsChecked = !draft.SideBySide;
         SideBySide.IsChecked = draft.SideBySide;
         IgnoreWhitespace.IsChecked = draft.IgnoreWhitespace;
+        LoadFonts(draft.DiffFont, draft.DiffFontSize);
         MergeCommand.Text = draft.MergeTool;
         LoadFormats(draft.DiffFormats);
         _choices = ThemeFiles.Choices(AppPaths.ThemesDirectory());
@@ -223,8 +225,77 @@ public partial class SettingsWindow : Window
             chosen,
             MergeToolCommand.Normalize(merge) ?? "",
             formats,
-            palette.Id);
+            palette.Id,
+            SelectedFont(),
+            SelectedSize());
         Close();
+    }
+
+    private void LoadFonts(string? saved, double size)
+    {
+        var choices = new List<FontChoice> { new("Default", "") };
+        var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            foreach (var family in FontManager.Current.SystemFonts)
+            {
+                var name = family.Name?.Trim();
+                if (string.IsNullOrEmpty(name) || name.Contains(',') || name.Contains('"') || name.Contains('\''))
+                    continue;
+                if (name[0] == '$')
+                    continue;
+                names.Add(name);
+            }
+        }
+        catch (Exception)
+        {
+        }
+
+        foreach (var name in names)
+            choices.Add(new FontChoice(name, name));
+
+        var current = DiffFontPreference.Normalize(saved);
+        if (current.Length > 0 && choices.All(choice => !string.Equals(choice.Saved, current, StringComparison.OrdinalIgnoreCase)))
+            choices.Insert(1, new FontChoice(current, current));
+
+        DiffFontBox.ItemsSource = choices;
+        DiffFontBox.SelectedItem = choices.First(choice => string.Equals(choice.Saved, current, StringComparison.OrdinalIgnoreCase));
+        DiffFontSizeBox.Value = (decimal)DiffFontPreference.NormalizeSize(size);
+        DiffFontBox.SelectionChanged += (_, _) => UpdateFontPreview();
+        DiffFontSizeBox.ValueChanged += (_, _) => UpdateFontPreview();
+        UpdateFontPreview();
+    }
+
+    private void UpdateFontPreview()
+    {
+        var family = new FontFamily(DiffFontPreference.Family(SelectedFont()));
+        var size = SelectedSize();
+        foreach (var block in new[] { FontPreviewContext, FontPreviewAdded, FontPreviewRemoved })
+        {
+            block.FontFamily = family;
+            block.FontSize = size;
+        }
+    }
+
+    private string SelectedFont() =>
+        DiffFontBox.SelectedItem is FontChoice choice ? choice.Saved : "";
+
+    private double SelectedSize() =>
+        DiffFontPreference.NormalizeSize((double)(DiffFontSizeBox.Value ?? (decimal)DiffFontPreference.DefaultSize));
+
+    private sealed class FontChoice
+    {
+        public FontChoice(string title, string saved)
+        {
+            Title = title;
+            Saved = saved;
+        }
+
+        public string Title { get; }
+
+        public string Saved { get; }
+
+        public override string ToString() => Title;
     }
 
     private void LoadFormats(IReadOnlyList<DiffFormatRule>? rules)

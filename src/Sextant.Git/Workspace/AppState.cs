@@ -164,6 +164,12 @@ public sealed class AppSettings
 
     public bool IgnoreWhitespace { get; set; }
 
+    /// <summary>Font family for diffs and the merge editor. Empty uses Cascadia Mono, then Consolas, then DejaVu Sans Mono.</summary>
+    public string? DiffFont { get; set; }
+
+    /// <summary>Point size for that font. 12 when unset.</summary>
+    public double DiffFontSize { get; set; } = DiffFontPreference.DefaultSize;
+
     /// <summary><see cref="ThemePreference.System"/>, <see cref="ThemePreference.Light"/>, or <see cref="ThemePreference.Dark"/>.</summary>
     public string Theme { get; set; } = ThemePreference.System;
 

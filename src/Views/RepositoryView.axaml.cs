@@ -49,6 +49,31 @@ public partial class RepositoryView : UserControl
         InitializeComponent();
     }
 
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        DiffFont.Changed += OnFontChanged;
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        DiffFont.Changed -= OnFontChanged;
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    private void OnFontChanged()
+    {
+        _charWidth = 0;
+        Dispatcher.UIThread.Post(RefreshFontLayout, DispatcherPriority.Background);
+    }
+
+    private void RefreshFontLayout()
+    {
+        foreach (var panel in DiffList.GetVisualDescendants().OfType<DiffVirtualizingPanel>())
+            panel.ResetHeights();
+        UpdateSideScroll();
+    }
+
     protected override void OnLoaded(RoutedEventArgs e)
     {
         base.OnLoaded(e);
@@ -420,8 +445,8 @@ public partial class RepositoryView : UserControl
                 "0000000000",
                 CultureInfo.InvariantCulture,
                 FlowDirection.LeftToRight,
-                new Typeface(new FontFamily("Cascadia Mono, Consolas, DejaVu Sans Mono")),
-                12,
+                new Typeface(DiffFont.Current),
+                DiffFont.Size,
                 Brushes.Black);
             _charWidth = text.Width / 10;
             if (_charWidth < 1)

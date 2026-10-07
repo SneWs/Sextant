@@ -34,6 +34,8 @@ Sextant stores them in `settings.json`. It does not write these choices into the
 
 The saved values are `palette` (`catppuccin` by default) and `theme` (`system`, `light`, or `dark`).
 
+**Font** is the typeface for diff text, the merge editor, and the command log. Default tries Cascadia Mono, then Consolas, then DejaVu Sans Mono. A chosen face is tried first, and that stack is the fallback. The saved field is `diffFont`. Empty means the default. **Size** is that face's point size, from 8 to 48. It defaults to 12. The saved field is `diffFontSize`. The sample to the right updates as you change the face or the size. OK applies it to open diffs.
+
 A `.xaml` or `.axaml` file in the themes folder is listed with those themes. The folder is `themes` inside the configuration folder above. The path under Color theme opens that folder in the file manager. The file name, without the extension, is the saved id. `Solarized.axaml` is `solarized`. A file named `Catppuccin.axaml` replaces the built-in Catppuccin palette. Sextant loads the file with Avalonia's runtime XAML loader. The root must be a `ResourceDictionary` with a `Light` palette and a `Dark` palette. These brushes are optional: `OnAccentBrush`, `CommitAddedPillBrush`, `CommitAddedTextBrush`, `CommitRemovedPillBrush`, and `CommitRemovedTextBrush`.
 
 ```xml

@@ -586,7 +586,9 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _settings.Theme,
             _settings.MergeTool ?? "",
             DiffFormatRules.Normalize(_settings.DiffFormats),
-            _settings.Palette));
+            _settings.Palette,
+            _settings.DiffFont,
+            _settings.DiffFontSize));
         if (edit is null)
             return;
         var path = string.IsNullOrWhiteSpace(edit.GitExecutable) ? null : edit.GitExecutable.Trim();
@@ -605,8 +607,12 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         _settings.Palette = PalettePreference.Normalize(edit.Palette);
         _settings.MergeTool = MergeToolCommand.Normalize(edit.MergeTool);
         _settings.DiffFormats = DiffFormatRules.Normalize(edit.DiffFormats);
+        var font = DiffFontPreference.Normalize(edit.DiffFont);
+        _settings.DiffFont = font.Length == 0 ? null : font;
+        _settings.DiffFontSize = DiffFontPreference.NormalizeSize(edit.DiffFontSize);
         _store.SaveSettings(_settings);
         AppTheme.Apply(_settings.Theme, _settings.Palette);
+        DiffFont.Apply(_settings.DiffFont, _settings.DiffFontSize);
         if (diffChanged)
             ApplyDiffPreferences();
         if (formatsChanged)

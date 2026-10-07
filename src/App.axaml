@@ -26,6 +26,8 @@
                     <SolidColorBrush x:Key="CommitRemovedTextBrush" Color="#F38BA8"/>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
+            <FontFamily x:Key="DiffFontFamily">Cascadia Mono, Consolas, DejaVu Sans Mono</FontFamily>
+            <x:Double x:Key="DiffFontSize">12</x:Double>
         </ResourceDictionary>
     </Application.Resources>
 
@@ -139,8 +141,8 @@
             <Setter Property="MinHeight" Value="0"/>
         </Style>
         <Style Selector=":is(TextBlock).diff">
-            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, DejaVu Sans Mono"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontFamily" Value="{DynamicResource DiffFontFamily}"/>
+            <Setter Property="FontSize" Value="{DynamicResource DiffFontSize}"/>
         </Style>
         <Style Selector=":is(views|CopyableText)">
             <Setter Property="SelectionBrush" Value="{DynamicResource TextControlSelectionHighlightColor}"/>
@@ -156,8 +158,8 @@
             <Setter Property="Background" Value="Transparent"/>
         </Style>
         <Style Selector="TextBox.diff">
-            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, DejaVu Sans Mono"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontFamily" Value="{DynamicResource DiffFontFamily}"/>
+            <Setter Property="FontSize" Value="{DynamicResource DiffFontSize}"/>
         </Style>
     </Application.Styles>
 </Application>

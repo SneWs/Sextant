@@ -12,6 +12,7 @@ using AvaloniaEdit.Document;
 using AvaloniaEdit.Editing;
 using AvaloniaEdit.Rendering;
 using AvaloniaEdit.TextMate;
+using Sextant;
 using Sextant.ViewModels;
 using TextMateSharp.Grammars;
 
@@ -111,6 +112,7 @@ public sealed class DiffTextHost : Grid
     {
         base.OnAttachedToVisualTree(e);
         ActualThemeVariantChanged += OnTheme;
+        DiffFont.Changed += OnFontChanged;
         if (_editors.Count == 0)
             Rebuild();
         ApplyTheme();
@@ -120,12 +122,24 @@ public sealed class DiffTextHost : Grid
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         ActualThemeVariantChanged -= OnTheme;
+        DiffFont.Changed -= OnFontChanged;
         ClearEditors();
         _built = null;
         base.OnDetachedFromVisualTree(e);
     }
 
     private void OnTheme(object? sender, EventArgs e) => ApplyTheme();
+
+    private void OnFontChanged()
+    {
+        var family = DiffFont.Current;
+        foreach (var editor in _editors)
+        {
+            editor.FontFamily = family;
+            editor.FontSize = DiffFont.Size;
+        }
+        InvalidateMeasure();
+    }
 
     private void Rebuild()
     {
@@ -171,8 +185,8 @@ public sealed class DiffTextHost : Grid
         {
             IsReadOnly = true,
             ShowLineNumbers = false,
-            FontFamily = new FontFamily("Cascadia Mono, Consolas, DejaVu Sans Mono"),
-            FontSize = 12,
+            FontFamily = DiffFont.Current,
+            FontSize = DiffFont.Size,
             Background = Brushes.Transparent,
             Foreground = this.TryFindResource("SystemControlForegroundBaseHighBrush", ActualThemeVariant, out var foreground) && foreground is IBrush brush
                 ? brush
@@ -347,13 +361,15 @@ public sealed class DiffTextHost : Grid
         _ => null,
     };
 
-    private static FormattedText Format(string text, IBrush brush, double size = 12)
+    private static FormattedText Format(string text, IBrush brush, double size = 0)
     {
+        if (size < 1)
+            size = DiffFont.Size;
         return new FormattedText(
             text,
             System.Globalization.CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight,
-            new Typeface(new FontFamily("Cascadia Mono, Consolas, DejaVu Sans Mono")),
+            new Typeface(DiffFont.Current),
             size,
             brush);
     }

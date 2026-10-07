@@ -39,7 +39,9 @@ public sealed record SettingsDraft(
     string Theme,
     string MergeTool,
     IReadOnlyList<DiffFormatRule>? DiffFormats = null,
-    string? Palette = null);
+    string? Palette = null,
+    string? DiffFont = null,
+    double DiffFontSize = DiffFontPreference.DefaultSize);
 
 public sealed record CloneRequest(string Url, string Destination);
 

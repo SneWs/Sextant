@@ -10,6 +10,7 @@ using AvaloniaEdit;
 using AvaloniaEdit.Document;
 using AvaloniaEdit.Rendering;
 using AvaloniaEdit.TextMate;
+using Sextant;
 using Sextant.Git.Parsing;
 using TextMateSharp.Grammars;
 
@@ -136,6 +137,7 @@ public sealed class MergeEditor : Grid
     {
         base.OnAttachedToVisualTree(e);
         ActualThemeVariantChanged += OnTheme;
+        DiffFont.Changed += OnFontChanged;
         ApplyChrome();
         InstallGrammars();
         Retarget(Session);
@@ -146,6 +148,7 @@ public sealed class MergeEditor : Grid
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         ActualThemeVariantChanged -= OnTheme;
+        DiffFont.Changed -= OnFontChanged;
         Retarget(null);
         DisposeGrammars();
         base.OnDetachedFromVisualTree(e);
@@ -155,6 +158,16 @@ public sealed class MergeEditor : Grid
     {
         ApplyChrome();
         Restyle();
+    }
+
+    private void OnFontChanged()
+    {
+        var family = DiffFont.Current;
+        foreach (var editor in Editors)
+        {
+            editor.FontFamily = family;
+            editor.FontSize = DiffFont.Size;
+        }
     }
 
     private void OnSessionChanged() => LoadFromSession(resetDocuments: false);
@@ -457,8 +470,8 @@ public sealed class MergeEditor : Grid
             Name = name,
             IsReadOnly = readOnly,
             ShowLineNumbers = false,
-            FontFamily = new FontFamily("Cascadia Mono, Consolas, DejaVu Sans Mono"),
-            FontSize = 12,
+            FontFamily = DiffFont.Current,
+            FontSize = DiffFont.Size,
             Background = Brushes.Transparent,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Hidden,

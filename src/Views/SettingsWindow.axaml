@@ -40,6 +40,30 @@
                         <Run Text="is listed here. It needs a Light palette and a Dark palette."
                              Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
                     </TextBlock>
+                    <GroupBox Header="Font" Margin="0,8,0,0">
+                        <StackPanel Spacing="8">
+                            <Grid ColumnDefinitions="220,*" ColumnSpacing="16">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Face" Opacity="0.75"/>
+                                    <ComboBox x:Name="DiffFontBox" HorizontalAlignment="Stretch"/>
+                                    <TextBlock Text="Size" Opacity="0.75"/>
+                                    <NumericUpDown x:Name="DiffFontSizeBox" Width="96" HorizontalAlignment="Left"
+                                                   Minimum="8" Maximum="48" Increment="1" FormatString="0"/>
+                                </StackPanel>
+                                <Border Grid.Column="1" Padding="12,8" BorderThickness="1" VerticalAlignment="Stretch"
+                                        BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock x:Name="FontPreviewContext" Text="  const answer = 42;"/>
+                                        <TextBlock x:Name="FontPreviewAdded" Text="+     return true;" Foreground="#3FB950"/>
+                                        <TextBlock x:Name="FontPreviewRemoved" Text="-     return false;" Foreground="#F85149"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                            <TextBlock TextWrapping="Wrap" Opacity="0.75"
+                                       Text="Used for diffs, the merge editor, and the command log. Default is Cascadia Mono, then Consolas, then DejaVu Sans Mono. Size is 8 to 48."/>
+                        </StackPanel>
+                    </GroupBox>
                 </StackPanel>
 
                 <StackPanel x:Name="DiffPage" Spacing="8" IsVisible="False">
@@ -93,7 +117,7 @@
             </Grid>
         </ScrollViewer>
 
-        <Border Grid.Row="1" Grid.ColumnSpan="2" BorderThickness="0,1,0,0" Padding="16"
+        <Border Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="0" BorderThickness="0,1,0,0" Padding="16"
                 BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
             <Grid ColumnDefinitions="*,Auto">
                 <TextBlock x:Name="ErrorText" Foreground="IndianRed" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/>
