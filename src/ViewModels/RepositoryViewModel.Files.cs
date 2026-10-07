@@ -21,11 +21,7 @@ public partial class RepositoryViewModel
     [ObservableProperty]
     public partial bool RepositoryFilesTabOn { get; set; }
 
-    [ObservableProperty]
-    public partial string RepositoryLocksNotice { get; set; } = "";
-
     public bool HistoryTabOn => !RepositoryFilesTabOn;
-    public bool HasRepositoryLocksNotice => RepositoryLocksNotice.Length > 0;
     public bool RepositoryTreeEmpty => _repositoryFiles.Count == 0 && !IsBusy;
 
     partial void OnRepositoryFilesTabOnChanged(bool value)
@@ -33,8 +29,6 @@ public partial class RepositoryViewModel
         OnPropertyChanged(nameof(HistoryTabOn));
         OnPropertyChanged(nameof(ShowHistoryChrome));
     }
-
-    partial void OnRepositoryLocksNoticeChanged(string value) => OnPropertyChanged(nameof(HasRepositoryLocksNotice));
 
     [RelayCommand]
     private void ShowHistoryTab() => RepositoryFilesTabOn = false;
@@ -65,12 +59,7 @@ public partial class RepositoryViewModel
         _repositoryFiles = files;
         var needsLocks = _repositoryFiles.Count > 0 || _repositoryLocks.Count > 0;
         if (refreshLocks)
-        {
             _repositoryLocksKnown = false;
-            RepositoryLocksNotice = "";
-        }
-        else if (needsLocks && !_repositoryLocksKnown && RepositoryLocksNotice.Length == 0)
-            RepositoryLocksNotice = "Refresh to load LFS lock status.";
         BuildRepositoryFileTree();
         if (!refreshLocks)
             return;
@@ -88,22 +77,6 @@ public partial class RepositoryViewModel
             foreach (var item in locks)
                 _repositoryLocks[item.Path] = item;
             _repositoryLocksKnown = needsLocks;
-            RepositoryLocksNotice = "";
-        }
-        catch (GitCommandFailedException exception)
-        {
-            RepositoryLocksNotice = "LFS lock status unavailable. " + exception.Message;
-            throw;
-        }
-        catch (RepositoryActionException exception)
-        {
-            RepositoryLocksNotice = exception.Message;
-            throw;
-        }
-        catch (OperationCanceledException)
-        {
-            RepositoryLocksNotice = "LFS lock lookup cancelled. Refresh to load lock status.";
-            throw;
         }
         finally
         {
@@ -245,7 +218,6 @@ public partial class RepositoryViewModel
         if (!ok && !_lifetime.IsCancellationRequested)
         {
             _repositoryLocksKnown = false;
-            RepositoryLocksNotice = "Refresh to load current LFS lock status.";
             BuildRepositoryFileTree();
         }
     }

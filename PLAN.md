@@ -80,6 +80,10 @@ On 2026-10-07 the Files tab stopped showing Unlocked and unknown-state labels on
 
 On 2026-10-07 the LFS lock-loading message moved into the centered branch bar with other running-command status. The Files pane keeps only lock errors and refresh guidance above its tree; it no longer displays the loading message there.
 
+On 2026-10-07 the Files pane's Refresh button was removed. Opening the Files tab, switching back to its repository tab, and reactivating the window refresh the file tree and server lock information through the existing activation refresh. Directory expansion and file selection stay in place. F5 still refreshes the active repository.
+
+On 2026-10-07 the Files pane's inline lock-error and refresh-guidance messages were removed, along with lock-error text in file tooltips. Lock failures use the existing global error banner, like other Git commands. Unknown lock state still disables lock actions; loading status remains in the centered branch bar.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

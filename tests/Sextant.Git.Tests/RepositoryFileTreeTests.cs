@@ -86,6 +86,7 @@ public class RepositoryFileTreeTests
                 "The repository file tree must realize only the visible rows.");
             Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "readme.txt");
             Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Git");
+            Assert.DoesNotContain(view.GetVisualDescendants().OfType<Button>(), button => button.Content as string == "Refresh");
 
             repo.WriteFile("docs/another.txt", "new after refresh\n");
             await vm.RefreshRepositoryFilesCommand.ExecuteAsync(null);
@@ -139,10 +140,24 @@ public class RepositoryFileTreeTests
             Assert.False(file.LocksKnown);
             Assert.False(file.ShowLock);
             Assert.False(file.ShowUnlock);
-            Assert.True(vm.HasRepositoryLocksNotice);
             Assert.True(vm.HasBanner);
             Assert.Contains(vm.RepositoryFileTree, item => item.Path == "plain.txt");
             Assert.False(vm.IsBusy);
+            Assert.DoesNotContain("lock status unavailable", file.Tip, StringComparison.Ordinal);
+            var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 700 };
+            var window = new Window { Content = view, Width = 1100, Height = 700 };
+            window.Show();
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            var message = Assert.Single(view.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == vm.Banner);
+            var messagePoint = message.TranslatePoint(default, view);
+            var files = view.FindControl<ListBox>("RepositoryFileList")!;
+            var filesPoint = files.TranslatePoint(default, view);
+            Assert.NotNull(messagePoint);
+            Assert.NotNull(filesPoint);
+            Assert.True(messagePoint.Value.Y < filesPoint.Value.Y);
+            Assert.DoesNotContain(files.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == vm.Banner);
+            window.Close();
             await vm.DisposeAsync();
         }, CancellationToken.None);
     }
@@ -275,7 +290,6 @@ public class RepositoryFileTreeTests
             server.ListStatus = 500;
             await vm.RefreshRepositoryFilesCommand.ExecuteAsync(null);
             Assert.True(vm.HasBanner);
-            Assert.True(vm.HasRepositoryLocksNotice);
             Assert.All(vm.RepositoryFileTree.Where(item => item.IsFile), item =>
             {
                 Assert.Equal("", item.LockText);
@@ -358,8 +372,7 @@ public class RepositoryFileTreeTests
                 Dispatcher.UIThread.RunJobs();
                 Assert.True(vm.IsBusy);
                 Assert.Equal("Loading LFS locks…", vm.BusyText);
-                Assert.False(vm.HasRepositoryLocksNotice);
-                Assert.Equal("", vm.RepositoryLocksNotice);
+                Assert.False(vm.HasBanner, vm.Banner);
                 var message = Assert.Single(view.GetVisualDescendants().OfType<TextBlock>(),
                     text => text.IsEffectivelyVisible && text.Text == "Loading LFS locks…");
                 var messagePoint = message.TranslatePoint(default, view);
@@ -378,6 +391,87 @@ public class RepositoryFileTreeTests
             Assert.False(vm.IsBusy);
             Assert.Equal("", vm.BusyText);
         }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Returning_to_repository_files_or_the_window_refreshes_files_and_remote_locks()
+    {
+        if (!LfsLockTests.GitLfsInstalled())
+            return;
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        await using var server = new LocalLfsLockServer([]);
+        using var repo = LfsLockTests.CreateLfsRepo(server, ["docs/plain.txt"]);
+        using var other = new TempRepo();
+        other.WriteFile("other.txt", "another repository\n");
+        other.CommitAll("other");
+
+        await session.Dispatch(async () =>
+        {
+            var store = new WorkspaceStore(Path.Combine(repo.Directory, ".git", "test-workspace"));
+            var main = new MainViewModel(store, new WorkspaceState(),
+                new AppSettings { GitExecutable = repo.Git, ReopenTabs = false }, new GitProcessRunner());
+            await main.InitializeAsync();
+            var first = new RepositoryViewModel(main, repo.Directory);
+            var second = new RepositoryViewModel(main, other.Directory);
+            main.Tabs.Add(first);
+            main.Tabs.Add(second);
+            try
+            {
+                main.Activate(first);
+                await first.EnsureLoadedAsync();
+                await WaitUntilIdle(first);
+                await first.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
+                first.ToggleRepositoryDirectory(first.RepositoryFileTree.Single(item => item.Path == "docs"));
+                first.SelectedRepositoryFile = first.RepositoryFileTree.Single(item => item.Path == "docs/plain.txt");
+
+                main.Activate(second);
+                await second.EnsureLoadedAsync();
+                await WaitUntilIdle(second);
+                await using var external = await RepositorySession.OpenAsync(new GitProcessRunner(), repo.Git, repo.Directory, CancellationToken.None);
+                await external.LockLfsFileAsync("docs/plain.txt", CancellationToken.None);
+                repo.WriteFile("docs/new.txt", "new while away\n");
+                var requests = server.Requests.Count(request => request.Method == "GET");
+                main.Activate(first);
+                await WaitUntilIdle(first);
+                Assert.False(first.HasBanner, first.Banner);
+                Assert.True(server.Requests.Count(request => request.Method == "GET") > requests);
+                Assert.Equal("Locked by Test", first.RepositoryFileTree.Single(item => item.Path == "docs/plain.txt").LockText);
+                Assert.Contains(first.RepositoryFileTree, item => item.Path == "docs/new.txt");
+                Assert.True(first.RepositoryFileTree.Single(item => item.Path == "docs").IsExpanded);
+                Assert.Equal("docs/plain.txt", first.SelectedRepositoryFile?.Path);
+
+                await external.UnlockLfsFileAsync("docs/plain.txt", force: false, CancellationToken.None);
+                requests = server.Requests.Count(request => request.Method == "GET");
+                main.OnWindowActivated();
+                await WaitUntilIdle(first);
+                Assert.False(first.HasBanner, first.Banner);
+                Assert.True(server.Requests.Count(request => request.Method == "GET") > requests);
+                Assert.False(first.RepositoryFileTree.Single(item => item.Path == "docs/plain.txt").HasLockInfo);
+                Assert.Equal("docs/plain.txt", first.SelectedRepositoryFile?.Path);
+
+                first.ShowHistoryTabCommand.Execute(null);
+                requests = server.Requests.Count(request => request.Method == "GET");
+                main.OnWindowActivated();
+                await WaitUntilIdle(first);
+                Assert.Equal(requests, server.Requests.Count(request => request.Method == "GET"));
+                await external.LockLfsFileAsync("docs/plain.txt", CancellationToken.None);
+                await first.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
+                Assert.False(first.HasBanner, first.Banner);
+                Assert.Equal("Locked by Test", first.RepositoryFileTree.Single(item => item.Path == "docs/plain.txt").LockText);
+            }
+            finally
+            {
+                main.Shutdown();
+            }
+        }, CancellationToken.None);
+    }
+
+    private static async Task WaitUntilIdle(RepositoryViewModel tab)
+    {
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (tab.IsBusy && DateTime.UtcNow < until)
+            await Task.Delay(20);
+        Assert.False(tab.IsBusy);
     }
 
     private sealed class TreeHost(string git, IDialogService? dialogs = null) : IWorkspaceHost

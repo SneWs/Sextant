@@ -348,18 +348,12 @@
                 </ListBox>
             </DockPanel>
 
-                <Grid Grid.Row="1" RowDefinitions="Auto,Auto,*" IsVisible="{Binding RepositoryFilesTabOn}">
-                    <DockPanel Margin="8,0,4,4">
-                        <Button DockPanel.Dock="Right" Classes="flat" Content="Refresh"
-                                Command="{Binding RefreshRepositoryFilesCommand}" IsEnabled="{Binding CanRunCommands}"
-                                ToolTip.Tip="Refresh repository files and LFS locks"/>
-                        <TextBlock Text="Repository files" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                    </DockPanel>
-                    <TextBlock Grid.Row="1" Margin="8,0,8,6" Text="{Binding RepositoryLocksNotice}"
-                               IsVisible="{Binding HasRepositoryLocksNotice}" TextWrapping="Wrap" MaxHeight="100"/>
-                    <TextBlock Grid.Row="2" Text="No repository files." Margin="8"
+                <Grid Grid.Row="1" RowDefinitions="Auto,*" IsVisible="{Binding RepositoryFilesTabOn}">
+                    <TextBlock Text="Repository files" FontWeight="SemiBold" Margin="8,0,4,4"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Grid.Row="1" Text="No repository files." Margin="8"
                                IsVisible="{Binding RepositoryTreeEmpty}" Opacity="0.65"/>
-                    <ListBox x:Name="RepositoryFileList" Grid.Row="2" ItemsSource="{Binding RepositoryFileTree}"
+                    <ListBox x:Name="RepositoryFileList" Grid.Row="1" ItemsSource="{Binding RepositoryFileTree}"
                              SelectedItem="{Binding SelectedRepositoryFile}"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              DoubleTapped="OnRepositoryFileDoubleTapped" KeyDown="OnRepositoryFileKeyDown">

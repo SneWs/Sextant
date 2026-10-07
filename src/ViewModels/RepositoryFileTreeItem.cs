@@ -29,7 +29,7 @@ public partial class RepositoryFileTreeItem : ObservableObject
         : Lock.Owner.Length == 0 ? "Locked" : $"Locked by {Lock.Owner}";
     public string Tip => IsDirectory ? Path
         : $"{Path} - {(LfsTracked ? "tracked with Git LFS" : "not tracked with Git LFS")}"
-            + (!LocksKnown ? " - lock status unavailable" : LockText.Length == 0 ? "" : $" - {LockText}");
+            + (LockText.Length == 0 ? "" : $" - {LockText}");
     public bool ShowLock => IsFile && LocksKnown && Lock is null;
     public bool ShowUnlock => IsFile && LocksKnown && Lock is not null;
     public bool ShowLockActions => ShowLock || ShowUnlock;
