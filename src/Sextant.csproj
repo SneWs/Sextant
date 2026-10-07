@@ -21,10 +21,6 @@
 
   <ItemGroup>
     <ProjectReference Include="Sextant.Git\Sextant.Git.csproj" />
-    <ProjectReference Include="Sextant.AskPass\Sextant.AskPass.csproj" Condition="$([MSBuild]::IsOSPlatform('Windows'))">
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-      <Private>false</Private>
-    </ProjectReference>
     <InternalsVisibleTo Include="Sextant.Git.Tests" />
   </ItemGroup>
 
@@ -55,12 +51,24 @@
   <Import Project="MacApp.targets" />
 
   <!--
-    SSH_ASKPASS must be a console executable. Debug builds copy the framework-dependent
-    helper beside Sextant.exe. A Windows publish with a RID copies the self-contained
+    SSH_ASKPASS must be a console executable. The helper is not in the solution, so a
+    solution build does not compile it. Build the framework-dependent helper here, then
+    copy it beside Sextant.exe. A Windows publish with a RID copies the self-contained
     helper into that folder so it uses the runtime already published with Sextant.
     macOS and Linux do not use this helper.
   -->
-  <Target Name="CopySextantAskPass" AfterTargets="Build" Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+  <Target Name="BuildSextantAskPass" Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <MSBuild Projects="$(MSBuildThisFileDirectory)Sextant.AskPass\Sextant.AskPass.csproj"
+             Targets="Restore"
+             Properties="Configuration=$(Configuration)"
+             RemoveProperties="RuntimeIdentifier;SelfContained" />
+    <MSBuild Projects="$(MSBuildThisFileDirectory)Sextant.AskPass\Sextant.AskPass.csproj"
+             Targets="Build"
+             Properties="Configuration=$(Configuration)"
+             RemoveProperties="RuntimeIdentifier;SelfContained" />
+  </Target>
+
+  <Target Name="CopySextantAskPass" AfterTargets="Build" DependsOnTargets="BuildSextantAskPass" Condition="$([MSBuild]::IsOSPlatform('Windows'))">
     <ItemGroup>
       <_AskPassFile Include="$(MSBuildThisFileDirectory)Sextant.AskPass\bin\$(Configuration)\net10.0\Sextant.AskPass.exe" />
       <_AskPassFile Include="$(MSBuildThisFileDirectory)Sextant.AskPass\bin\$(Configuration)\net10.0\Sextant.AskPass.dll" />
@@ -72,6 +80,7 @@
 
   <Target Name="CopySextantAskPassPublish"
           AfterTargets="Publish"
+          DependsOnTargets="BuildSextantAskPass"
           Condition="$([MSBuild]::IsOSPlatform('Windows')) and '$(RuntimeIdentifier)' == ''">
     <ItemGroup>
       <_AskPassFile Include="$(MSBuildThisFileDirectory)Sextant.AskPass\bin\$(Configuration)\net10.0\Sextant.AskPass.exe" />
