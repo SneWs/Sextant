@@ -17,7 +17,7 @@ A conflict replaces that quiet state with a banner and Continue and Abort. A spa
 Below that, the window is three columns. Drag the splitters to resize them. The widths are remembered.
 
 1. **Locations** lists branches, remotes, tags, stashes, submodules, and worktrees.
-2. **History** is the commit graph.
+2. **History / Files** switches between the commit graph and the repository file tree.
 3. **Files and the diff** describe the selected commit, or the working copy.
 
 View, Toggle locations hides the first column. The command palette has the same action.
@@ -58,6 +58,14 @@ Search is Ctrl+F (Command+F). The box spans the window under the branch bar. The
 A name with no slash matches that file in any directory. A version such as `1.2.3` stays a text search. A path, author, subject, or SHA search is a flat list, without the lane lines. A `branch:` search keeps the graph.
 
 A file's History button is the same search limited to that path.
+
+## Repository file tree
+
+The Files tab beside History lists the current repository's tracked files and non-ignored untracked files, not just changed files. Directories expand with the arrow or a double-click. Only visible rows are drawn, and a refresh keeps expanded directories. Sparse-checkout paths are listed from Git's index without checking them out.
+
+Each file has a Git or LFS badge. Only locked files show lock information, including the owner's name. Opening this tab or pressing its Refresh button asks the LFS server for current locks, including locks on ordinary Git files; ordinary history browsing does not. F5 also refreshes locks while the Files tab is open. Loading LFS locks is shown in the centered branch bar. A failed lookup shows a notice above the tree, and lock actions stay disabled until the lookup succeeds.
+
+Right-click any unlocked file for Lock file, or a locked file for Unlock file. A file does not need to be stored in LFS to use an LFS lock. Force Unlock file sits below Unlock file and asks for confirmation before removing a lock, including another user's lock. These actions use your installed Git LFS and its configured server and credentials. Server errors are shown in the window, rather than treating unknown locks as unlocked. Lock protection depends on the Git LFS lock checks; it does not prevent editing a local file. A file's History action returns to the History tab.
 
 ## Files and commits
 

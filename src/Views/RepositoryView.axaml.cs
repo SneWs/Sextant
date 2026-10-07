@@ -838,6 +838,42 @@ public partial class RepositoryView : UserControl
             vm.ActivateLocation(item);
     }
 
+    private void OnRepositoryDirectoryExpand(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is Button { DataContext: RepositoryFileTreeItem item } && DataContext is RepositoryViewModel vm)
+            vm.ToggleRepositoryDirectory(item);
+    }
+
+    private void OnRepositoryFileDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Source is Visual source && source.FindAncestorOfType<Button>(includeSelf: true) is not null)
+            return;
+        if (DataContext is RepositoryViewModel vm && vm.SelectedRepositoryFile is { IsDirectory: true } item)
+        {
+            vm.ToggleRepositoryDirectory(item);
+            e.Handled = true;
+        }
+    }
+
+    private void OnRepositoryFileKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not RepositoryViewModel vm || vm.SelectedRepositoryFile is not { } item)
+            return;
+        if (e.Key == Key.Right && item.IsDirectory && !item.IsExpanded
+            || e.Key == Key.Left && item.IsDirectory && item.IsExpanded)
+        {
+            vm.ToggleRepositoryDirectory(item);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Left && item.Depth > 0)
+        {
+            var parent = item.Path[..item.Path.LastIndexOf('/')];
+            vm.SelectedRepositoryFile = vm.RepositoryFileTree.FirstOrDefault(row => row.IsDirectory && row.Path == parent);
+            e.Handled = true;
+        }
+    }
+
     private void OnMenuOpening(object? sender, CancelEventArgs e)
     {
         if (sender is not ContextMenu menu || menu.PlacementTarget is not Control target)
@@ -846,6 +882,8 @@ public partial class RepositoryView : UserControl
         if (target.DataContext is LocationItem item && !HasLocationMenu(item))
             e.Cancel = true;
         if (target.DataContext is DiffFileRow { FileMenu: null })
+            e.Cancel = true;
+        if (target.DataContext is RepositoryFileTreeItem { IsDirectory: true })
             e.Cancel = true;
     }
 }

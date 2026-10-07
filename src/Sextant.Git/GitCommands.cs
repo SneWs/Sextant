@@ -711,6 +711,23 @@ public static class GitCommands
     public static IReadOnlyList<string> LfsSmudge(string toplevel) =>
         ["-C", toplevel, "lfs", "smudge"];
 
+    public static IReadOnlyList<string> RepositoryFiles(string toplevel) =>
+        ["-C", toplevel, "--no-optional-locks", "ls-files", "--cached", "--others", "--exclude-standard", "--deduplicate", "-z"];
+
+    public static IReadOnlyList<string> LfsLocks(string toplevel) =>
+        ["-C", toplevel, "--no-optional-locks", "lfs", "locks"];
+
+    public static IReadOnlyList<string> LfsLocksCached(string toplevel) =>
+        ["-C", toplevel, "--no-optional-locks", "lfs", "locks", "--cached", "--json"];
+
+    public static IReadOnlyList<string> LfsLock(string toplevel, string path) =>
+        ["-C", toplevel, "lfs", "lock", "--json", "--", path];
+
+    public static IReadOnlyList<string> LfsUnlock(string toplevel, string path, bool force) =>
+        force
+            ? ["-C", toplevel, "lfs", "unlock", "--json", "--force", "--", path]
+            : ["-C", toplevel, "lfs", "unlock", "--json", "--", path];
+
     public static IReadOnlyList<string> CheckLfsAttr(string toplevel, string? source)
     {
         var arguments = new List<string> { "-C", toplevel, "--no-optional-locks", "check-attr", "--stdin", "-z" };

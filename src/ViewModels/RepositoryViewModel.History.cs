@@ -31,7 +31,7 @@ public partial class RepositoryViewModel
     [ObservableProperty]
     public partial bool ShowHistorySearch { get; set; }
 
-    public bool ShowHistoryChrome => ShowHistorySearch || HasHistoryFilter;
+    public bool ShowHistoryChrome => HistoryTabOn && (ShowHistorySearch || HasHistoryFilter);
 
     [ObservableProperty]
     public partial string ConflictText { get; set; } = "";
@@ -111,7 +111,16 @@ public partial class RepositoryViewModel
     partial void OnShowHistorySearchChanged(bool value) => OnPropertyChanged(nameof(ShowHistoryChrome));
 
     [RelayCommand]
-    private void ToggleHistorySearch() => ShowHistorySearch = !ShowHistorySearch;
+    private void ToggleHistorySearch()
+    {
+        if (RepositoryFilesTabOn)
+        {
+            RepositoryFilesTabOn = false;
+            ShowHistorySearch = true;
+            return;
+        }
+        ShowHistorySearch = !ShowHistorySearch;
+    }
 
     partial void OnShowMergeBaseChanged(bool value) => OnPropertyChanged(nameof(MergeBaseLabel));
 
@@ -308,8 +317,11 @@ public partial class RepositoryViewModel
         return LoadDiffAsync();
     }
 
-    private Task ShowFileHistoryAsync(string path) =>
-        RunAsync("Loading file history…", ct => _session!.SetHistoryAsync(HistoryQuery.ForPath(path), ct));
+    private Task ShowFileHistoryAsync(string path)
+    {
+        RepositoryFilesTabOn = false;
+        return RunAsync("Loading file history…", ct => _session!.SetHistoryAsync(HistoryQuery.ForPath(path), ct));
+    }
 
     private Task StashAsync()
     {

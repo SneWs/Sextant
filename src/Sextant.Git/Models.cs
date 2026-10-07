@@ -44,6 +44,10 @@ public sealed record GitRef(string Oid, string Name, bool IsHead, string? Upstre
 
 public sealed record CommitFileChange(string Path, string? OriginalPath, ChangeKind Kind);
 
+public sealed record RepositoryFile(string Path, bool LfsTracked);
+
+public sealed record LfsLock(string Id, string Path, string Owner);
+
 public sealed class GraphCommit
 {
     public required CommitRecord Commit { get; init; }

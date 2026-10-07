@@ -352,7 +352,12 @@ public partial class RepositoryViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    public Task Refresh() => RunAsync("Refreshing…", ct => Session.RefreshRefsAndStatusAsync(ct));
+    public Task Refresh() => RunAsync("Refreshing…", async ct =>
+    {
+        await Session.RefreshRefsAndStatusAsync(ct);
+        if (RepositoryFilesTabOn)
+            await LoadRepositoryFilesAsync(ct, refreshLocks: true);
+    }, refreshRepositoryFiles: false);
 
     public Task RefreshFromFocusAsync()
     {
@@ -597,6 +602,7 @@ public partial class RepositoryViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanRunCommands));
         OnPropertyChanged(nameof(ShowBranchStatus));
         NotifyBulkStage();
+        NotifyRepositoryFileCommands();
     }
 
     partial void OnShowAheadBehindChanged(bool value) => OnPropertyChanged(nameof(ShowBranchStatus));
@@ -837,6 +843,8 @@ public partial class RepositoryViewModel : ViewModelBase
                 return;
             Apply(_session.Snapshot());
             await LoadDetailsAsync();
+            if (RepositoryFilesTabOn)
+                await LoadRepositoryFilesAsync(_lifetime.Token, refreshLocks: false);
         }
         catch (OperationCanceledException)
         {
@@ -920,7 +928,7 @@ public partial class RepositoryViewModel : ViewModelBase
         await LoadDetailsAsync();
     }
 
-    private async Task<bool> RunAsync(string label, Func<CancellationToken, Task> action)
+    private async Task<bool> RunAsync(string label, Func<CancellationToken, Task> action, bool refreshRepositoryFiles = true)
     {
         if (_session is null || IsBusy)
             return false;
@@ -933,6 +941,8 @@ public partial class RepositoryViewModel : ViewModelBase
         try
         {
             await action(_operation.Token);
+            if (refreshRepositoryFiles && RepositoryFilesTabOn)
+                await LoadRepositoryFilesAsync(_operation.Token, refreshLocks: false);
             HasBanner = false;
             Banner = "";
             ok = true;
@@ -1870,6 +1880,7 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         if (_session is null)
             return;
+        RepositoryFilesTabOn = false;
         for (var attempt = 0; attempt < 12; attempt++)
         {
             var found = Rows.FirstOrDefault(row => string.Equals(row.Sha, oid, StringComparison.OrdinalIgnoreCase));
