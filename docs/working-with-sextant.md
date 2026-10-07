@@ -4,7 +4,7 @@ A repository is a tab. The active tab is the one Sextant loads. History, the fil
 
 The tab shows a green dot when the working tree is clean, an amber dot when it is dirty, and a red dot during a conflict.
 
-The empty window, and the File menu, open, clone, or init a repository. A closed repository is opened again from the folder. There is no list of recent repositories beyond the tabs that restore on launch.
+The empty window, and the File menu, open, clone, or init a repository. On Windows 11, when WSL2 is installed, they also open a repository from a distribution. That tab uses the distribution's git against the Linux folder. A closed repository is opened again from the folder. There is no list of recent repositories beyond the tabs that restore on launch.
 
 The command palette (Ctrl+P, or Command+P on macOS) lists the actions for the open repository, in alphabetical order. A click runs the row you clicked. Type to filter. Enter runs the selected row.
 

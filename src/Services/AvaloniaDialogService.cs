@@ -18,12 +18,25 @@ public sealed class AvaloniaDialogService : IDialogService
 
     public AvaloniaDialogService(Window owner) => _owner = owner;
 
-    public async Task<string?> PickFolderAsync(string title)
+    public async Task<string?> PickFolderAsync(string title, string? startDirectory = null)
     {
+        IStorageFolder? start = null;
+        if (!string.IsNullOrWhiteSpace(startDirectory))
+        {
+            try
+            {
+                start = await _owner.StorageProvider.TryGetFolderFromPathAsync(startDirectory);
+            }
+            catch (Exception)
+            {
+            }
+        }
+
         var folders = await _owner.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
             Title = title,
             AllowMultiple = false,
+            SuggestedStartLocation = start,
         });
         return folders.Count == 0 ? null : folders[0].Path.LocalPath;
     }
@@ -82,6 +95,24 @@ public sealed class AvaloniaDialogService : IDialogService
         await window.ShowDialog(_owner);
         if (allowEmpty && accepted)
             return value ?? "";
+        return value;
+    }
+
+    public async Task<string?> PromptSecretAsync(string title, string message)
+    {
+        var window = Create(title);
+        var box = new TextBox { PasswordChar = '*', PlaceholderText = message };
+        string? value = null;
+        var ok = new Button { Content = "Unlock", IsDefault = true };
+        var cancel = new Button { Content = "Cancel", IsCancel = true };
+        ok.Click += (_, _) =>
+        {
+            value = box.Text ?? "";
+            window.Close();
+        };
+        cancel.Click += (_, _) => window.Close();
+        window.Content = Column(Message(message), box, Buttons(cancel, ok));
+        await window.ShowDialog(_owner);
         return value;
     }
 

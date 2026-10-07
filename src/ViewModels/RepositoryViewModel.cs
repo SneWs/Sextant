@@ -73,14 +73,22 @@ public partial class RepositoryViewModel : ViewModelBase
     private bool _wasMerge;
     private string? _shownSha;
 
-    public RepositoryViewModel(IWorkspaceHost host, string requestedPath)
+    private readonly WslGit? _wsl;
+
+    public RepositoryViewModel(IWorkspaceHost host, string requestedPath, WslGit? wsl = null)
     {
         _host = host;
         RequestedPath = requestedPath;
-        Title = System.IO.Path.GetFileName(requestedPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar));
+        _wsl = wsl is { Distribution.Length: > 0 } ? wsl : null;
+        Title = TabTitle(System.IO.Path.GetFileName(requestedPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar)));
         if (string.IsNullOrWhiteSpace(Title))
-            Title = requestedPath;
+            Title = TabTitle(requestedPath);
     }
+
+    public WslGit? Wsl => _wsl;
+
+    private string TabTitle(string name) =>
+        _wsl is null || string.IsNullOrWhiteSpace(name) ? name : name + " (" + _wsl.Distribution + ")";
 
     public string RequestedPath { get; }
 
@@ -791,9 +799,16 @@ public partial class RepositoryViewModel : ViewModelBase
         if (_lifetime.IsCancellationRequested)
             return;
         using var pending = new PendingRepositoryWork(this);
-        if (!_host.GitReady || _host.GitExecutable is null)
+        if (_wsl is null && (!_host.GitReady || _host.GitExecutable is null))
         {
             Fail("Git is not ready.");
+            _load = null;
+            return;
+        }
+
+        if (_wsl is { Problem: { Length: > 0 } problem })
+        {
+            Fail(problem);
             _load = null;
             return;
         }
@@ -807,7 +822,7 @@ public partial class RepositoryViewModel : ViewModelBase
                 return;
             _session.UseDiffFormats(_host.DiffFormats);
             Toplevel = _session.Toplevel;
-            Title = _session.DisplayName;
+            Title = TabTitle(_session.DisplayName);
             Apply(_session.Snapshot());
             _host.NoteLoaded(this);
             StartWatcher();
@@ -831,9 +846,17 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private async Task<RepositorySession?> OpenSessionAsync(string path)
     {
+        var executable = _wsl?.Launcher ?? _host.GitExecutable;
+        if (string.IsNullOrEmpty(executable))
+        {
+            Fail(_wsl is null ? "Git is not ready." : "Git was not found in " + _wsl.Distribution + ".");
+            _load = null;
+            return null;
+        }
+
         try
         {
-            return await RepositorySession.OpenAsync(_host.Runner, _host.GitExecutable!, path, _lifetime.Token, _hiddenBranches);
+            return await RepositorySession.OpenAsync(_host.Runner, executable, path, _lifetime.Token, _hiddenBranches, _wsl);
         }
         catch (GitCommandFailedException exception) when (exception.IsDubiousOwnership)
         {
@@ -854,8 +877,8 @@ public partial class RepositoryViewModel : ViewModelBase
 
             try
             {
-                await RepositoryAdmin.AddSafeDirectoryAsync(_host.Runner, _host.GitExecutable!, path, _lifetime.Token);
-                return await RepositorySession.OpenAsync(_host.Runner, _host.GitExecutable!, path, _lifetime.Token, _hiddenBranches);
+                await RepositoryAdmin.AddSafeDirectoryAsync(_host.Runner, executable, path, _lifetime.Token, _wsl);
+                return await RepositorySession.OpenAsync(_host.Runner, executable, path, _lifetime.Token, _hiddenBranches, _wsl);
             }
             catch (GitCommandFailedException again)
             {
@@ -877,8 +900,17 @@ public partial class RepositoryViewModel : ViewModelBase
         if (_session is null)
             return;
         _watcher?.Dispose();
-        _watcher = new GitDirectoryWatcher(_session.GitDirectory, () => Dispatcher.UIThread.Post(() => RefreshFromWatcherCommand.Execute(null)));
-        _watcher.Failed += () => Dispatcher.UIThread.Post(OnWatcherFailed);
+        _watcher = null;
+        try
+        {
+            _watcher = new GitDirectoryWatcher(_session.GitDirectory, () => Dispatcher.UIThread.Post(() => RefreshFromWatcherCommand.Execute(null)));
+            _watcher.Failed += () => Dispatcher.UIThread.Post(OnWatcherFailed);
+        }
+        catch (Exception) when (_wsl is not null)
+        {
+            // The 9P share does not always support a watcher. Focus still refreshes the tab.
+            _watcherFailed = true;
+        }
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
@@ -1098,7 +1130,7 @@ public partial class RepositoryViewModel : ViewModelBase
         {
             Toplevel = _session?.Toplevel ?? Toplevel;
             if (_session is not null && !string.IsNullOrEmpty(_session.DisplayName))
-                Title = _session.DisplayName;
+                Title = TabTitle(_session.DisplayName);
             BranchText = DescribeBranch(state.Branch);
             ShowAheadBehind = state.Branch.Ahead != 0 || state.Branch.Behind != 0;
             AheadBehindText = ShowAheadBehind ? $"↑{state.Branch.Ahead}  ↓{state.Branch.Behind}" : "";
@@ -1615,6 +1647,7 @@ public partial class RepositoryViewModel : ViewModelBase
             foreach (var tree in state.Worktrees.OrderBy(tree => tree.Path, StringComparer.Ordinal))
             {
                 var current = Toplevel is not null && RepoPath.Same(tree.Path, Toplevel);
+                var shown = WslPath.TryParseUnc(tree.Path, out _, out var linux) ? linux : tree.Path;
                 var tracked = tree.Branch is null
                     ? null
                     : state.Refs.FirstOrDefault(reference => reference.Name == tree.Branch);
@@ -1625,8 +1658,8 @@ public partial class RepositoryViewModel : ViewModelBase
                 trees.Add(new LocationItem
                 {
                     Key = "w:" + tree.Path,
-                    Label = name + pending + "  " + tree.Path,
-                    SearchText = tree.Path,
+                    Label = name + pending + "  " + shown,
+                    SearchText = shown + " " + tree.Path,
                     IsCurrent = current,
                     ShowOpen = !current,
                     OpenCommand = new AsyncRelayCommand(() => _host.OpenRepositoryAsync(tree.Path)),

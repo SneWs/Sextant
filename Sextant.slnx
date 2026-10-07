@@ -5,6 +5,7 @@
   <Folder Name="/src/">
     <Project Path="src/Sextant.csproj" />
     <Project Path="src/Sextant.Git/Sextant.Git.csproj" />
+    <Project Path="src/Sextant.AskPass/Sextant.AskPass.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Sextant.Git.Tests/Sextant.Git.Tests.csproj" />

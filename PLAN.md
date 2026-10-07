@@ -526,3 +526,7 @@ UI checks are manual on the desktop app. There is no browser surface. The Phase 
 - File watcher limits on Linux. The git-dir-only watch is the mitigation. If a platform cannot watch even `.git`, refresh-on-focus still has to work.
 - Windows process-startup cost. The command table is the cap on how many processes one gesture starts. Do not add a process per row or per file to "just get a name". A file type tool is the exception, and only when that diff is opened: one process per side of a matching file, at most 64 files in an all-files diff, and nothing while the rows are painted.
 - Credential helpers that only speak to a console. Known Phase 1 limitation, shown as a git error, not papered over with a stored password.
+
+## WSL2
+
+On Windows 11, a detected WSL2 distribution is offered from File → Open from WSL and from the empty window. The folder is taken from that distribution (`wslpath` and `git rev-parse --show-toplevel`). The tab runs `wsl.exe -d <distro> -e <that distro's git>` so config, hooks, attributes, and credential helpers are the distribution's, not Git for Windows. The saved path is the `\\wsl.localhost\` form so the file list, previews, and the watcher still have a Windows path. Opening that UNC path from the ordinary folder picker uses the same distribution git. WSL1 is not offered. Docker's own distributions are left out when another WSL2 distribution is installed. A WSL or Windows git command can ask for the SSH key passphrase in a window; Sextant does not save it.

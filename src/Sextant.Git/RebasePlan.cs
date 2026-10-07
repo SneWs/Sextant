@@ -178,7 +178,7 @@ public static class RebaseEditor
 {
     public const string PointerName = "sextant-rebase.path";
 
-    public static string Create(string gitDirectory, IReadOnlyList<RebaseStep> steps)
+    public static string Create(string gitDirectory, IReadOnlyList<RebaseStep> steps, Func<string, string?>? toGitPath = null)
     {
         Cleanup(gitDirectory);
         var directory = Path.Combine(Path.GetTempPath(), "sextant-rebase-" + Guid.NewGuid().ToString("N"));
@@ -196,7 +196,7 @@ public static class RebaseEditor
             if (!text.EndsWith('\n'))
                 text += "\n";
             File.WriteAllText(path, text, new UTF8Encoding(false));
-            messages[i] = path;
+            messages[i] = ForGit(path, toGitPath);
         }
 
         var todo = RebasePlan.Render(steps, messages);
@@ -213,7 +213,16 @@ public static class RebaseEditor
         }
 
         File.WriteAllText(Path.Combine(gitDirectory, PointerName), directory, new UTF8Encoding(false));
-        return Quote(script);
+        var command = Quote(ForGit(script, toGitPath));
+        // A file written on the Windows temp drive is not executable inside WSL unless the
+        // mount records that bit. The shell does not need it.
+        return toGitPath is null ? command : "sh " + command;
+    }
+
+    private static string ForGit(string path, Func<string, string?>? toGitPath)
+    {
+        var git = toGitPath?.Invoke(path);
+        return string.IsNullOrEmpty(git) ? path : git;
     }
 
     public static string Quote(string path)

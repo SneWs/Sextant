@@ -17,6 +17,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     private readonly CancellationTokenSource _lifetime = new();
     private readonly List<PaletteItem> _palette = [];
     private readonly HashSet<Task> _closingTabs = [];
+    private readonly List<WslDistro> _wslDistros = [];
     private Task? _initialize;
     private Task? _shutdown;
     private bool _started;
@@ -55,6 +56,12 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     [ObservableProperty]
     public partial bool GitReady { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasWsl { get; set; }
+
+    /// <summary>Open from WSL does not need the Windows git binary. The tab uses the distribution's git.</summary>
+    public bool CanOpenWsl => HasWsl && !IsBusy;
 
     [ObservableProperty]
     public partial string GitProblem { get; set; } = "";
@@ -258,6 +265,9 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     [RelayCommand(CanExecute = nameof(CanUseGit))]
     public Task OpenFolder() => OpenFolderAsync();
 
+    [RelayCommand(CanExecute = nameof(CanOpenWsl))]
+    public Task OpenWsl() => OpenWslAsync();
+
     [RelayCommand(CanExecute = nameof(CanUseGit))]
     public Task Clone() => CloneAsync();
 
@@ -358,12 +368,20 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     partial void OnIsBusyChanged(bool value)
     {
         OnPropertyChanged(nameof(CanUseGit));
+        OnPropertyChanged(nameof(CanOpenWsl));
         NotifyFileCommands();
+    }
+
+    partial void OnHasWslChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanOpenWsl));
+        OpenWslCommand.NotifyCanExecuteChanged();
     }
 
     private void NotifyFileCommands()
     {
         OpenFolderCommand.NotifyCanExecuteChanged();
+        OpenWslCommand.NotifyCanExecuteChanged();
         CloneCommand.NotifyCanExecuteChanged();
         InitCommand.NotifyCanExecuteChanged();
     }
@@ -411,18 +429,22 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     private async Task InitializeCoreAsync()
     {
-        await ProbeAsync();
+        await Task.WhenAll(ProbeAsync(), RefreshWslAsync());
         if (_lifetime.IsCancellationRequested)
             return;
         if (_settings.ReopenTabs)
         {
             foreach (var path in _workspace.OpenTabs)
             {
-                if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+                if (string.IsNullOrWhiteSpace(path))
                     continue;
-                if (Tabs.Any(tab => SameTab(tab, path)))
+                var canonical = WslPath.CanonicalWindows(path);
+                var openPath = Directory.Exists(canonical) ? canonical : path;
+                if (!Directory.Exists(openPath))
                     continue;
-                Tabs.Add(CreateTab(path));
+                if (Tabs.Any(tab => SameTab(tab, openPath)))
+                    continue;
+                Tabs.Add(CreateTab(openPath, await BindingForAsync(openPath)));
             }
 
             var active = Tabs.FirstOrDefault(tab => _workspace.ActiveTab is not null && SameTab(tab, _workspace.ActiveTab));
@@ -475,6 +497,32 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         }
     }
 
+    private async Task RefreshWslAsync()
+    {
+        try
+        {
+            var distros = await WslProbe.ListUserDistrosAsync(_lifetime.Token);
+            _wslDistros.Clear();
+            _wslDistros.AddRange(distros);
+            HasWsl = _wslDistros.Count > 0;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception)
+        {
+            _wslDistros.Clear();
+            HasWsl = false;
+        }
+    }
+
+    private async Task<WslGit?> BindingForAsync(string path)
+    {
+        if (!WslPath.TryParseUnc(path, out var distribution, out _))
+            return null;
+        return await WslProbe.BindingAsync(distribution, _lifetime.Token);
+    }
+
     public Task OpenRepositoryAsync(string path) => OpenPathAsync(path);
 
     private async Task OpenFolderAsync()
@@ -487,9 +535,135 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         await OpenPathAsync(path);
     }
 
-    private async Task OpenPathAsync(string path)
+    private async Task OpenWslAsync()
     {
-        if (!GitReady || GitExecutable is null)
+        if (Dialogs is null || IsBusy)
+            return;
+        await RefreshWslAsync();
+        if (_wslDistros.Count == 0)
+        {
+            StatusText = "No WSL2 distribution was found.";
+            return;
+        }
+
+        var distro = await ChooseDistroAsync();
+        if (distro is null)
+            return;
+
+        IsBusy = true;
+        StatusText = "Asking " + distro.Name + "…";
+        string? home = null;
+        string? start = null;
+        try
+        {
+            home = await WslProbe.HomeAsync(distro.Name, _lifetime.Token);
+            if (home is not null)
+                start = await WslProbe.ToWindowsAsync(distro.Name, home, _lifetime.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "";
+            return;
+        }
+        catch (Exception exception)
+        {
+            StatusText = exception.Message;
+            return;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+
+        StatusText = "";
+        var picked = await PickWslFolderAsync(distro.Name, start, home);
+        if (string.IsNullOrWhiteSpace(picked))
+            return;
+
+        IsBusy = true;
+        StatusText = "Opening " + distro.Name + "…";
+        try
+        {
+            var repo = await WslProbe.ResolveAsync(distro.Name, picked, _lifetime.Token);
+            if (repo.Problem is not null)
+            {
+                StatusText = repo.Problem;
+                return;
+            }
+
+            StatusText = "";
+            await OpenPathAsync(repo.WindowsPath, repo.Git);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Open cancelled.";
+        }
+        catch (Exception exception)
+        {
+            StatusText = exception.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task<WslDistro?> ChooseDistroAsync()
+    {
+        if (_wslDistros.Count == 1)
+            return _wslDistros[0];
+        var labels = _wslDistros.Select(distro =>
+            distro.Name + (distro.IsDefault ? " (default)" : "") + " — " + distro.State).ToArray();
+        var picked = await Dialogs!.PickAsync("Open from WSL", "Choose a WSL2 distribution.", labels);
+        if (picked is null)
+            return null;
+        var index = Array.IndexOf(labels, picked);
+        return index < 0 ? null : _wslDistros[index];
+    }
+
+    private async Task<string?> PickWslFolderAsync(string distribution, string? windowsHome, string? linuxHome)
+    {
+        if (!string.IsNullOrWhiteSpace(windowsHome))
+            return await Dialogs!.PickFolderAsync("Open repository in " + distribution, windowsHome);
+        return await Dialogs!.PromptAsync(
+            "Open repository in " + distribution,
+            "Linux path inside " + distribution,
+            linuxHome ?? "/");
+    }
+
+    private async Task OpenPathAsync(string path, WslGit? wsl = null)
+    {
+        path = WslPath.CanonicalWindows(path);
+        if (wsl is null && WslPath.TryParseUnc(path, out var distribution, out _))
+        {
+            try
+            {
+                wsl = await BindingForAsync(path);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                StatusText = exception.Message;
+                return;
+            }
+
+            if (wsl is null)
+            {
+                StatusText = "Git was not found in " + distribution + ".";
+                return;
+            }
+        }
+
+        if (wsl is { Problem: { Length: > 0 } problem })
+        {
+            StatusText = problem;
+            return;
+        }
+
+        if (wsl is null && (!GitReady || GitExecutable is null))
             return;
         if (!Directory.Exists(path))
         {
@@ -504,7 +678,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             return;
         }
 
-        var tab = CreateTab(path);
+        var tab = CreateTab(path, wsl);
         Tabs.Add(tab);
         await Activate(tab);
         if (!Tabs.Contains(tab))
@@ -713,9 +887,9 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         }
     }
 
-    private RepositoryViewModel CreateTab(string path)
+    private RepositoryViewModel CreateTab(string path, WslGit? wsl = null)
     {
-        var tab = new RepositoryViewModel(this, path);
+        var tab = new RepositoryViewModel(this, path, wsl);
         var layout = RepoLayouts.Resolve(_workspace, path);
         tab.LocationsWidth = layout.LocationsWidth;
         tab.GraphWidth = layout.GraphWidth;
@@ -745,6 +919,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     {
         _palette.Clear();
         _palette.Add(new PaletteItem { Title = "Open repository", Run = OpenFolderAsync });
+        if (HasWsl)
+            _palette.Add(new PaletteItem { Title = "Open from WSL", Run = OpenWslAsync });
         _palette.Add(new PaletteItem { Title = "Clone repository", Run = CloneAsync });
         _palette.Add(new PaletteItem { Title = "Init repository", Run = InitAsync });
         _palette.Add(new PaletteItem { Title = "Locate git", Run = LocateGitAsync });

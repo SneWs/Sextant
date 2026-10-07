@@ -5,13 +5,16 @@ namespace Sextant.Services;
 
 public interface IDialogService
 {
-    Task<string?> PickFolderAsync(string title);
+    Task<string?> PickFolderAsync(string title, string? startDirectory = null);
 
     Task<string?> PickGitExecutableAsync();
 
     Task<bool> ConfirmAsync(string title, string message, string confirm = "OK");
 
     Task<string?> PromptAsync(string title, string message, string initial = "", bool allowEmpty = false);
+
+    /// <summary>Masked prompt. Cancel returns null. Confirming an empty field returns an empty string.</summary>
+    Task<string?> PromptSecretAsync(string title, string message);
 
     Task<string?> SaveFileAsync(string title, string suggestedName);
 

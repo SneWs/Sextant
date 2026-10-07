@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\sextant.ico</ApplicationIcon>
-    <DefaultItemExcludes>$(DefaultItemExcludes);Sextant.Git/**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Sextant.Git/**;Sextant.AskPass/**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +21,10 @@
 
   <ItemGroup>
     <ProjectReference Include="Sextant.Git\Sextant.Git.csproj" />
+    <ProjectReference Include="Sextant.AskPass\Sextant.AskPass.csproj" Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
     <InternalsVisibleTo Include="Sextant.Git.Tests" />
   </ItemGroup>
 
@@ -49,4 +53,57 @@
   </ItemGroup>
 
   <Import Project="MacApp.targets" />
+
+  <!--
+    SSH_ASKPASS must be a console executable. Debug builds copy the framework-dependent
+    helper beside Sextant.exe. A Windows publish with a RID copies the self-contained
+    helper into that folder so it uses the runtime already published with Sextant.
+    macOS and Linux do not use this helper.
+  -->
+  <Target Name="CopySextantAskPass" AfterTargets="Build" Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <ItemGroup>
+      <_AskPassFile Include="$(MSBuildThisFileDirectory)Sextant.AskPass\bin\$(Configuration)\net10.0\Sextant.AskPass.exe" />
+      <_AskPassFile Include="$(MSBuildThisFileDirectory)Sextant.AskPass\bin\$(Configuration)\net10.0\Sextant.AskPass.dll" />
+      <_AskPassFile Include="$(MSBuildThisFileDirectory)Sextant.AskPass\bin\$(Configuration)\net10.0\Sextant.AskPass.deps.json" />
+      <_AskPassFile Include="$(MSBuildThisFileDirectory)Sextant.AskPass\bin\$(Configuration)\net10.0\Sextant.AskPass.runtimeconfig.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_AskPassFile)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopySextantAskPassPublish"
+          AfterTargets="Publish"
+          Condition="$([MSBuild]::IsOSPlatform('Windows')) and '$(RuntimeIdentifier)' == ''">
+    <ItemGroup>
+      <_AskPassFile Include="$(MSBuildThisFileDirectory)Sextant.AskPass\bin\$(Configuration)\net10.0\Sextant.AskPass.exe" />
+      <_AskPassFile Include="$(MSBuildThisFileDirectory)Sextant.AskPass\bin\$(Configuration)\net10.0\Sextant.AskPass.dll" />
+      <_AskPassFile Include="$(MSBuildThisFileDirectory)Sextant.AskPass\bin\$(Configuration)\net10.0\Sextant.AskPass.deps.json" />
+      <_AskPassFile Include="$(MSBuildThisFileDirectory)Sextant.AskPass\bin\$(Configuration)\net10.0\Sextant.AskPass.runtimeconfig.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_AskPassFile)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="PublishSextantAskPass"
+          AfterTargets="Publish"
+          Condition="$([MSBuild]::IsOSPlatform('Windows')) and $(RuntimeIdentifier.StartsWith('win'))">
+    <PropertyGroup>
+      <_AskPassStage>$(MSBuildProjectDirectory)\obj\askpass-publish\$(RuntimeIdentifier)\</_AskPassStage>
+      <_AskPassDest>$([System.IO.Path]::GetFullPath('$(PublishDir)'))</_AskPassDest>
+    </PropertyGroup>
+    <RemoveDir Directories="$(_AskPassStage)" />
+    <MakeDir Directories="$(_AskPassStage)" />
+    <MSBuild Projects="$(MSBuildThisFileDirectory)Sextant.AskPass\Sextant.AskPass.csproj"
+             Targets="Restore"
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=true" />
+    <MSBuild Projects="$(MSBuildThisFileDirectory)Sextant.AskPass\Sextant.AskPass.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=true;PublishSingleFile=false;PublishDir=$(_AskPassStage)" />
+    <Error Condition="!Exists('$(_AskPassStage)Sextant.AskPass.exe')" Text="Sextant.AskPass.exe was not published." />
+    <ItemGroup>
+      <_AskPassPublished Include="$(_AskPassStage)Sextant.AskPass.exe" />
+      <_AskPassPublished Include="$(_AskPassStage)Sextant.AskPass.dll" />
+      <_AskPassPublished Include="$(_AskPassStage)Sextant.AskPass.deps.json" />
+      <_AskPassPublished Include="$(_AskPassStage)Sextant.AskPass.runtimeconfig.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_AskPassPublished)" DestinationFolder="$(_AskPassDest)" />
+  </Target>
 </Project>
