@@ -63,9 +63,9 @@ public interface IWorkspaceHost
 
     bool GitReady { get; }
 
-    void Activate(RepositoryViewModel tab);
+    Task Activate(RepositoryViewModel tab);
 
-    void Close(RepositoryViewModel tab);
+    Task Close(RepositoryViewModel tab);
 
     void NoteLoaded(RepositoryViewModel tab);
 

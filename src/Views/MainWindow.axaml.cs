@@ -24,10 +24,16 @@ public partial class MainWindow : Window
         SizeChanged += (_, _) => RememberWindow();
         PositionChanged += (_, _) => RememberWindow();
         PropertyChanged += OnWindowPropertyChanged;
-        Activated += (_, _) => (DataContext as MainViewModel)?.OnWindowActivated();
+        Activated += OnWindowActivated;
     }
 
-    protected override void OnOpened(EventArgs e)
+    private async void OnWindowActivated(object? sender, EventArgs e)
+    {
+        if (DataContext is MainViewModel vm)
+            await vm.OnWindowActivated();
+    }
+
+    protected override async void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
         BringOnScreen();
@@ -35,19 +41,34 @@ public partial class MainWindow : Window
             return;
         vm.PropertyChanged += OnViewModelPropertyChanged;
         vm.Attach(new AvaloniaDialogService(this));
-        _ = vm.InitializeAsync();
+        await vm.InitializeAsync();
+    }
+
+    private bool _closing;
+    private bool _shutdownComplete;
+
+    protected override async void OnClosing(WindowClosingEventArgs e)
+    {
+        base.OnClosing(e);
+        if (e.Cancel || _shutdownComplete || DataContext is not MainViewModel vm)
+            return;
+        e.Cancel = true;
+        if (_closing)
+            return;
+        _closing = true;
+        CommitWindow();
+        ReadWidths();
+        IsEnabled = false;
+        await vm.Shutdown();
+        _shutdownComplete = true;
+        Dispatcher.UIThread.Post(Close);
     }
 
     protected override void OnClosed(EventArgs e)
     {
         _dragTab = null;
-        CommitWindow();
         if (DataContext is MainViewModel vm)
-        {
-            ReadWidths();
-            vm.Shutdown();
-        }
-
+            vm.PropertyChanged -= OnViewModelPropertyChanged;
         base.OnClosed(e);
     }
 
@@ -153,7 +174,7 @@ public partial class MainWindow : Window
             rule.Width = width;
     }
 
-    private void OnTunnelKey(object? sender, KeyEventArgs e)
+    private async void OnTunnelKey(object? sender, KeyEventArgs e)
     {
         if (DataContext is not MainViewModel vm)
             return;
@@ -166,9 +187,9 @@ public partial class MainWindow : Window
 
         if (AppGestures.Matches(e, Key.O))
         {
-            if (vm.CanUseGit)
-                vm.OpenFolderCommand.Execute(null);
             e.Handled = true;
+            if (vm.CanUseGit)
+                await vm.OpenFolderCommand.ExecuteAsync(null);
             return;
         }
 
@@ -181,17 +202,17 @@ public partial class MainWindow : Window
 
         if (AppGestures.Matches(e, Key.B) && vm.ActiveTab is { } branchTab)
         {
-            if (branchTab.CanRunCommands)
-                branchTab.CreateBranchCommand.Execute(null);
             e.Handled = true;
+            if (branchTab.CanRunCommands)
+                await branchTab.CreateBranchCommand.ExecuteAsync(null);
             return;
         }
 
         if (AppGestures.Matches(e, Key.S, KeyModifiers.Shift) && vm.ActiveTab is { } stashTab)
         {
-            if (stashTab.CanRunCommands)
-                stashTab.StashCommand.Execute(null);
             e.Handled = true;
+            if (stashTab.CanRunCommands)
+                await stashTab.StashCommand.ExecuteAsync(null);
             return;
         }
 
@@ -204,44 +225,44 @@ public partial class MainWindow : Window
 
         if (AppGestures.Matches(e, Key.W))
         {
+            e.Handled = true;
             if (vm.PaletteOpen)
                 vm.ClosePalette();
             else
-                vm.CloseActive();
-            e.Handled = true;
+                await vm.CloseActiveCommand.ExecuteAsync(null);
             return;
         }
 
         // Command+Tab is the macOS application switcher, so next tab is Control+Tab everywhere.
         if (e.Key == Key.Tab && e.KeyModifiers == KeyModifiers.Control)
         {
-            vm.NextTab();
             e.Handled = true;
+            await vm.NextTabCommand.ExecuteAsync(null);
             return;
         }
 
         if (!vm.PaletteOpen && e.KeyModifiers == AppGestures.Command && Digit(e.Key) is int digit)
         {
-            vm.ActivateDigit(digit);
             e.Handled = true;
+            await vm.ActivateDigit(digit);
             return;
         }
 
         if (e.Key == Key.F5)
         {
-            vm.RefreshActive();
             e.Handled = true;
+            await vm.RefreshActiveCommand.ExecuteAsync(null);
         }
     }
 
-    private void OnPaletteKeyDown(object? sender, KeyEventArgs e)
+    private async void OnPaletteKeyDown(object? sender, KeyEventArgs e)
     {
         if (DataContext is not MainViewModel vm)
             return;
         if (e.Key == Key.Enter)
         {
-            _ = vm.RunPaletteAsync();
             e.Handled = true;
+            await vm.RunPaletteCommand.ExecuteAsync(null);
         }
         else if (e.Key == Key.Down)
         {
@@ -255,7 +276,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnPaletteChosen(object? sender, TappedEventArgs e)
+    private async void OnPaletteChosen(object? sender, TappedEventArgs e)
     {
         if (DataContext is not MainViewModel vm || e.Source is not Visual source)
             return;
@@ -263,8 +284,8 @@ public partial class MainWindow : Window
         if (row?.DataContext is not PaletteItem chosen)
             return;
         vm.SelectedPalette = chosen;
-        _ = vm.RunPaletteAsync();
         e.Handled = true;
+        await vm.RunPaletteCommand.ExecuteAsync(null);
     }
 
     private void OnPaletteBackdrop(object? sender, PointerPressedEventArgs e)
@@ -421,13 +442,13 @@ public partial class MainWindow : Window
         _dragMoved = false;
     }
 
-    private void OnWindowPointerMoved(object? sender, PointerEventArgs e)
+    private async void OnWindowPointerMoved(object? sender, PointerEventArgs e)
     {
         if (_dragTab is null || DataContext is not MainViewModel vm)
             return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
-            FinishTabGesture(activateIfClick: true);
+            await FinishTabGesture(activateIfClick: true);
             return;
         }
 
@@ -448,26 +469,28 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private void OnWindowPointerReleased(object? sender, PointerReleasedEventArgs e)
+    private async void OnWindowPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (_dragTab is null)
             return;
         if (_dragMoved)
             e.Handled = true;
-        FinishTabGesture(activateIfClick: true);
+        var activation = FinishTabGesture(activateIfClick: true);
         if (e.Pointer.Captured == this)
             e.Pointer.Capture(null);
+        await activation;
     }
 
-    private void FinishTabGesture(bool activateIfClick)
+    private Task FinishTabGesture(bool activateIfClick)
     {
         if (_dragTab is null)
-            return;
+            return Task.CompletedTask;
         var tab = _dragTab;
         var moved = _dragMoved;
         EndDrag();
         if (activateIfClick && !moved && DataContext is MainViewModel vm)
-            vm.Activate(tab);
+            return vm.Activate(tab);
+        return Task.CompletedTask;
     }
 
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)

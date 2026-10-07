@@ -168,8 +168,9 @@ public partial class RepositoryViewModel
     [RelayCommand]
     private async Task ShowLfs()
     {
-        if (_session is null || IsBusy || _lfsPath.Length == 0)
+        if (_session is null || IsBusy || _lfsPath.Length == 0 || _lifetime.IsCancellationRequested)
             return;
+        using var pending = new PendingRepositoryWork(this);
         var path = _lfsPath;
         var revision = _lfsRevision;
         var local = _lfsLocal;
@@ -836,7 +837,7 @@ public partial class RepositoryViewModel
             FileMenu = FileMenuFor(path, tracked),
         };
         var section = new DiffSection(path, header);
-        header.ToggleCommand = new RelayCommand(() => SetExpanded(section, !header.Expanded));
+        header.ToggleCommand = new AsyncRelayCommand(() => SetExpanded(section, !header.Expanded), AsyncRelayCommandOptions.AllowConcurrentExecutions);
         _sections.Add(section);
         DiffRows.Add(header);
         NoteSectionFolds();
@@ -872,7 +873,7 @@ public partial class RepositoryViewModel
         new(path, null, null, beforeNotice, afterNotice)
         {
             FileMenu = FileMenuFor(path),
-            ToggleCommand = new RelayCommand(() => ToggleFileSection(path)),
+            ToggleCommand = new AsyncRelayCommand(() => ToggleFileSection(path), AsyncRelayCommandOptions.AllowConcurrentExecutions),
         };
 
     private void PlaceImage(string path, Bitmap bitmap)

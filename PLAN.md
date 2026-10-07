@@ -88,6 +88,8 @@ On 2026-10-07 a repository file's menu gained Open in editor and the platform's 
 
 On 2026-10-07 the LFS tests share one cached asynchronous availability probe through the existing GitProcessRunner. The Windows runner had waited five seconds for git lfs version, ignored the timeout result, then read ExitCode before the process exited. The shared probe allows 30 seconds, waits for process completion, and cancels and drains the process through the runner on timeout. A timeout is a clear test failure, not a false report that LFS is missing.
 
+On 2026-10-07 view-model commands and callable actions that run asynchronous work return Task rather than discarding it from a void method. Tab activation, close, refresh, and palette execution await their repository work through the workspace host. The main window waits for repository cleanup before closing, and repeated shutdown requests share the same completion task, including tabs whose close is already in progress. Clipboard commands also await their writes. Framework event handlers remain void where Avalonia requires it, but await the underlying task.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

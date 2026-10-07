@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
+using CommunityToolkit.Mvvm.Input;
 using Sextant.ViewModels;
 
 namespace Sextant.Views;
@@ -15,9 +16,13 @@ public class CopyableText : SelectableTextBlock
     public CopyableText()
     {
         IsTabStop = false;
-        var copy = new MenuItem { Header = "Copy", InputGesture = TextBox.CopyGesture };
+        var copy = new MenuItem
+        {
+            Header = "Copy",
+            InputGesture = TextBox.CopyGesture,
+            Command = new AsyncRelayCommand(() => Host?.Copy() ?? Task.CompletedTask),
+        };
         var all = new MenuItem { Header = "Select all", InputGesture = AppGestures.CommandKey(Key.A) };
-        copy.Click += (_, _) => Host?.Copy();
         all.Click += (_, _) => Host?.SelectAll(this);
         var flyout = new MenuFlyout { Items = { copy, all } };
         flyout.Opening += (_, _) => copy.IsEnabled = Host?.HasSelection() == true;
@@ -125,13 +130,14 @@ public class CopyableText : SelectableTextBlock
             host.Clear();
     }
 
-    protected override void OnKeyDown(KeyEventArgs e)
+    protected override async void OnKeyDown(KeyEventArgs e)
     {
         var map = Application.Current?.PlatformSettings?.HotkeyConfiguration;
         if (map is not null && map.Copy.Any(gesture => gesture.Matches(e)))
         {
-            Host?.Copy();
             e.Handled = true;
+            if (Host is { } host)
+                await host.Copy();
             return;
         }
 

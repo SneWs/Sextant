@@ -19,7 +19,7 @@ public class TabBarTests
         Directory.CreateDirectory(directory);
         try
         {
-            await session.Dispatch(() =>
+            await session.Dispatch(async () =>
             {
                 var store = new WorkspaceStore(directory);
                 var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner());
@@ -48,7 +48,7 @@ public class TabBarTests
                 Assert.True(left.Width + right.Width > 1);
                 Assert.Contains(window.GetVisualDescendants().OfType<Border>(), border => border.Classes.Contains("tab") && border.IsEffectivelyVisible);
 
-                vm.Close(tab);
+                await vm.Close(tab);
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
 
@@ -57,7 +57,7 @@ public class TabBarTests
                 Assert.Equal(0, left.Width);
                 Assert.Equal(0, right.Width);
 
-                vm.Shutdown();
+                await vm.Shutdown();
                 window.DataContext = null;
                 window.Close();
             }, CancellationToken.None);
@@ -94,21 +94,18 @@ public class TabBarTests
                 vm.Tabs.Add(first);
                 vm.Tabs.Add(second);
 
-                vm.Activate(first);
-                await first.EnsureLoadedAsync();
-                await WaitUntilIdle(first);
-                vm.Activate(second);
-                await second.EnsureLoadedAsync();
-                await WaitUntilIdle(second);
+                await vm.Activate(first);
+                Assert.True(first.IsReady);
+                await vm.Activate(second);
+                Assert.True(second.IsReady);
 
                 left.WriteFile("fresh.txt", "new\n");
                 Assert.DoesNotContain(first.Files, row => row.Path == "fresh.txt");
 
-                vm.Activate(first);
-                await WaitUntilIdle(first);
+                await vm.Activate(first);
                 Assert.Contains(first.Files, row => row.Path == "fresh.txt");
 
-                vm.Shutdown();
+                await vm.Shutdown();
             }, CancellationToken.None);
         }
         finally
@@ -118,11 +115,116 @@ public class TabBarTests
         }
     }
 
-    private static async Task WaitUntilIdle(RepositoryViewModel tab)
+    [Fact]
+    public async Task Next_tab_and_close_commands_wait_for_loading_and_refresh()
     {
-        var until = DateTime.UtcNow.AddSeconds(8);
-        while (tab.IsBusy && DateTime.UtcNow < until)
-            await Task.Delay(30);
-        Assert.False(tab.IsBusy);
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var left = new TempRepo();
+        using var right = new TempRepo();
+        left.WriteFile("a.txt", "one\n");
+        left.CommitAll("left");
+        right.WriteFile("b.txt", "one\n");
+        right.CommitAll("right");
+        right.WriteFile("b.txt", "changed\n");
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-tab-commands-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var store = new WorkspaceStore(directory);
+                var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner())
+                {
+                    GitExecutable = left.Git,
+                    GitReady = true,
+                };
+                var first = new RepositoryViewModel(vm, left.Directory);
+                var second = new RepositoryViewModel(vm, right.Directory);
+                vm.Tabs.Add(first);
+                vm.Tabs.Add(second);
+                try
+                {
+                    await vm.Activate(first);
+                    await vm.NextTabCommand.ExecuteAsync(null);
+                    Assert.Same(second, vm.ActiveTab);
+                    Assert.True(second.IsReady);
+                    Assert.Contains(second.Files, row => row.Path == "b.txt");
+
+                    right.WriteFile("refresh.txt", "new\n");
+                    await vm.RefreshActiveCommand.ExecuteAsync(null);
+                    Assert.Contains(second.Files, row => row.Path == "refresh.txt");
+
+                    left.WriteFile("after-close.txt", "new\n");
+                    await second.CloseTabCommand.ExecuteAsync(null);
+                    Assert.DoesNotContain(second, vm.Tabs);
+                    Assert.Same(first, vm.ActiveTab);
+                    Assert.Contains(first.Files, row => row.Path == "after-close.txt");
+
+                    await vm.CloseActiveCommand.ExecuteAsync(null);
+                    Assert.Empty(vm.Tabs);
+                    Assert.Null(vm.ActiveTab);
+                }
+                finally
+                {
+                    await vm.Shutdown();
+                }
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Shutdown_shares_completion_and_window_close_waits_for_it()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("initial");
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-tab-shutdown-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var store = new WorkspaceStore(directory);
+                var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner())
+                {
+                    GitExecutable = repo.Git,
+                    GitReady = true,
+                };
+                var tab = new RepositoryViewModel(vm, repo.Directory);
+                vm.Tabs.Add(tab);
+                await vm.Activate(tab);
+                var window = new MainWindow { DataContext = vm, Width = 1000, Height = 700 };
+                var closed = false;
+                window.Closed += (_, _) => closed = true;
+                window.Show();
+                await vm.InitializeAsync();
+                try
+                {
+                    window.Close();
+                    Assert.False(closed);
+                    var shutdown = vm.Shutdown();
+                    Assert.Same(shutdown, vm.Shutdown());
+                    await shutdown;
+                    Dispatcher.UIThread.RunJobs();
+                    Assert.True(closed);
+                    Assert.True(RepoPath.Same(repo.Directory, Assert.Single(store.LoadWorkspace().OpenTabs)));
+                }
+                finally
+                {
+                    await vm.Shutdown();
+                    window.DataContext = null;
+                    window.Close();
+                }
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
     }
 }

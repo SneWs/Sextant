@@ -163,7 +163,7 @@ public partial class RepositoryView : UserControl
         e.Handled = true;
     }
 
-    private void OnFilePointerReleased(object? sender, PointerReleasedEventArgs e)
+    private async void OnFilePointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (e.InitialPressMouseButton != MouseButton.Left)
             return;
@@ -174,7 +174,7 @@ public partial class RepositoryView : UserControl
         if (source.FindAncestorOfType<Button>(includeSelf: true) is not null)
             return;
         if (DataContext is RepositoryViewModel vm)
-            vm.RevealSelectedFile();
+            await vm.RevealSelectedFile();
     }
 
     private void OnJumpToFile(string path, string? original)
@@ -729,14 +729,14 @@ public partial class RepositoryView : UserControl
     private ScrollViewer? FileScroll() =>
         FileList.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
 
-    private void OnGraphScroll(object? sender, ScrollChangedEventArgs e)
+    private async void OnGraphScroll(object? sender, ScrollChangedEventArgs e)
     {
         if (sender is not ScrollViewer scroll || scroll.Extent.Height <= scroll.Viewport.Height)
             return;
         if (scroll.Offset.Y + scroll.Viewport.Height < scroll.Extent.Height - 48)
             return;
         if (DataContext is RepositoryViewModel vm)
-            _ = vm.LoadMoreFromScrollAsync();
+            await vm.LoadMoreFromScrollAsync();
     }
 
     private void OnCommitKeyDown(object? sender, KeyEventArgs e)
@@ -785,7 +785,7 @@ public partial class RepositoryView : UserControl
         e.Handled = true;
     }
 
-    private void OnGraphSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    private async void OnGraphSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (DataContext is not RepositoryViewModel vm || sender is not ListBox list)
             return;
@@ -799,7 +799,7 @@ public partial class RepositoryView : UserControl
             }
         }
 
-        vm.NoteGraphSelection(rows);
+        await vm.NoteGraphSelection(rows);
     }
 
     private static bool HasLocationMenu(LocationItem item) =>
@@ -828,14 +828,14 @@ public partial class RepositoryView : UserControl
         item.RevealCommand.Execute(null);
     }
 
-    private void OnLocationDoubleTapped(object? sender, TappedEventArgs e)
+    private async void OnLocationDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (DataContext is not RepositoryViewModel vm || vm.SelectedLocation is not { } item)
             return;
         if (item.HasChildren)
             vm.ToggleLocation(item);
         else
-            vm.ActivateLocation(item);
+            await vm.ActivateLocation(item);
     }
 
     private void OnRepositoryDirectoryExpand(object? sender, RoutedEventArgs e)

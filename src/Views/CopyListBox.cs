@@ -123,15 +123,13 @@ public class CopyListBox : ListBox
         return slice is not null && caret >= slice.Value.Start && caret <= slice.Value.End;
     }
 
-    public void Copy()
+    public Task Copy()
     {
         var text = SelectedString();
         if (text.Length == 0)
-            return;
+            return Task.CompletedTask;
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-        if (clipboard is null)
-            return;
-        _ = CopyAsync(clipboard, text);
+        return clipboard is null ? Task.CompletedTask : CopyAsync(clipboard, text);
     }
 
     public void Clear()

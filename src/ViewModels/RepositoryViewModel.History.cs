@@ -184,10 +184,10 @@ public partial class RepositoryViewModel
         await RunAsync("Saving resolution…", ct => _session.SaveResolutionAsync(path, text, ct));
     }
 
-    public void NoteGraphSelection(IReadOnlyList<GraphRowViewModel> rows)
+    public Task NoteGraphSelection(IReadOnlyList<GraphRowViewModel> rows)
     {
         if (_applying || _session is null)
-            return;
+            return Task.CompletedTask;
         var commits = rows.Where(row => !row.IsWorkingCopy && row.Sha is not null).ToList();
         _selectedShas.Clear();
         _selectedShas.AddRange(commits.Select(row => row.Sha!));
@@ -200,20 +200,18 @@ public partial class RepositoryViewModel
                 .Select(item => item.Row)
                 .ToList();
             if (ordered.Count < 2)
-                return;
+                return Task.CompletedTask;
             _rangeOlder = ordered[0].Sha;
             _rangeNewer = ordered[^1].Sha;
             _rangeOlderSubject = ordered[0].Subject;
             _rangeNewerSubject = ordered[^1].Subject;
-            _ = LoadRangeAsync();
-            return;
+            return LoadRangeAsync();
         }
 
         var wasRange = _rangeOlder is not null;
         _rangeOlder = null;
         _rangeNewer = null;
-        if (wasRange)
-            _ = LoadDetailsAsync();
+        return wasRange ? LoadDetailsAsync() : Task.CompletedTask;
     }
 
     [RelayCommand]
@@ -255,20 +253,18 @@ public partial class RepositoryViewModel
     [RelayCommand]
     private Task AddRemote() => AddRemoteAsync();
 
-    public void ApplyDiffPreferences(bool sideBySide, bool ignoreWhitespace)
+    public Task ApplyDiffPreferences(bool sideBySide, bool ignoreWhitespace)
     {
         var changed = SideBySide != sideBySide || IgnoreWhitespace != ignoreWhitespace;
         SideBySide = sideBySide;
         IgnoreWhitespace = ignoreWhitespace;
-        if (changed && _session is not null)
-            _ = ReloadDiffViewAsync();
+        return changed && _session is not null ? ReloadDiffViewAsync() : Task.CompletedTask;
     }
 
-    public void ApplyDiffFormats(IReadOnlyList<DiffFormatRule> rules)
+    public Task ApplyDiffFormats(IReadOnlyList<DiffFormatRule> rules)
     {
         _session?.UseDiffFormats(rules);
-        if (_session is not null)
-            _ = ReloadDiffViewAsync();
+        return _session is not null ? ReloadDiffViewAsync() : Task.CompletedTask;
     }
 
     [RelayCommand]
@@ -547,6 +543,7 @@ public partial class RepositoryViewModel
     {
         if (_session is null || _rangeOlder is null || _rangeNewer is null || _lifetime.IsCancellationRequested)
             return;
+        using var pending = new PendingRepositoryWork(this);
         ShowingWorkingCopy = false;
         ShowingCommit = true;
         if (ShowingBlame)
@@ -627,7 +624,7 @@ public partial class RepositoryViewModel
                 FileMenu = FileMenuFor(file.Path, file.LfsTracked),
             };
             var section = new DiffSection(key, header);
-            header.ToggleCommand = new RelayCommand(() => SetExpanded(section, !header.Expanded));
+            header.ToggleCommand = new AsyncRelayCommand(() => SetExpanded(section, !header.Expanded), AsyncRelayCommandOptions.AllowConcurrentExecutions);
             _sections.Add(section);
             DiffRows.Add(header);
         }
@@ -638,7 +635,7 @@ public partial class RepositoryViewModel
         foreach (var section in _sections)
         {
             if (section.Header.Expanded)
-                RequestBlame(section);
+                QueueBlame(section);
         }
 
         if (AllFiles && !armJump && SelectedFile is { IsHeader: false, Path.Length: > 0 } selected)
@@ -648,13 +645,14 @@ public partial class RepositoryViewModel
             jumpOriginal = selected.OriginalPath;
         }
 
+        var opening = Task.CompletedTask;
         if (armJump && AllFiles && jumpPath is { Length: > 0 })
         {
-            OpenForJump(jumpPath, jumpOriginal);
+            opening = OpenForJump(jumpPath, jumpOriginal);
             JumpToFile?.Invoke(jumpPath, jumpOriginal);
         }
 
-        return Task.CompletedTask;
+        return Task.WhenAll(opening, RunBlameQueueAsync());
     }
 
     private List<FileRowViewModel> BlameFiles()
@@ -680,27 +678,42 @@ public partial class RepositoryViewModel
         _blameQueue.Clear();
     }
 
-    private void RequestBlame(DiffSection section, bool showLoading = true)
+    private Task RequestBlame(DiffSection section, bool showLoading = true)
     {
-        if (!ShowingBlame || !section.Header.Expanded || section.BlameReady || section.BlamePending)
+        if (_lifetime.IsCancellationRequested || !ShowingBlame || !section.Header.Expanded || section.BlameReady)
+            return Task.CompletedTask;
+        QueueBlame(section, showLoading);
+        return RunBlameQueueAsync();
+    }
+
+    private void QueueBlame(DiffSection section, bool showLoading = true)
+    {
+        if (_lifetime.IsCancellationRequested || !ShowingBlame || !section.Header.Expanded || section.BlameReady || section.BlamePending)
             return;
         section.BlamePending = true;
         if (showLoading)
             InsertBlameLoading(section);
         _blameQueue.Enqueue(section);
-        if (!_blamePump)
-            _ = PumpBlameAsync(_blameGeneration);
+    }
+
+    private Task RunBlameQueueAsync()
+    {
+        if (!_blamePump && _blameQueue.Count > 0)
+            _blameLoad = PumpBlameAsync(_blameGeneration);
+        return _blameLoad;
     }
 
     private async Task PumpBlameAsync(int generation)
     {
         if (_blamePump)
             return;
+        using var pending = new PendingRepositoryWork(this);
         _blamePump = true;
         try
         {
-            while (generation == _blameGeneration && _blameQueue.Count > 0)
+            while (_blameQueue.Count > 0)
             {
+                generation = _blameGeneration;
                 var section = _blameQueue.Dequeue();
                 if (generation != _blameGeneration || !_sections.Contains(section) || !section.Header.Expanded)
                 {
@@ -732,8 +745,6 @@ public partial class RepositoryViewModel
         finally
         {
             _blamePump = false;
-            if (_blameQueue.Count > 0)
-                _ = PumpBlameAsync(_blameGeneration);
         }
     }
 

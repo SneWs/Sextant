@@ -21,7 +21,7 @@ public class CommandPaletteTests
         Directory.CreateDirectory(directory);
         try
         {
-            await session.Dispatch(() =>
+            await session.Dispatch(async () =>
             {
                 var store = new WorkspaceStore(directory);
                 var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner());
@@ -46,7 +46,7 @@ public class CommandPaletteTests
                 Assert.Equal(new Thickness(12, 6, 12, 6), item.Padding);
                 Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Open repository");
 
-                vm.Shutdown();
+                await vm.Shutdown();
                 window.DataContext = null;
                 window.Close();
             }, CancellationToken.None);
@@ -66,14 +66,14 @@ public class CommandPaletteTests
         Directory.CreateDirectory(directory);
         try
         {
-            await session.Dispatch(() =>
+            await session.Dispatch(async () =>
             {
                 var store = new WorkspaceStore(directory);
                 var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner());
                 var tab = new RepositoryViewModel(vm, Path.Combine(directory, "repo"));
                 Directory.CreateDirectory(tab.RequestedPath);
                 vm.Tabs.Add(tab);
-                vm.Activate(tab);
+                await vm.Activate(tab);
                 var window = new MainWindow { DataContext = vm, Width = 1000, Height = 700 };
                 window.Show();
                 vm.TogglePalette();
@@ -104,7 +104,7 @@ public class CommandPaletteTests
                 Assert.True(tab.CommandsOpen);
                 Assert.Equal("Toggle command log", vm.SelectedPalette?.Title);
 
-                vm.Shutdown();
+                await vm.Shutdown();
                 window.DataContext = null;
                 window.Close();
             }, CancellationToken.None);
@@ -124,7 +124,7 @@ public class CommandPaletteTests
         Directory.CreateDirectory(directory);
         try
         {
-            await session.Dispatch(() =>
+            await session.Dispatch(async () =>
             {
                 var store = new WorkspaceStore(directory);
                 var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner());
@@ -155,7 +155,7 @@ public class CommandPaletteTests
                     ],
                     vm.PaletteMatches.Select(item => item.Title).ToList());
 
-                vm.Shutdown();
+                await vm.Shutdown();
                 window.DataContext = null;
                 window.Close();
             }, CancellationToken.None);
@@ -164,6 +164,57 @@ public class CommandPaletteTests
         {
             if (Directory.Exists(directory))
                 Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task A_palette_tab_command_waits_for_repository_loading()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var left = new TempRepo();
+        using var right = new TempRepo();
+        left.WriteFile("a.txt", "one\n");
+        left.CommitAll("left");
+        right.WriteFile("b.txt", "one\n");
+        right.CommitAll("right");
+        right.WriteFile("new.txt", "untracked\n");
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-palette-async-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var store = new WorkspaceStore(directory);
+                var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner())
+                {
+                    GitExecutable = left.Git,
+                    GitReady = true,
+                };
+                var first = new RepositoryViewModel(vm, left.Directory);
+                var second = new RepositoryViewModel(vm, right.Directory);
+                vm.Tabs.Add(first);
+                vm.Tabs.Add(second);
+                try
+                {
+                    await vm.Activate(first);
+                    vm.TogglePalette();
+                    vm.SelectedPalette = vm.PaletteMatches.Single(item => item.Title == "Next tab");
+                    await vm.RunPaletteCommand.ExecuteAsync(null);
+
+                    Assert.False(vm.PaletteOpen);
+                    Assert.Same(second, vm.ActiveTab);
+                    Assert.True(second.IsReady);
+                    Assert.Contains(second.Files, row => row.Path == "new.txt");
+                }
+                finally
+                {
+                    await vm.Shutdown();
+                }
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
         }
     }
 }

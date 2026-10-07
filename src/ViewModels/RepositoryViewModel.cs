@@ -22,6 +22,8 @@ public partial class RepositoryViewModel : ViewModelBase
     private CancellationTokenSource? _operation;
     private CancellationTokenSource? _details;
     private Task? _load;
+    private Task? _dispose;
+    private readonly HashSet<Task> _pendingRepositoryWork = [];
     private bool _applying;
     private bool _askedPerformance;
     private int _holdFocusRefresh;
@@ -48,6 +50,7 @@ public partial class RepositoryViewModel : ViewModelBase
     private readonly List<DiffSection> _sections = [];
     private readonly Queue<DiffSection> _blameQueue = [];
     private bool _blamePump;
+    private Task _blameLoad = Task.CompletedTask;
     private int _blameGeneration;
     private string? _blameRevision;
     // A loaded changelist starts collapsed. Exceptions are the files the user opened, or closed after Expand all.
@@ -327,28 +330,59 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public bool ShowCleanDot => !IsDirty && !IsConflicted;
 
-    public Task EnsureLoadedAsync() => _load ??= LoadCoreAsync();
+    public Task EnsureLoadedAsync() => _lifetime.IsCancellationRequested
+        ? Task.CompletedTask
+        : _load ??= LoadCoreAsync();
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync() => new(_dispose ??= DisposeCoreAsync());
+
+    private async Task DisposeCoreAsync()
     {
         _lifetime.Cancel();
         _operation?.Cancel();
         _details?.Cancel();
         _watcher?.Dispose();
         _watcher = null;
-        ClearPreview();
-        if (_session is not null)
-            await _session.DisposeAsync();
+        ResetBlameQueue();
+        try
+        {
+            if (_load is { } load)
+                await load;
+        }
+        finally
+        {
+            // Canceled reads must leave the scheduler before its semaphores are disposed.
+            while (_pendingRepositoryWork.Count > 0)
+                await Task.WhenAll(_pendingRepositoryWork.ToArray());
+            ClearPreview();
+            var session = _session;
+            _session = null;
+            try
+            {
+                if (session is not null)
+                    await session.DisposeAsync();
+            }
+            finally
+            {
+                _operation?.Dispose();
+                _operation = null;
+                _details?.Dispose();
+                _details = null;
+                _lifetime.Dispose();
+            }
+        }
     }
 
-    public void ActivateLocation(LocationItem item)
+    public Task ActivateLocation(LocationItem item)
     {
-        if (item.ShowCheckout)
-            item.CheckoutCommand.Execute(null);
-        else if (item.ShowOpen)
-            item.OpenCommand.Execute(null);
-        else if (item.ShowReveal || item.ShowTag)
-            item.RevealCommand.Execute(null);
+        var command = item.ShowCheckout ? item.CheckoutCommand
+            : item.ShowOpen ? item.OpenCommand
+            : item.ShowReveal || item.ShowTag ? item.RevealCommand
+            : null;
+        if (command is IAsyncRelayCommand asyncCommand)
+            return asyncCommand.ExecuteAsync(null);
+        command?.Execute(null);
+        return Task.CompletedTask;
     }
 
     [RelayCommand]
@@ -544,11 +578,11 @@ public partial class RepositoryViewModel : ViewModelBase
     [RelayCommand]
     private void ToggleCommands() => CommandsOpen = !CommandsOpen;
 
-    [RelayCommand]
-    private void ActivateTab() => _host.Activate(this);
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private Task ActivateTab() => _host.Activate(this);
 
     [RelayCommand]
-    private void CloseTab() => _host.Close(this);
+    private Task CloseTab() => _host.Close(this);
 
     [RelayCommand]
     private Task LoadMore()
@@ -643,7 +677,7 @@ public partial class RepositoryViewModel : ViewModelBase
         {
             if (_applying || _rangeOlder is not null || !ReferenceEquals(SelectedGraphRow, value))
                 return;
-            _ = LoadDetailsAsync();
+            LoadDetailsCommand.Execute(null);
         }, DispatcherPriority.Background);
     }
 
@@ -671,7 +705,13 @@ public partial class RepositoryViewModel : ViewModelBase
 
             return;
         }
-        if (TryRevealOpenFile(value))
+        LoadSelectedFileCommand.Execute(value);
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private async Task LoadSelectedFileAsync(FileRowViewModel? value)
+    {
+        if (await TryRevealOpenFile(value))
             return;
         _allowLarge = false;
         if (AllFiles && value is not null)
@@ -685,13 +725,16 @@ public partial class RepositoryViewModel : ViewModelBase
             _armJump = false;
         }
 
-        _ = LoadDiffAsync();
+        await LoadDiffAsync();
     }
 
     /// <summary>A click on the file that is already selected. The selection does not change, so scroll from here.</summary>
-    public void RevealSelectedFile() => TryRevealOpenFile(SelectedFile);
+    public async Task RevealSelectedFile()
+    {
+        await TryRevealOpenFile(SelectedFile);
+    }
 
-    private bool TryRevealOpenFile(FileRowViewModel? value)
+    private async Task<bool> TryRevealOpenFile(FileRowViewModel? value)
     {
         if (!AllFiles || !_diffReady || !_allFilesShown || value is not { IsHeader: false } file)
             return false;
@@ -699,8 +742,9 @@ public partial class RepositoryViewModel : ViewModelBase
             return false;
         if (!DiffHasFile(file) && !ImageHasFile(file))
             return false;
-        OpenForJump(file.Path, file.OriginalPath);
+        var opening = OpenForJump(file.Path, file.OriginalPath);
         JumpToFile?.Invoke(file.Path, file.OriginalPath);
+        await opening;
         return true;
     }
 
@@ -744,6 +788,9 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private async Task LoadCoreAsync()
     {
+        if (_lifetime.IsCancellationRequested)
+            return;
+        using var pending = new PendingRepositoryWork(this);
         if (!_host.GitReady || _host.GitExecutable is null)
         {
             Fail("Git is not ready.");
@@ -790,12 +837,14 @@ public partial class RepositoryViewModel : ViewModelBase
         }
         catch (GitCommandFailedException exception) when (exception.IsDubiousOwnership)
         {
+            if (_lifetime.IsCancellationRequested)
+                return null;
             var dialogs = _host.Dialogs;
             var trust = dialogs is not null && await dialogs.ConfirmAsync(
                 "Trust this repository?",
                 exception.Message + Environment.NewLine + Environment.NewLine
                     + "Trusting adds this path to the global safe.directory list.",
-                "Trust");
+                "Trust").WaitAsync(_lifetime.Token);
             if (!trust)
             {
                 Fail(exception.Message);
@@ -828,14 +877,16 @@ public partial class RepositoryViewModel : ViewModelBase
         if (_session is null)
             return;
         _watcher?.Dispose();
-        _watcher = new GitDirectoryWatcher(_session.GitDirectory, () => Dispatcher.UIThread.Post(() => _ = RefreshFromWatcherAsync()));
+        _watcher = new GitDirectoryWatcher(_session.GitDirectory, () => Dispatcher.UIThread.Post(() => RefreshFromWatcherCommand.Execute(null)));
         _watcher.Failed += () => Dispatcher.UIThread.Post(OnWatcherFailed);
     }
 
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task RefreshFromWatcherAsync()
     {
         if (_session is null || IsBusy || _lifetime.IsCancellationRequested)
             return;
+        using var pending = new PendingRepositoryWork(this);
         try
         {
             await _session.RefreshStatusAsync(_lifetime.Token);
@@ -869,7 +920,7 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private async Task MaybeSuggestAsync()
     {
-        if (_askedPerformance || _session is null || _host.Dialogs is null)
+        if (_askedPerformance || _session is null || _host.Dialogs is null || _lifetime.IsCancellationRequested)
             return;
         var suggestion = _session.Snapshot().Suggestion;
         if (suggestion is null)
@@ -878,7 +929,7 @@ public partial class RepositoryViewModel : ViewModelBase
         _holdFocusRefresh++;
         try
         {
-            var choice = await _host.Dialogs.ConfirmPerformanceAsync(suggestion.Value);
+            var choice = await _host.Dialogs.ConfirmPerformanceAsync(suggestion.Value).WaitAsync(_lifetime.Token);
             if (choice is null || _session is null)
                 return;
             if (!choice.ManyFiles && !choice.FileSystemMonitor)
@@ -890,6 +941,9 @@ public partial class RepositoryViewModel : ViewModelBase
                 settings.Add(("core.fsmonitor", "true"));
             await ApplyPerformanceAsync(settings);
         }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+        }
         finally
         {
             _holdFocusRefresh--;
@@ -898,8 +952,9 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private async Task ApplyPerformanceAsync(List<(string Key, string Value)> settings)
     {
-        if (_session is null)
+        if (_session is null || _lifetime.IsCancellationRequested)
             return;
+        using var pending = new PendingRepositoryWork(this);
 
         // RunAsync refuses to start while a refresh owns IsBusy. The accepted
         // keys still have to reach this repository's local config.
@@ -930,8 +985,9 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private async Task<bool> RunAsync(string label, Func<CancellationToken, Task> action, bool refreshRepositoryFiles = true)
     {
-        if (_session is null || IsBusy)
+        if (_session is null || IsBusy || _lifetime.IsCancellationRequested)
             return false;
+        using var pending = new PendingRepositoryWork(this);
         _operation?.Dispose();
         _operation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         IsBusy = true;
@@ -1287,48 +1343,55 @@ public partial class RepositoryViewModel : ViewModelBase
         if (_session is null)
             return Task.CompletedTask;
         if (UseInAppMerge())
-        {
-            OpenInAppMerge(path);
-            return Task.CompletedTask;
-        }
+            return OpenInAppMerge(path);
 
         return RunAsync("Opening merge tool…", ct => _session.MergetoolAsync(path, _host.MergeTool, ct));
     }
 
-    private void OpenInAppMerge(string path)
+    private Task OpenInAppMerge(string path)
     {
-        var working = Rows.FirstOrDefault(row => row.IsWorkingCopy);
-        if (working is not null && !ReferenceEquals(SelectedGraphRow, working))
-            SelectedGraphRow = working;
-        var file = Files.FirstOrDefault(candidate =>
+        IEnumerable<FileRowViewModel> files = _showingCommitFiles ? _workingFiles : Files;
+        var file = files.FirstOrDefault(candidate =>
             !candidate.IsHeader && candidate.Kind == ChangeKind.Unmerged && candidate.Path == path);
         if (file is null)
-            return;
-        if (ReferenceEquals(SelectedFile, file))
+            return Task.CompletedTask;
+        _applying = true;
+        try
         {
-            _allowLarge = false;
-            _ = LoadDiffAsync();
-            return;
+            var working = Rows.FirstOrDefault(row => row.IsWorkingCopy);
+            if (working is not null && !ReferenceEquals(SelectedGraphRow, working))
+                SelectedGraphRow = working;
+            if (_showingCommitFiles)
+            {
+                RestoreWorkingFiles();
+                _applying = true;
+            }
+            SelectedFile = file;
+        }
+        finally
+        {
+            _applying = false;
         }
 
-        SelectedFile = file;
+        _allowLarge = false;
+        return LoadDetailsAsync();
     }
 
-    public void ApplyMergePreference()
+    public Task ApplyMergePreference()
     {
         if (_session is null)
-            return;
+            return Task.CompletedTask;
         var state = _session.Snapshot();
         var inApp = MergeToolCommand.UseInAppEditor(_host.MergeTool, state.Config);
         if (inApp == _inAppMerge)
-            return;
+            return Task.CompletedTask;
 
         _inAppMerge = inApp;
         var path = SelectedFile is { IsHeader: false } selected ? selected.Path : null;
         var staged = SelectedFile?.FromStagedList ?? false;
         RebuildFiles(state);
         if (_showingCommitFiles)
-            return;
+            return Task.CompletedTask;
 
         _applying = true;
         try
@@ -1342,8 +1405,7 @@ public partial class RepositoryViewModel : ViewModelBase
             _applying = false;
         }
 
-        if (ShowingWorkingCopy)
-            _ = LoadDiffAsync();
+        return ShowingWorkingCopy ? LoadDiffAsync() : Task.CompletedTask;
     }
 
     private Task DiscardAsync(string path, bool untracked)
@@ -1822,6 +1884,7 @@ public partial class RepositoryViewModel : ViewModelBase
             bool merged;
             try
             {
+                using var pending = new PendingRepositoryWork(this);
                 merged = await _session.IsMergedIntoHeadAsync(shown, _lifetime.Token);
             }
             catch (GitCommandFailedException exception)
@@ -1834,6 +1897,8 @@ public partial class RepositoryViewModel : ViewModelBase
                 return;
             }
 
+            if (_lifetime.IsCancellationRequested)
+                return;
             if (!merged)
             {
                 var force = await dialogs.ConfirmAsync(
@@ -1878,37 +1943,44 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private async Task RevealAsync(string oid)
     {
-        if (_session is null)
+        if (_session is null || _lifetime.IsCancellationRequested)
             return;
+        using var pending = new PendingRepositoryWork(this);
         RepositoryFilesTabOn = false;
-        for (var attempt = 0; attempt < 12; attempt++)
+        try
         {
-            var found = Rows.FirstOrDefault(row => string.Equals(row.Sha, oid, StringComparison.OrdinalIgnoreCase));
-            if (found is not null)
+            for (var attempt = 0; attempt < 12; attempt++)
             {
-                SelectedGraphRow = found;
-                return;
+                var found = Rows.FirstOrDefault(row => string.Equals(row.Sha, oid, StringComparison.OrdinalIgnoreCase));
+                if (found is not null)
+                {
+                    SelectedGraphRow = found;
+                    return;
+                }
+
+                var state = _session.Snapshot();
+                if (state.HistoryEnded)
+                    break;
+                var pastCap = state.HistoryCapped;
+                var loaded = await _session.LoadMoreHistoryAsync(pastCap, _lifetime.Token);
+                Apply(_session.Snapshot());
+                if (!loaded)
+                {
+                    if (!pastCap && _session.Snapshot().HistoryCapped)
+                        continue;
+                    break;
+                }
             }
 
-            var state = _session.Snapshot();
-            if (state.HistoryEnded)
-                break;
-            var pastCap = state.HistoryCapped;
-            var loaded = await _session.LoadMoreHistoryAsync(pastCap, _lifetime.Token);
-            Apply(_session.Snapshot());
-            if (!loaded)
-            {
-                if (!pastCap && _session.Snapshot().HistoryCapped)
-                    continue;
-                break;
-            }
+            var row = Rows.FirstOrDefault(candidate => string.Equals(candidate.Sha, oid, StringComparison.OrdinalIgnoreCase));
+            if (row is null)
+                Fail("That commit is not in the loaded history.");
+            else
+                SelectedGraphRow = row;
         }
-
-        var row = Rows.FirstOrDefault(candidate => string.Equals(candidate.Sha, oid, StringComparison.OrdinalIgnoreCase));
-        if (row is null)
-            Fail("That commit is not in the loaded history.");
-        else
-            SelectedGraphRow = row;
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+        }
     }
 
     private async Task<string?> PickRefAsync(string title, string message)
@@ -1934,8 +2006,9 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private async Task LoadMoreAsync(bool pastCap)
     {
-        if (_session is null || _loadingMore || IsBusy)
+        if (_session is null || _loadingMore || IsBusy || _lifetime.IsCancellationRequested)
             return;
+        using var pending = new PendingRepositoryWork(this);
         _loadingMore = true;
         try
         {
@@ -1955,10 +2028,12 @@ public partial class RepositoryViewModel : ViewModelBase
         }
     }
 
+    [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadDetailsAsync()
     {
         if (_applying || _lifetime.IsCancellationRequested)
             return;
+        using var pending = new PendingRepositoryWork(this);
         var row = SelectedGraphRow;
         if (row is null || row.IsWorkingCopy)
         {
@@ -2106,6 +2181,7 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         if (_lifetime.IsCancellationRequested)
             return;
+        using var pending = new PendingRepositoryWork(this);
         var armJump = _armJump;
         var jumpPath = _jumpPath;
         var jumpOriginal = _jumpOriginal;
@@ -2179,8 +2255,9 @@ public partial class RepositoryViewModel : ViewModelBase
             RenderDiff(document, file, workingCopy);
             if (armJump && AllFiles && jumpPath is { Length: > 0 })
             {
-                OpenForJump(jumpPath, jumpOriginal);
+                var opening = OpenForJump(jumpPath, jumpOriginal);
                 JumpToFile?.Invoke(jumpPath, jumpOriginal);
+                await opening;
             }
             await LoadImageAsync(file, workingCopy, range, token);
         }
@@ -2290,7 +2367,7 @@ public partial class RepositoryViewModel : ViewModelBase
                     FileMenu = FileMenuFor(entry.Path, trackedFile),
                 };
                 var section = new DiffSection(key, header);
-                header.ToggleCommand = new RelayCommand(() => SetExpanded(section, !header.Expanded));
+                header.ToggleCommand = new AsyncRelayCommand(() => SetExpanded(section, !header.Expanded), AsyncRelayCommandOptions.AllowConcurrentExecutions);
                 _rowSink = section.Body;
                 try
                 {
@@ -2596,10 +2673,10 @@ public partial class RepositoryViewModel : ViewModelBase
             DiffRows.Add(row);
     }
 
-    private void SetExpanded(DiffSection section, bool expanded)
+    private Task SetExpanded(DiffSection section, bool expanded)
     {
         if (section.Header.Expanded == expanded)
-            return;
+            return expanded ? RequestBlame(section) : Task.CompletedTask;
         var index = DiffRows.IndexOf(section.Header);
         section.Header.Expanded = expanded;
         SetFold(section.Key, expanded);
@@ -2618,22 +2695,22 @@ public partial class RepositoryViewModel : ViewModelBase
         }
 
         ApplyImageFolds();
-        if (expanded)
-            RequestBlame(section);
+        return expanded ? RequestBlame(section) : Task.CompletedTask;
     }
 
-    private void ToggleFileSection(string path)
+    private Task ToggleFileSection(string path)
     {
         foreach (var section in _sections)
         {
             if (!SectionMatches(section, path, null))
                 continue;
-            SetExpanded(section, !section.Header.Expanded);
-            return;
+            return SetExpanded(section, !section.Header.Expanded);
         }
+
+        return Task.CompletedTask;
     }
 
-    private void OpenForJump(string path, string? original)
+    private Task OpenForJump(string path, string? original)
     {
         SetFold(path, true);
         if (original is { Length: > 0 } old)
@@ -2642,11 +2719,11 @@ public partial class RepositoryViewModel : ViewModelBase
         {
             if (!SectionMatches(section, path, original))
                 continue;
-            SetExpanded(section, true);
-            return;
+            return SetExpanded(section, true);
         }
 
         ApplyImageFolds();
+        return Task.CompletedTask;
     }
 
     private static bool SectionMatches(DiffSection section, string path, string? original) =>
@@ -2658,11 +2735,11 @@ public partial class RepositoryViewModel : ViewModelBase
     // The hotkey stays registered while the command bar is hidden, so this is what keeps the keys from running.
     private bool CanFoldSections() => ShowSectionFolds;
 
-    [RelayCommand(CanExecute = nameof(CanFoldSections))]
-    private void ExpandAllSections()
+    [RelayCommand(CanExecute = nameof(CanFoldSections), AllowConcurrentExecutions = true)]
+    private Task ExpandAllSections()
     {
         if (_sections.Count == 0)
-            return;
+            return Task.CompletedTask;
         _foldsOpen = true;
         _foldExceptions.Clear();
         foreach (var section in _sections)
@@ -2670,9 +2747,10 @@ public partial class RepositoryViewModel : ViewModelBase
         PublishSections();
         ApplyImageFolds();
         if (!ShowingBlame)
-            return;
+            return Task.CompletedTask;
         foreach (var section in _sections)
-            RequestBlame(section, showLoading: false);
+            QueueBlame(section, showLoading: false);
+        return RunBlameQueueAsync();
     }
 
     [RelayCommand(CanExecute = nameof(CanFoldSections))]
@@ -3150,9 +3228,9 @@ public partial class RepositoryViewModel : ViewModelBase
         return new WorktreeFileMenu
         {
             OpenFolderLabel = DesktopOpen.FolderLabel(DesktopOpen.Current),
-            CopyFileNameCommand = new RelayCommand(() => _ = CopyText(name)),
-            CopyPathCommand = new RelayCommand(() => _ = CopyText(relative)),
-            CopyFullPathCommand = full is null ? UiCommands.Disabled : new RelayCommand(() => _ = CopyText(full)),
+            CopyFileNameCommand = new AsyncRelayCommand(() => CopyText(name)),
+            CopyPathCommand = new AsyncRelayCommand(() => CopyText(relative)),
+            CopyFullPathCommand = full is null ? UiCommands.Disabled : new AsyncRelayCommand(() => CopyText(full)),
             OpenFolderCommand = full is null ? UiCommands.Disabled : new RelayCommand(() => OpenFolder(full)),
             OpenEditorCommand = full is null ? UiCommands.Disabled : new RelayCommand(() => OpenEditor(full)),
             ShowLfsTrack = actions && !tracked,
@@ -3245,6 +3323,25 @@ public partial class RepositoryViewModel : ViewModelBase
         catch (Exception exception)
         {
             Fail(exception.Message);
+        }
+    }
+
+    private sealed class PendingRepositoryWork : IDisposable
+    {
+        private readonly RepositoryViewModel _owner;
+        // The command retains its result or exception; this task only signals that cleanup can proceed.
+        private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public PendingRepositoryWork(RepositoryViewModel owner)
+        {
+            _owner = owner;
+            owner._pendingRepositoryWork.Add(_completion.Task);
+        }
+
+        public void Dispose()
+        {
+            _owner._pendingRepositoryWork.Remove(_completion.Task);
+            _completion.TrySetResult();
         }
     }
 

@@ -16,9 +16,10 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     private readonly AppSettings _settings;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly List<PaletteItem> _palette = [];
+    private readonly HashSet<Task> _closingTabs = [];
     private Task? _initialize;
+    private Task? _shutdown;
     private bool _started;
-    private int _shutDown;
 
     public MainViewModel(WorkspaceStore store, WorkspaceState workspace, AppSettings settings, GitProcessRunner runner)
     {
@@ -113,63 +114,80 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     public Task InitializeAsync() => _initialize ??= InitializeCoreAsync();
 
-    public void OnWindowActivated()
+    public Task OnWindowActivated()
     {
-        if (!_started)
-            return;
-        if (ActiveTab is { IsReady: true } tab)
-            _ = tab.RefreshFromFocusAsync();
+        return _started && ActiveTab is { IsReady: true } tab
+            ? tab.RefreshFromFocusAsync()
+            : Task.CompletedTask;
     }
 
-    public void Shutdown()
+    public Task Shutdown() => _shutdown ??= ShutdownCoreAsync();
+
+    private async Task ShutdownCoreAsync()
     {
         Save();
-        if (Interlocked.Exchange(ref _shutDown, 1) == 1)
-            return;
         _lifetime.Cancel();
-        foreach (var tab in Tabs.ToArray())
-            _ = tab.DisposeAsync();
+        var tabs = Tabs.ToArray();
+        var closing = _closingTabs.ToArray();
+        await Task.WhenAll(tabs.Select(tab => tab.DisposeAsync().AsTask()).Concat(closing));
+        if (_initialize is not null)
+            await _initialize;
     }
 
-    public void Activate(RepositoryViewModel tab)
+    public async Task Activate(RepositoryViewModel tab)
     {
         if (!Tabs.Contains(tab))
             return;
-        var switching = ActiveTab != tab;
+        var refresh = ActiveTab != tab && tab.IsReady;
         foreach (var other in Tabs)
             other.IsActive = other == tab;
         ActiveTab = tab;
         TitleText = $"Sextant — {tab.Title}";
-        _ = tab.EnsureLoadedAsync();
+        Save();
+        await tab.EnsureLoadedAsync();
         // The first selection loads the repository. A later switch refreshes it
         // the same way focusing the window does, so commits and files stay current.
-        if (switching && tab.IsReady)
-            _ = tab.RefreshFromFocusAsync();
-        Save();
+        if (refresh && ActiveTab == tab)
+            await tab.RefreshFromFocusAsync();
     }
 
-    public void Close(RepositoryViewModel tab)
+    public async Task Close(RepositoryViewModel tab)
     {
         var index = Tabs.IndexOf(tab);
         if (index < 0)
             return;
         Tabs.Remove(tab);
-        _ = tab.DisposeAsync();
-        if (ActiveTab == tab)
+        var cleanup = tab.DisposeAsync().AsTask();
+        _closingTabs.Add(cleanup);
+        try
         {
-            if (Tabs.Count == 0)
+            if (ActiveTab == tab)
             {
-                ActiveTab = null;
-                TitleText = "Sextant";
+                if (Tabs.Count == 0)
+                {
+                    ActiveTab = null;
+                    TitleText = "Sextant";
+                }
+                else
+                {
+                    await Activate(Tabs[Math.Min(index, Tabs.Count - 1)]);
+                    return;
+                }
             }
-            else
+
+            Save();
+        }
+        finally
+        {
+            try
             {
-                Activate(Tabs[Math.Min(index, Tabs.Count - 1)]);
-                return;
+                await cleanup;
+            }
+            finally
+            {
+                _closingTabs.Remove(cleanup);
             }
         }
-
-        Save();
     }
 
     public void NoteLoaded(RepositoryViewModel tab)
@@ -223,12 +241,12 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         Tabs.Move(from, index);
     }
 
-    public void ActivateDigit(int digit)
+    public Task ActivateDigit(int digit)
     {
         var index = TabShortcut.IndexFromDigit(digit);
         if (index is not int slot || slot >= Tabs.Count || Tabs[slot] == ActiveTab)
-            return;
-        Activate(Tabs[slot]);
+            return Task.CompletedTask;
+        return Activate(Tabs[slot]);
     }
 
     private void RefreshShortcutHints()
@@ -297,29 +315,22 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     [RelayCommand]
     public void ClosePalette() => PaletteOpen = false;
 
-    [RelayCommand]
-    public void CloseActive()
-    {
-        if (ActiveTab is not null)
-            Close(ActiveTab);
-    }
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    public Task CloseActive() => ActiveTab is { } tab ? Close(tab) : Task.CompletedTask;
 
-    [RelayCommand]
-    public void NextTab()
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    public Task NextTab()
     {
         if (Tabs.Count < 2 || ActiveTab is null)
-            return;
+            return Task.CompletedTask;
         var index = Tabs.IndexOf(ActiveTab);
-        Activate(Tabs[(index + 1) % Tabs.Count]);
+        return Activate(Tabs[(index + 1) % Tabs.Count]);
     }
 
     [RelayCommand]
-    public void RefreshActive()
-    {
-        if (ActiveTab is not null)
-            _ = ActiveTab.Refresh();
-    }
+    public Task RefreshActive() => ActiveTab?.Refresh() ?? Task.CompletedTask;
 
+    [RelayCommand]
     public Task RunPaletteAsync()
     {
         var item = SelectedPalette ?? PaletteMatches.FirstOrDefault();
@@ -401,6 +412,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     private async Task InitializeCoreAsync()
     {
         await ProbeAsync();
+        if (_lifetime.IsCancellationRequested)
+            return;
         if (_settings.ReopenTabs)
         {
             foreach (var path in _workspace.OpenTabs)
@@ -416,7 +429,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             if (active is null && Tabs.Count > 0)
                 active = Tabs[0];
             if (active is not null)
-                Activate(active);
+                await Activate(active);
         }
 
         _started = true;
@@ -487,14 +500,13 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         var existing = Tabs.FirstOrDefault(tab => SameTab(tab, path));
         if (existing is not null)
         {
-            Activate(existing);
+            await Activate(existing);
             return;
         }
 
         var tab = CreateTab(path);
         Tabs.Add(tab);
-        Activate(tab);
-        await tab.EnsureLoadedAsync();
+        await Activate(tab);
         if (!Tabs.Contains(tab))
             return;
         if (tab.Toplevel is not null)
@@ -502,8 +514,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             var duplicate = Tabs.FirstOrDefault(other => other != tab && other.Toplevel is not null && RepoPath.Same(other.Toplevel, tab.Toplevel));
             if (duplicate is not null)
             {
-                Close(tab);
-                Activate(duplicate);
+                await Close(tab);
+                await Activate(duplicate);
                 return;
             }
         }
@@ -613,12 +625,10 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         _store.SaveSettings(_settings);
         AppTheme.Apply(_settings.Theme, _settings.Palette);
         DiffFont.Apply(_settings.DiffFont, _settings.DiffFontSize);
-        if (diffChanged)
-            ApplyDiffPreferences();
-        if (formatsChanged)
-            ApplyDiffFormats();
-        if (mergeChanged)
-            ApplyMergePreference();
+        await Task.WhenAll(
+            diffChanged ? ApplyDiffPreferences() : Task.CompletedTask,
+            formatsChanged ? ApplyDiffFormats() : Task.CompletedTask,
+            mergeChanged ? ApplyMergePreference() : Task.CompletedTask);
         if (gitChanged)
             await ProbeAsync();
     }
@@ -646,38 +656,29 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         await Dialogs.ShowAboutAsync();
     }
 
-    private void ApplyDiffPreferences()
+    private Task ApplyDiffPreferences() =>
+        Task.WhenAll(Tabs.Select(tab => tab.ApplyDiffPreferences(_settings.SideBySide, _settings.IgnoreWhitespace)));
+
+    private Task ApplyDiffFormats()
     {
-        foreach (var tab in Tabs)
-            tab.ApplyDiffPreferences(_settings.SideBySide, _settings.IgnoreWhitespace);
+        var formats = DiffFormats;
+        return Task.WhenAll(Tabs.Select(tab => tab.ApplyDiffFormats(formats)));
     }
 
-    private void ApplyDiffFormats()
-    {
-        foreach (var tab in Tabs)
-            tab.ApplyDiffFormats(DiffFormats);
-    }
-
-    private void ApplyMergePreference()
-    {
-        foreach (var tab in Tabs)
-            tab.ApplyMergePreference();
-    }
+    private Task ApplyMergePreference() => Task.WhenAll(Tabs.Select(tab => tab.ApplyMergePreference()));
 
     private Task ToggleSavedSideBySide()
     {
         _settings.SideBySide = !_settings.SideBySide;
         _store.SaveSettings(_settings);
-        ApplyDiffPreferences();
-        return Task.CompletedTask;
+        return ApplyDiffPreferences();
     }
 
     private Task ToggleSavedWhitespace()
     {
         _settings.IgnoreWhitespace = !_settings.IgnoreWhitespace;
         _store.SaveSettings(_settings);
-        ApplyDiffPreferences();
-        return Task.CompletedTask;
+        return ApplyDiffPreferences();
     }
 
     private async Task LocateGitAsync()
@@ -788,8 +789,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _palette.Add(new PaletteItem { Title = "Toggle command log", Run = () => { tab.CommandsOpen = !tab.CommandsOpen; return Task.CompletedTask; } });
         }
 
-        _palette.Add(new PaletteItem { Title = "Next tab", Run = () => { NextTab(); return Task.CompletedTask; } });
-        _palette.Add(new PaletteItem { Title = "Close tab", Run = () => { CloseActive(); return Task.CompletedTask; } });
+        _palette.Add(new PaletteItem { Title = "Next tab", Run = () => NextTabCommand.ExecuteAsync(null) });
+        _palette.Add(new PaletteItem { Title = "Close tab", Run = () => CloseActiveCommand.ExecuteAsync(null) });
         _palette.Sort(static (left, right) => string.Compare(left.Title, right.Title, StringComparison.OrdinalIgnoreCase));
     }
 

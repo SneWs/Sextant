@@ -27,25 +27,20 @@ public partial class App : Application
                 DataContext = new MainViewModel(store, store.LoadWorkspace(), settings, new GitProcessRunner()),
             };
             desktop.MainWindow = window;
-            desktop.ShutdownRequested += (_, _) =>
-            {
-                if (window.DataContext is MainViewModel vm)
-                    vm.Shutdown();
-            };
         }
 
         base.OnFrameworkInitializationCompleted();
     }
 
-    private void OnShowAbout(object? sender, EventArgs e)
+    private async void OnShowAbout(object? sender, EventArgs e)
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime { MainWindow.DataContext: MainViewModel vm })
-            vm.ShowAboutCommand.Execute(null);
+            await vm.ShowAboutCommand.ExecuteAsync(null);
     }
 
-    private void OnOpenSettings(object? sender, EventArgs e)
+    private async void OnOpenSettings(object? sender, EventArgs e)
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime { MainWindow.DataContext: MainViewModel vm })
-            vm.OpenSettingsCommand.Execute(null);
+            await vm.OpenSettingsCommand.ExecuteAsync(null);
     }
 }

@@ -422,21 +422,21 @@ public class RepositoryFileTreeTests
             main.Tabs.Add(second);
             try
             {
-                main.Activate(first);
+                await main.Activate(first);
                 await first.EnsureLoadedAsync();
                 await WaitUntilIdle(first);
                 await first.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
                 first.ToggleRepositoryDirectory(first.RepositoryFileTree.Single(item => item.Path == "docs"));
                 first.SelectedRepositoryFile = first.RepositoryFileTree.Single(item => item.Path == "docs/plain.txt");
 
-                main.Activate(second);
+                await main.Activate(second);
                 await second.EnsureLoadedAsync();
                 await WaitUntilIdle(second);
                 await using var external = await RepositorySession.OpenAsync(new GitProcessRunner(), repo.Git, repo.Directory, CancellationToken.None);
                 await external.LockLfsFileAsync("docs/plain.txt", CancellationToken.None);
                 repo.WriteFile("docs/new.txt", "new while away\n");
                 var requests = server.Requests.Count(request => request.Method == "GET");
-                main.Activate(first);
+                await main.Activate(first);
                 await WaitUntilIdle(first);
                 Assert.False(first.HasBanner, first.Banner);
                 Assert.True(server.Requests.Count(request => request.Method == "GET") > requests);
@@ -447,7 +447,7 @@ public class RepositoryFileTreeTests
 
                 await external.UnlockLfsFileAsync("docs/plain.txt", force: false, CancellationToken.None);
                 requests = server.Requests.Count(request => request.Method == "GET");
-                main.OnWindowActivated();
+                await main.OnWindowActivated();
                 await WaitUntilIdle(first);
                 Assert.False(first.HasBanner, first.Banner);
                 Assert.True(server.Requests.Count(request => request.Method == "GET") > requests);
@@ -456,7 +456,7 @@ public class RepositoryFileTreeTests
 
                 first.ShowHistoryTabCommand.Execute(null);
                 requests = server.Requests.Count(request => request.Method == "GET");
-                main.OnWindowActivated();
+                await main.OnWindowActivated();
                 await WaitUntilIdle(first);
                 Assert.Equal(requests, server.Requests.Count(request => request.Method == "GET"));
                 await external.LockLfsFileAsync("docs/plain.txt", CancellationToken.None);
@@ -466,7 +466,7 @@ public class RepositoryFileTreeTests
             }
             finally
             {
-                main.Shutdown();
+                await main.Shutdown();
             }
         }, CancellationToken.None);
     }
@@ -529,8 +529,8 @@ public class RepositoryFileTreeTests
         public string? GitExecutable => git;
         public string? MergeTool => null;
         public bool GitReady => true;
-        public void Activate(RepositoryViewModel tab) { }
-        public void Close(RepositoryViewModel tab) { }
+        public Task Activate(RepositoryViewModel tab) => Task.CompletedTask;
+        public Task Close(RepositoryViewModel tab) => Task.CompletedTask;
         public void NoteLoaded(RepositoryViewModel tab) { }
         public void Save() { }
         public Task OpenRepositoryAsync(string path) => Task.CompletedTask;

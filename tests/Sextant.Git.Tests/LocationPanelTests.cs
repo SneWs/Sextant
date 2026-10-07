@@ -168,13 +168,9 @@ public class LocationPanelTests
 
         public bool GitReady => true;
 
-        public void Activate(RepositoryViewModel tab)
-        {
-        }
+        public Task Activate(RepositoryViewModel tab) => Task.CompletedTask;
 
-        public void Close(RepositoryViewModel tab)
-        {
-        }
+        public Task Close(RepositoryViewModel tab) => Task.CompletedTask;
 
         public void NoteLoaded(RepositoryViewModel tab)
         {

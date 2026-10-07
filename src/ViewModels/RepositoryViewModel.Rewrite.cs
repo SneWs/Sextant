@@ -38,6 +38,7 @@ public partial class RepositoryViewModel
             IReadOnlyList<(string Sha, string Subject)> replaced;
             try
             {
+                using var pending = new PendingRepositoryWork(this);
                 replaced = await _session.ListUpstreamOnlyAsync(_lifetime.Token);
             }
             catch (OperationCanceledException)
@@ -50,6 +51,8 @@ public partial class RepositoryViewModel
                 return;
             }
 
+            if (_lifetime.IsCancellationRequested)
+                return;
             var upstream = state.Branch.Upstream;
             var branch = state.Branch.HeadName;
             var message = DescribeLease(branch, upstream, replaced);
