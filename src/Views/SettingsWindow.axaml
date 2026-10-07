@@ -34,7 +34,7 @@
                         <InlineUIContainer BaselineAlignment="TextBottom">
                             <HyperlinkButton x:Name="ThemesFolderLink" Padding="0" MinHeight="0" MinWidth="0"
                                              Cursor="Hand" Click="OnOpenThemesFolder">
-                                <TextBlock x:Name="ThemesFolderPath" TextDecorations="Underline" Cursor="Hand"/>
+                                <TextBlock x:Name="ThemesFolderPath" Cursor="Hand"/>
                             </HyperlinkButton>
                         </InlineUIContainer>
                         <Run Text="is listed here. It needs a Light palette and a Dark palette."

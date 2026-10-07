@@ -33,6 +33,10 @@ public partial class SettingsWindow : Window
         PaletteBox.SelectedItem = _choices.First(choice => choice.Id == palette);
         var themesDirectory = AppPaths.ThemesDirectory();
         ThemesFolderPath.Text = themesDirectory;
+        // The theme's Underline value is one shared object. Another test thread may own it, and drawing it then throws.
+        var underline = new TextDecorationCollection { new TextDecoration { Location = TextDecorationLocation.Underline } };
+        ThemesFolderLink.SetValue(TextBlock.TextDecorationsProperty, underline);
+        ThemesFolderPath.TextDecorations = underline;
         ToolTip.SetTip(ThemesFolderLink, DesktopOpen.FolderLabel(DesktopOpen.Current));
         var theme = ThemePreference.Normalize(draft.Theme);
         FollowSystem.IsChecked = false;
