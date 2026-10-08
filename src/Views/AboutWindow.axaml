@@ -9,9 +9,18 @@
         Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
     <Grid RowDefinitions="*,Auto" Margin="28,24,28,16">
         <StackPanel Spacing="8">
-            <Image Width="72" Height="72" Stretch="Uniform" HorizontalAlignment="Center"
-                   RenderOptions.BitmapInterpolationMode="HighQuality"
-                   Source="avares://Sextant/Assets/sextant.png"/>
+            <!-- The stroke traces the icon's own outline: the 901px artwork's opaque tile is
+                 855x892 with a 189px corner radius, so at 72px the box is inset 1.9/0.3/1.8/0.4
+                 and the matching CornerRadius is 72 * 189 / 901. -->
+            <Panel Width="72" Height="72" HorizontalAlignment="Center">
+                <Image Stretch="Uniform"
+                       RenderOptions.BitmapInterpolationMode="HighQuality"
+                       Source="avares://Sextant/Assets/sextant.png"/>
+                <Border Margin="1.9,0.3,1.8,0.4"
+                        CornerRadius="15.1"
+                        BorderThickness="1"
+                        BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
+            </Panel>
             <TextBlock Text="Sextant" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center"/>
             <TextBlock x:Name="VersionText" HorizontalAlignment="Center" Opacity="0.75" TextAlignment="Center"/>
             <TextBlock Text="A Git client for very large repositories."

@@ -18,8 +18,10 @@
     <PublishDir>bin\$(Configuration)\$(RuntimeIdentifier)\Sextant.app\Contents\MacOS\</PublishDir>
   </PropertyGroup>
 
+  <!-- The tools are inputs too: make-icns.sh repaints the artwork before packing, so editing
+       either script has to invalidate a cached .icns the same way editing the artwork does. -->
   <Target Name="GenerateSextantIcns"
-          Inputs="$(MSBuildThisFileDirectory)Assets\sextant.png"
+          Inputs="$(MSBuildThisFileDirectory)Assets\sextant.png;$(MSBuildThisFileDirectory)tools/make-icns.sh;$(MSBuildThisFileDirectory)tools/normalize-icon.swift"
           Outputs="$(IntermediateOutputPath)sextant.icns"
           Condition="$([MSBuild]::IsOSPlatform('OSX'))">
     <Exec Command="bash &quot;$(MSBuildThisFileDirectory)tools/make-icns.sh&quot; &quot;$(MSBuildThisFileDirectory)Assets\sextant.png&quot; &quot;$(IntermediateOutputPath)sextant.icns&quot;" />

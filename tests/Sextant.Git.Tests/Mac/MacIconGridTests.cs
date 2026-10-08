@@ -56,8 +56,8 @@ public class MacIconGridTests
     [Fact]
     public void Packed_icon_tile_keeps_the_mark()
     {
-        // The normaliser draws the artwork over a purple backdrop; if only the backdrop
-        // survived we would have a correct shape with no sextant in it.
+        // The normaliser rescales the artwork to cover the grid; if that went wrong we would
+        // have a correct shape with no sextant in it, so check the mark itself survived.
         var tile = PackedTile();
         var white = 0;
         for (var i = 0; i < tile.Pixels.Length; i += 4)
