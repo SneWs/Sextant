@@ -138,6 +138,8 @@ The command key is Command on macOS and Ctrl on Windows and Linux, except where 
 | Create branch | Command/Ctrl+B |
 | Stash | Command/Ctrl+S |
 | Pop latest stash | Command/Ctrl+Shift+S |
+| Stage all | Command/Ctrl+Shift+A |
+| Unstage all | Command/Ctrl+Shift+R |
 | Close tab | Command/Ctrl+W |
 | Next tab | Ctrl+Tab |
 | Refresh | F5 |

@@ -110,6 +110,10 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     public bool CanPopLatestStash => ActiveTab is { CanPopLatestStash: true };
 
+    public bool CanStageAll => ActiveTab is { CanStageAll: true };
+
+    public bool CanUnstageAll => ActiveTab is { CanUnstageAll: true };
+
     public bool HasStatusText => !string.IsNullOrWhiteSpace(StatusText);
 
     public bool HasActiveTab => ActiveTab is not null;
@@ -321,6 +325,16 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
     private Task Pull() => ActiveTab?.PullCommand.ExecuteAsync(null) ?? Task.CompletedTask;
 
+    [RelayCommand(CanExecute = nameof(CanStageAll))]
+    private Task StageAll() => ActiveTab is { } stageTab && stageTab.StageAllCommand.CanExecute(null)
+        ? stageTab.StageAllCommand.ExecuteAsync(null)
+        : Task.CompletedTask;
+
+    [RelayCommand(CanExecute = nameof(CanUnstageAll))]
+    private Task UnstageAll() => ActiveTab is { } unstageTab && unstageTab.UnstageAllCommand.CanExecute(null)
+        ? unstageTab.UnstageAllCommand.ExecuteAsync(null)
+        : Task.CompletedTask;
+
     [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
     private Task Push() => ActiveTab?.PushCommand.ExecuteAsync(null) ?? Task.CompletedTask;
 
@@ -435,7 +449,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     private void OnMenuTabChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is not (nameof(RepositoryViewModel.CanRunCommands) or nameof(RepositoryViewModel.IsBusy)
-            or nameof(RepositoryViewModel.CanStash) or nameof(RepositoryViewModel.CanPopLatestStash)))
+            or nameof(RepositoryViewModel.CanStash) or nameof(RepositoryViewModel.CanPopLatestStash)
+            or nameof(RepositoryViewModel.CanStageAll) or nameof(RepositoryViewModel.CanUnstageAll)))
             return;
         OnPropertyChanged(nameof(CanRunRepositoryCommands));
         NotifyRepositoryCommands();
@@ -448,6 +463,10 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         CreateBranchCommand.NotifyCanExecuteChanged();
         StashCommand.NotifyCanExecuteChanged();
         PopLatestStashCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanStageAll));
+        OnPropertyChanged(nameof(CanUnstageAll));
+        StageAllCommand.NotifyCanExecuteChanged();
+        UnstageAllCommand.NotifyCanExecuteChanged();
         AddRemoteCommand.NotifyCanExecuteChanged();
         AddWorktreeCommand.NotifyCanExecuteChanged();
         ApplyPatchCommand.NotifyCanExecuteChanged();

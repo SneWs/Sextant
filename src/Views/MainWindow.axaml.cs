@@ -246,6 +246,22 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (AppGestures.Matches(e, Key.A, KeyModifiers.Shift))
+        {
+            e.Handled = true;
+            if (vm.StageAllCommand.CanExecute(null))
+                await vm.StageAllCommand.ExecuteAsync(null);
+            return;
+        }
+
+        if (AppGestures.Matches(e, Key.R, KeyModifiers.Shift))
+        {
+            e.Handled = true;
+            if (vm.UnstageAllCommand.CanExecute(null))
+                await vm.UnstageAllCommand.ExecuteAsync(null);
+            return;
+        }
+
         if (e.Key == Key.Escape && vm.PaletteOpen)
         {
             vm.ClosePalette();

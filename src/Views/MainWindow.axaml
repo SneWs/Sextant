@@ -41,6 +41,8 @@
                     <NativeMenuItem Header="_Branch…" Command="{Binding CreateBranchCommand}" Gesture="{app:CommandGesture Key=B}"/>
                     <NativeMenuItem Header="_Stash…" Command="{Binding StashCommand}" IsEnabled="{Binding CanStash}" Gesture="{app:CommandGesture Key=S}"/>
                     <NativeMenuItem Header="_Pop latest stash…" Command="{Binding PopLatestStashCommand}" IsEnabled="{Binding CanPopLatestStash}" Gesture="{app:CommandGesture Key=S, Shift=True}"/>
+                    <NativeMenuItem Header="Stage _all" Command="{Binding StageAllCommand}" IsEnabled="{Binding CanStageAll}" Gesture="{app:CommandGesture Key=A, Shift=True}"/>
+                    <NativeMenuItem Header="_Unstage all" Command="{Binding UnstageAllCommand}" IsEnabled="{Binding CanUnstageAll}" Gesture="{app:CommandGesture Key=R, Shift=True}"/>
                     <NativeMenuItem Header="_Pull" Command="{Binding PullCommand}" Gesture="{app:CommandGesture Key=U, Shift=True}"/>
                     <NativeMenuItem Header="_Push" Command="{Binding PushCommand}" Gesture="{app:CommandGesture Key=P, Shift=True}"/>
                     <NativeMenuItem Header="Add _remote…" Command="{Binding AddRemoteCommand}"/>
