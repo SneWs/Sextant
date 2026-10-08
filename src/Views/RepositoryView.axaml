@@ -75,9 +75,44 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto" SharedSizeGroup="BranchEnds"/>
             </Grid.ColumnDefinitions>
-            <Border Grid.Column="1"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="SidebarToggleButton" Classes="locationsearch" Padding="7,0" MinWidth="0" Height="26"
+                        Command="{Binding ToggleLocationsCommand}"
+                        Classes.pressed="{Binding ShowLocations}"
+                        ToolTip.Tip="Toggle locations" VerticalAlignment="Center"
+                        AutomationProperties.Name="Toggle locations">
+                    <Canvas Width="14" Height="14">
+                        <Rectangle Canvas.Left="1" Canvas.Top="1" Width="12" Height="12" RadiusX="2" RadiusY="2"
+                                   Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.2"/>
+                        <Line StartPoint="5.2,1" EndPoint="5.2,13"
+                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.2"/>
+                    </Canvas>
+                </Button>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6">
+                <SplitButton x:Name="StashSplitButton" Command="{Binding StashCommand}" VerticalAlignment="Center"
+                             Padding="7,0" MinWidth="0" Height="26" ToolTip.Tip="Stash changes"
+                             AutomationProperties.Name="Stash">
+                    <Canvas Width="14" Height="14">
+                        <Polygon Points="7,1.5 12.5,4.4 7,7.3 1.5,4.4"
+                                 Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.2"/>
+                        <Polyline Points="1.5,8.1 7,11 12.5,8.1"
+                                  Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.2"
+                                  StrokeLineCap="Round" StrokeJoin="Round"/>
+                        <Polyline Points="1.5,10.9 7,13.8 12.5,10.9"
+                                  Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.2"
+                                  StrokeLineCap="Round" StrokeJoin="Round"/>
+                    </Canvas>
+                    <SplitButton.Flyout>
+                        <MenuFlyout>
+                            <MenuItem Header="Stash…" Command="{Binding StashCommand}"/>
+                            <MenuItem Header="Stash (include untracked)" Command="{Binding StashUntrackedCommand}"/>
+                            <MenuItem Header="Stash (keep index)" Command="{Binding StashKeepIndexCommand}"/>
+                            <MenuItem Header="Stash (staged)" Command="{Binding StashStagedCommand}"/>
+                        </MenuFlyout>
+                    </SplitButton.Flyout>
+                </SplitButton>
+                <Border VerticalAlignment="Center"
                     MinWidth="210"
                     MaxWidth="840"
                     Padding="16,5"
@@ -96,7 +131,21 @@
                                VerticalAlignment="Center" Opacity="0.72" FontSize="12" Margin="8,0,0,0"
                                TextTrimming="CharacterEllipsis" MaxWidth="400"/>
                 </Grid>
-            </Border>
+                </Border>
+                <Button x:Name="HistorySearchToggleButton" Classes="locationsearch" Padding="7,0" MinWidth="0" Height="26"
+                        Command="{Binding ToggleHistorySearchCommand}"
+                        Classes.pressed="{Binding ShowHistorySearch}"
+                        ToolTip.Tip="Search history" VerticalAlignment="Center"
+                        AutomationProperties.Name="Search history">
+                    <Canvas Width="14" Height="14">
+                        <Ellipse Width="8" Height="8" Canvas.Left="1" Canvas.Top="1"
+                                 Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"/>
+                        <Line StartPoint="7.6,7.6" EndPoint="12.2,12.2"
+                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                              StrokeLineCap="Round"/>
+                    </Canvas>
+                </Button>
+            </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Panel.ZIndex="1">
                 <SplitButton Content="Pull" Command="{Binding PullCommand}" IsEnabled="{Binding CanRunCommands}">
                     <SplitButton.Flyout>

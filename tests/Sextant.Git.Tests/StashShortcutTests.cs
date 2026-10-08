@@ -1,7 +1,9 @@
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Sextant.Git;
 using Sextant.Git.Models;
 using Sextant.Git.Repo;
@@ -320,6 +322,80 @@ public class StashShortcutTests
         vm.Tabs.Add(tab);
         await vm.Activate(tab);
         return (vm, tab);
+    }
+
+    [Fact]
+    public async Task Toolbar_exposes_stash_split_button_and_search_toggle()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "base\n");
+        repo.CommitAll("first");
+        repo.WriteFile("a.txt", "edited\n");
+
+        await session.Dispatch(async () =>
+        {
+            var dialogs = new StashDialogs();
+            var (vm, tab) = await Open(repo, dialogs);
+            var window = new MainWindow { DataContext = vm, Width = 1000, Height = 700 };
+            try
+            {
+                window.Show();
+                await vm.InitializeAsync();
+                vm.Attach(dialogs);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                var until = DateTime.UtcNow.AddSeconds(5);
+                while (tab.IsBusy && DateTime.UtcNow < until)
+                    await Task.Delay(30);
+                Assert.False(tab.IsBusy);
+
+                var view = window.GetVisualDescendants().OfType<RepositoryView>().Single();
+                var stash = view.GetVisualDescendants().OfType<SplitButton>().Single(button => button.Name == "StashSplitButton");
+                var search = view.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "HistorySearchToggleButton");
+                var sidebar = view.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "SidebarToggleButton");
+                Assert.Same(tab.ToggleLocationsCommand, sidebar.Command);
+                Assert.Equal(stash.Bounds.Height, sidebar.Bounds.Height);
+                Assert.True(tab.ShowLocations);
+                sidebar.Command!.Execute(null);
+                Assert.False(tab.ShowLocations);
+                sidebar.Command.Execute(null);
+                Assert.True(tab.ShowLocations);
+                var group = stash.Parent;
+                Assert.IsType<StackPanel>(group);
+                Assert.Same(group, search.Parent);
+                var pill = ((Panel)group!).Children.OfType<Border>().Single();
+                Assert.Contains(pill.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == tab.BranchText);
+                Assert.Equal(0, ((StackPanel)group!).Children.IndexOf(stash));
+                Assert.Equal(2, ((StackPanel)group!).Children.IndexOf(search));
+                Assert.Equal(HorizontalAlignment.Center, ((StackPanel)group!).HorizontalAlignment);
+                Assert.Same(tab.StashCommand, stash.Command);
+                Assert.True(stash.IsEnabled);
+                Assert.Null(stash.Content as string);
+                Assert.NotEmpty(stash.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Polygon>());
+                Assert.True(stash.Bounds.Width <= 60, $"stash button too wide: {stash.Bounds.Width}");
+                var flyout = Assert.IsType<MenuFlyout>(stash.Flyout);
+                Assert.Equal(
+                    new[] { "Stash…", "Stash (include untracked)", "Stash (keep index)", "Stash (staged)" },
+                    flyout.Items.OfType<MenuItem>().Select(item => item.Header as string));
+                Assert.Same(tab.StashUntrackedCommand, flyout.Items.OfType<MenuItem>().ElementAt(1).Command);
+                Assert.Same(tab.StashKeepIndexCommand, flyout.Items.OfType<MenuItem>().ElementAt(2).Command);
+                Assert.Same(tab.StashStagedCommand, flyout.Items.OfType<MenuItem>().ElementAt(3).Command);
+
+                Assert.False(tab.ShowHistorySearch);
+                Assert.Same(tab.ToggleHistorySearchCommand, search.Command);
+                Assert.Equal(stash.Bounds.Height, search.Bounds.Height);
+                Assert.True(search.Bounds.Width <= 60, $"search button too wide: {search.Bounds.Width}");
+                search.Command!.Execute(null);
+                Assert.True(tab.ShowHistorySearch);
+                search.Command.Execute(null);
+                Assert.False(tab.ShowHistorySearch);
+            }
+            finally
+            {
+                await vm.Shutdown();
+            }
+        }, CancellationToken.None);
     }
 
     [Fact]
