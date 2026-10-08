@@ -52,6 +52,13 @@ public partial class GraphRowViewModel : ObservableObject
     [ObservableProperty]
     public partial string Detail { get; set; } = "";
 
+    /// <summary>Changed-file count drawn as a pill on the right of the history row. Empty until the batch load fills it.</summary>
+    [ObservableProperty]
+    public partial string FileCountText { get; set; } = "";
+    
+    [ObservableProperty]
+    public partial string FileCountTooltip { get; set; } = "";
+
     /// <summary>Tag names drawn as labels on the right of the history row.</summary>
     public IReadOnlyList<string> Tags { get; init; } = [];
 

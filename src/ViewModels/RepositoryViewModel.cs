@@ -1308,6 +1308,7 @@ public partial class RepositoryViewModel : ViewModelBase
     private void RebuildGraph(SessionState state)
     {
         Rows.Clear();
+        _fileCountsLoaded.Clear();
         Rows.Add(WorkingRow(state));
         foreach (var commit in state.Commits)
             Rows.Add(CommitRow(commit, state));
@@ -1323,6 +1324,61 @@ public partial class RepositoryViewModel : ViewModelBase
 
         for (var i = _seenCommits; i < state.Commits.Count; i++)
             Rows.Add(CommitRow(state.Commits[i], state));
+    }
+
+    // Row file counts load on demand, one batched git log per set of rows. A sha is asked for once
+    // per history generation so scrolling back and forth does not start the same walk again.
+    private readonly HashSet<string> _fileCountsLoaded = new(StringComparer.OrdinalIgnoreCase);
+
+    public void RequestFileCounts(IReadOnlyList<GraphRowViewModel?> rows)
+    {
+        if (_session is null)
+            return;
+        var missing = new List<string>();
+        foreach (var row in rows)
+        {
+            if (row is null || row.IsWorkingCopy || row.Sha is not { Length: > 0 } sha)
+                continue;
+            if (row.FileCountText.Length > 0 || !_fileCountsLoaded.Add(sha))
+                continue;
+            missing.Add(sha);
+        }
+
+        if (missing.Count == 0)
+            return;
+        _ = LoadFileCountsAsync(missing, _lifetime.Token);
+    }
+
+    private async Task LoadFileCountsAsync(List<string> shas, CancellationToken token)
+    {
+        var session = _session;
+        if (session is null)
+            return;
+        try
+        {
+            var counts = await session.FileCountsAsync(shas, token);
+            if (token.IsCancellationRequested || counts.Count == 0)
+            {
+                foreach (var sha in shas)
+                    _fileCountsLoaded.Remove(sha);
+                return;
+            }
+
+            foreach (var row in Rows)
+            {
+                if (row.Sha is { Length: > 0 } sha && counts.TryGetValue(sha, out var files) && files > 0)
+                {
+                    row.FileCountText = files.ToString(CultureInfo.InvariantCulture);
+                    row.FileCountTooltip = files == 1 ? "1 file changed" : $"{files} files changed";
+                }
+            }
+        }
+        catch (GitCommandFailedException)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     private GraphRowViewModel WorkingRow(SessionState state) => new()

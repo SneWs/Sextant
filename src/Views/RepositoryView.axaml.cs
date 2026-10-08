@@ -132,6 +132,9 @@ public partial class RepositoryView : UserControl
         _watched.JumpToFile += OnJumpToFile;
         _diffRows = _watched.DiffRows;
         _diffRows.CollectionChanged += OnDiffRowsChanged;
+        _watched.Rows.CollectionChanged += OnGraphRowsChanged;
+        var watched = _watched;
+        Dispatcher.UIThread.Post(() => RequestRowFileCounts(watched), DispatcherPriority.Loaded);
         ApplyCommandLog(_watched.CommandLog);
         _resetSideScroll = true;
         QueueSideScroll();
@@ -143,6 +146,7 @@ public partial class RepositoryView : UserControl
         {
             _watched.PropertyChanged -= OnViewModelPropertyChanged;
             _watched.JumpToFile -= OnJumpToFile;
+            _watched.Rows.CollectionChanged -= OnGraphRowsChanged;
             _watched = null;
         }
 
@@ -196,6 +200,14 @@ public partial class RepositoryView : UserControl
         if (e.Action == NotifyCollectionChangedAction.Reset)
             _resetSideScroll = true;
         QueueSideScroll();
+    }
+
+    private void OnGraphRowsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (_watched is null)
+            return;
+        var vm = _watched;
+        Dispatcher.UIThread.Post(() => RequestRowFileCounts(vm), DispatcherPriority.Loaded);
     }
 
     private void ScrollDiffTo(string path, string? original)
@@ -350,6 +362,8 @@ public partial class RepositoryView : UserControl
         }
         else if (e.PropertyName == nameof(RepositoryViewModel.CommandLog))
             ApplyCommandLog(vm.CommandLog);
+        else if (e.PropertyName == nameof(RepositoryViewModel.RepositoryFilesTabOn) && vm.HistoryTabOn)
+            RequestRowFileCounts(vm);
         else if (e.PropertyName == nameof(RepositoryViewModel.CommandsOpen) && vm.CommandsOpen)
             Dispatcher.UIThread.Post(ScrollCommandLogToEnd, DispatcherPriority.Loaded);
         else if (_widthsApplied && e.PropertyName is nameof(RepositoryViewModel.LocationsWidth) or nameof(RepositoryViewModel.GraphWidth) or nameof(RepositoryViewModel.FilesHeight) or nameof(RepositoryViewModel.ShowLocations))
@@ -740,12 +754,28 @@ public partial class RepositoryView : UserControl
 
     private async void OnGraphScroll(object? sender, ScrollChangedEventArgs e)
     {
-        if (sender is not ScrollViewer scroll || scroll.Extent.Height <= scroll.Viewport.Height)
-            return;
-        if (scroll.Offset.Y + scroll.Viewport.Height < scroll.Extent.Height - 48)
+        if (sender is not ScrollViewer scroll)
             return;
         if (DataContext is RepositoryViewModel vm)
+        {
+            RequestRowFileCounts(vm);
+            if (scroll.Extent.Height <= scroll.Viewport.Height)
+                return;
+            if (scroll.Offset.Y + scroll.Viewport.Height < scroll.Extent.Height - 48)
+                return;
             await vm.LoadMoreFromScrollAsync();
+        }
+    }
+
+    /// <summary>Asks the view model for the changed-file counts of the rows the graph has realized.</summary>
+    private void RequestRowFileCounts(RepositoryViewModel vm)
+    {
+        var rows = GraphList.GetRealizedContainers().OfType<Control>()
+            .Select(GraphList.ItemFromContainer)
+            .OfType<GraphRowViewModel>()
+            .ToList();
+        if (rows.Count > 0)
+            vm.RequestFileCounts(rows);
     }
 
     private void OnCommitKeyDown(object? sender, KeyEventArgs e)

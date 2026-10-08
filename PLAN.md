@@ -92,6 +92,8 @@ On 2026-10-07 view-model commands and callable actions that run asynchronous wor
 
 On 2026-10-08 File → Exit is the last item, after a separator. It closes the window, which saves the workspace and shuts down. The desktop window was not launched.
 
+On 2026-10-08 each commit row in the history shows a pill with the number of files that commit changed, like Sublime Merge. The pill sits on the right of the row, before the branch and tag labels, and is a rounded bar with a neutral fill. The working-copy row has no pill, and neither does a commit with no files of its own, such as a merge. The counts are not walked while the rows paint: the view asks for the rows it has realized, and one `git log --no-walk --numstat -z` covers that whole set. Scrolling and Load more ask again for the new rows, and a sha is walked once per history generation. `Batch_numstat_counts_files_per_commit_and_skips_the_separator`, `Batch_numstat_gives_a_merge_no_files`, `Batch_numstat_counts_a_rename_as_one_file`, and `File_counts_come_from_one_walk_of_the_requested_commits` passed against system git. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

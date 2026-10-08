@@ -182,6 +182,29 @@ public sealed partial class RepositorySession : IAsyncDisposable
             return NumStatParser.Parse(output.Stdout);
         }, cancellationToken);
 
+    /// <summary>
+    /// Changed-file counts for the given commits from one <c>git log --no-walk --numstat</c>. Rows the
+    /// walk did not report keep their old value, so a failure or a dropped page never clears a pill.
+    /// </summary>
+    public Task<Dictionary<string, int>> FileCountsAsync(IReadOnlyList<string> shas, CancellationToken cancellationToken)
+    {
+        if (shas.Count == 0)
+            return Task.FromResult(new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase));
+        return RunAsync(async ct =>
+        {
+            var output = await _scheduler.ReadAsync(
+                inner => ExecuteAsync(GitCommands.NumStatBatch(_toplevel, shas), null, inner),
+                ct).ConfigureAwait(false);
+            if (output.ExitCode != 0)
+            {
+                Track(output);
+                return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            return NumStatParser.ParseFileCounts(output.Stdout);
+        }, cancellationToken);
+    }
+
     public Task<string> CommitMessageAsync(string sha, CancellationToken cancellationToken) =>
         RunAsync(async ct =>
         {

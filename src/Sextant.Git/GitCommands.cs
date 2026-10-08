@@ -385,6 +385,22 @@ public static class GitCommands
         return arguments;
     }
 
+    /// <summary>
+    /// Numstat for many commits in one walk. Each commit is a <c>@@&lt;sha&gt;</c> sentinel record
+    /// followed by its numstat records, so the history rows can count changed files without a process per row.
+    /// A merge shows no numstat records, which matches the first-parent diff the details panel uses.
+    /// </summary>
+    public static IReadOnlyList<string> NumStatBatch(string toplevel, IReadOnlyList<string> shas)
+    {
+        var arguments = new List<string>
+        {
+            "-C", toplevel, "--no-optional-locks", "log", "--no-walk=unsorted", "--numstat", "-z", "--format=@@%H",
+        };
+        arguments.AddRange(shas);
+        KeepLfsPointers(arguments);
+        return arguments;
+    }
+
     /// <summary>Added and removed lines for a commit with no parent.</summary>
     public static IReadOnlyList<string> NumStatRoot(string toplevel, string sha)
     {
