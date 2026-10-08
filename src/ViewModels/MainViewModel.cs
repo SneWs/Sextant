@@ -106,6 +106,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     public bool HasActiveTab => ActiveTab is not null;
 
+    public bool ShowWindowExitMenu => OperatingSystem.IsWindows() || OperatingSystem.IsLinux();
+
     /// <summary>macOS shows Settings in the application menu, so the window does not repeat it.</summary>
     public bool ShowWindowSettingsMenu => !OperatingSystem.IsMacOS();
 

@@ -229,7 +229,7 @@ public class TabBarTests
     }
 
     [Fact]
-    public async Task File_menu_exit_is_last_and_closes_the_window()
+    public async Task File_menu_exit_is_visible_only_on_Windows_and_Linux_and_closes_the_window()
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
         var directory = Path.Combine(Path.GetTempPath(), "sextant-exit-" + Guid.NewGuid().ToString("N"));
@@ -249,10 +249,15 @@ public class TabBarTests
                 Assert.NotNull(menu);
                 var file = Assert.IsType<NativeMenuItem>(Assert.Single(menu.Items, item => item is NativeMenuItem { Header: "_File" }));
                 var items = file.Menu!.Items;
-                Assert.IsType<NativeMenuItemSeparator>(items[^2]);
+                var separator = Assert.IsType<NativeMenuItemSeparator>(items[^2]);
                 var exit = Assert.IsType<NativeMenuItem>(items[^1]);
                 Assert.Equal("E_xit", exit.Header);
                 Assert.Same(vm.ExitCommand, exit.Command);
+                var showExit = OperatingSystem.IsWindows() || OperatingSystem.IsLinux();
+                Assert.Equal(showExit, exit.IsVisible);
+                Assert.Equal(showExit, separator.IsVisible);
+                var lastVisible = items.OfType<NativeMenuItem>().Last(item => item.IsVisible);
+                Assert.Equal(showExit ? "E_xit" : "_Init repository…", lastVisible.Header);
 
                 exit.Command!.Execute(null);
                 Assert.False(closed);
