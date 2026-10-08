@@ -273,7 +273,7 @@ public class HistoryGraphTests
                 Assert.DoesNotContain(view.GetVisualDescendants().OfType<Button>(), button => button.Content as string is "Search" or "Clear");
                 var banner = view.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == "A repository message");
                 var conflict = view.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == "A merge is in progress");
-                var pull = view.GetVisualDescendants().OfType<SplitButton>().First(button => button.Content as string == "Pull");
+                var pull = view.GetVisualDescendants().OfType<SplitButton>().Single(button => button.Name == "PullSplitButton");
                 var locations = view.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == "Locations");
                 var graph = view.FindControl<ListBox>("GraphList");
                 Assert.NotNull(graph);

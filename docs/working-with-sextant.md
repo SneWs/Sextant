@@ -10,7 +10,7 @@ The command palette (Ctrl+P, or Command+P on macOS) lists the actions for the op
 
 ## The window
 
-Under the tabs, the branch bar names the checked-out branch and, when Git knows, how many commits you are ahead of or behind the upstream. On the far left, a sidebar button toggles the Locations column, the same as View, Toggle locations. The name sits in a rounded pill with a Stash button beside it on the left and a search button beside it on the right, and the group stays centered. The Stash split menu holds the stash variants, and the search button toggles the history search box, the same as the Search menu item. Pull and Push sit on the right of the bar. While a command runs, its label replaces that status, and Cancel appears when the command can be cancelled.
+Under the tabs, the branch bar names the checked-out branch and, when Git knows, how many commits you are ahead of or behind the upstream. On the far left, a sidebar button toggles the Locations column, the same as View, Toggle locations. The name sits in a rounded pill with a Stash button beside it on the left and a search button beside it on the right, and the group stays centered. The Stash split menu holds the stash variants, and the search button toggles the history search box, the same as the Search menu item. The down and up arrow buttons for Pull and Push sit on the right of the bar. While a command runs, its label replaces that status, and Cancel appears when the command can be cancelled.
 
 A conflict replaces that quiet state with a banner and Continue and Abort. A sparse checkout adds a banner: excluded paths stay out of the working tree. Sextant does not check those paths out to read them.
 
@@ -95,7 +95,7 @@ PNG, JPG, JPEG, GIF, BMP, WEBP, ICO, SVG, TIF, and TIFF open as a picture of eac
 
 ## Fetch, pull, and push
 
-Pull takes the upstream of the current branch. The menu on that button also offers Fetch, Fetch all, and Fetch all and clean up. Fetch all and clean up prunes remote-tracking branches that the remote has deleted. Pull is Ctrl+Shift+U (Command+Shift+U on macOS) and Push is Ctrl+Shift+P (Command+Shift+P). Both are also in the Repository menu.
+Pull takes the upstream of the current branch. The menu on that button also offers Pull, Pull with rebase, Fetch, Fetch all, and Fetch all and clean up. Pull with rebase rebases your local commits onto the upstream and passes --autostash, so uncommitted changes are stashed and restored around the rebase. Fetch all and clean up prunes remote-tracking branches that the remote has deleted. Pull is Ctrl+Shift+U (Command+Shift+U on macOS) and Push is Ctrl+Shift+P (Command+Shift+P). Both are also in the Repository menu.
 
 Push sends the current branch. The menu offers Push ignoring local checks, which skips hooks, and Push with force-with-lease. Force-with-lease refuses to overwrite remote commits that you have not seen. It is not a plain force.
 

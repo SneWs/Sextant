@@ -916,6 +916,9 @@ public sealed partial class RepositorySession : IAsyncDisposable
     public Task PullAsync(IProgress<string>? progress, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.Pull(_toplevel), progress, cancellationToken);
 
+    public Task PullRebaseAsync(IProgress<string>? progress, CancellationToken cancellationToken) =>
+        MutateAsync(GitCommands.PullRebase(_toplevel), progress, cancellationToken);
+
     public Task PushAsync(IProgress<string>? progress, CancellationToken cancellationToken, bool noVerify = false) =>
         MutateAsync(GitCommands.Push(_toplevel, noVerify), progress, cancellationToken);
 

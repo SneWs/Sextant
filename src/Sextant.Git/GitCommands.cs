@@ -590,6 +590,9 @@ public static class GitCommands
     public static IReadOnlyList<string> Pull(string toplevel) =>
         ["-C", toplevel, "pull", "--rebase", "--progress", "--no-edit"];
 
+    public static IReadOnlyList<string> PullRebase(string toplevel) =>
+        ["-C", toplevel, "pull", "--rebase", "--autostash", "--progress", "--no-edit"];
+
     public static IReadOnlyList<string> Push(string toplevel, bool noVerify = false)
     {
         var arguments = new List<string> { "-C", toplevel, "push", "--progress" };

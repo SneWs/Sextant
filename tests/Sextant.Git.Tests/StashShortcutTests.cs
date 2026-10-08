@@ -353,6 +353,15 @@ public class StashShortcutTests
                 var view = window.GetVisualDescendants().OfType<RepositoryView>().Single();
                 var stash = view.GetVisualDescendants().OfType<SplitButton>().Single(button => button.Name == "StashSplitButton");
                 var search = view.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "HistorySearchToggleButton");
+                var pull = view.GetVisualDescendants().OfType<SplitButton>().Single(button => button.Name == "PullSplitButton");
+                var push = view.GetVisualDescendants().OfType<SplitButton>().Single(button => button.Name == "PushSplitButton");
+                Assert.Null(pull.Content as string);
+                Assert.Null(push.Content as string);
+                Assert.NotEmpty(pull.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Polyline>());
+                Assert.NotEmpty(push.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Polyline>());
+                var pullFlyout = Assert.IsType<MenuFlyout>(pull.Flyout);
+                var pullRebase = pullFlyout.Items.OfType<MenuItem>().Single(item => item.Header as string == "Pull with rebase");
+                Assert.Same(tab.PullRebaseCommand, pullRebase.Command);
                 var sidebar = view.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "SidebarToggleButton");
                 Assert.Same(tab.ToggleLocationsCommand, sidebar.Command);
                 Assert.Equal(stash.Bounds.Height, sidebar.Bounds.Height);

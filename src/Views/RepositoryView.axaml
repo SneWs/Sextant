@@ -147,16 +147,44 @@
                 </Button>
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Panel.ZIndex="1">
-                <SplitButton Content="Pull" Command="{Binding PullCommand}" IsEnabled="{Binding CanRunCommands}">
+                <SplitButton x:Name="PullSplitButton" Command="{Binding PullCommand}" IsEnabled="{Binding CanRunCommands}"
+                             Padding="7,0" MinWidth="0" Height="26" ToolTip.Tip="Pull"
+                             AutomationProperties.Name="Pull">
+                    <Canvas Width="14" Height="14">
+                        <Line StartPoint="7,1.5" EndPoint="7,10"
+                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                              StrokeLineCap="Round"/>
+                        <Polyline Points="3,6.8 7,11 11,6.8"
+                                  Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                                  StrokeLineCap="Round" StrokeJoin="Round"/>
+                        <Line StartPoint="2,12.8" EndPoint="12,12.8"
+                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                              StrokeLineCap="Round"/>
+                    </Canvas>
                     <SplitButton.Flyout>
                         <MenuFlyout>
+                            <MenuItem Header="Pull" Command="{Binding PullCommand}"/>
+                            <MenuItem Header="Pull with rebase" Command="{Binding PullRebaseCommand}"/>
                             <MenuItem Header="Fetch" Command="{Binding FetchCommand}"/>
                             <MenuItem Header="Fetch all" Command="{Binding FetchAllCommand}"/>
                             <MenuItem Header="Fetch all and clean up" Command="{Binding FetchAllAndCleanUpCommand}"/>
                         </MenuFlyout>
                     </SplitButton.Flyout>
                 </SplitButton>
-                <SplitButton Content="Push" Command="{Binding PushCommand}" Margin="6,0,0,0" IsEnabled="{Binding CanRunCommands}">
+                <SplitButton x:Name="PushSplitButton" Command="{Binding PushCommand}" Margin="6,0,0,0" IsEnabled="{Binding CanRunCommands}"
+                             Padding="7,0" MinWidth="0" Height="26" ToolTip.Tip="Push"
+                             AutomationProperties.Name="Push">
+                    <Canvas Width="14" Height="14">
+                        <Line StartPoint="7,4" EndPoint="7,12.5"
+                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                              StrokeLineCap="Round"/>
+                        <Polyline Points="3,7.2 7,3 11,7.2"
+                                  Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                                  StrokeLineCap="Round" StrokeJoin="Round"/>
+                        <Line StartPoint="2,1.2" EndPoint="12,1.2"
+                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                              StrokeLineCap="Round"/>
+                    </Canvas>
                     <SplitButton.Flyout>
                         <MenuFlyout>
                             <MenuItem Header="Push" Command="{Binding PushCommand}"/>

@@ -496,6 +496,13 @@ public partial class RepositoryViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    public Task PullRebase()
+    {
+        var progress = Progress();
+        return RunAsync("Pulling with rebase…", ct => Session.PullRebaseAsync(progress, ct));
+    }
+
+    [RelayCommand]
     public Task Push() => PushCoreAsync(noVerify: false);
 
     [RelayCommand]
