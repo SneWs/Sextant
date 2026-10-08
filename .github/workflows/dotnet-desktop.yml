@@ -130,6 +130,7 @@ jobs:
         if ($LASTEXITCODE -ne 1 -or $output) {
           throw "The published SSH prompt helper failed its startup check (exit $LASTEXITCODE): $output"
         }
+        exit 0
 
     - name: Sign the application
       shell: pwsh
