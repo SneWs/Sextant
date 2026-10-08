@@ -12,11 +12,14 @@ namespace Sextant.Git.Tests;
 [Collection(HeadlessCollection.Name)]
 public class StashShortcutTests
 {
-    [Fact]
-    public async Task Stash_and_pop_latest_use_command_S_and_command_shift_S()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Stash_and_pop_latest_use_command_S_and_command_shift_S(bool autocrlf)
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
         using var repo = new TempRepo();
+        repo.Run("config", "core.autocrlf", autocrlf ? "true" : "false");
         repo.WriteFile("a.txt", "base\n");
         repo.CommitAll("first");
         repo.WriteFile("a.txt", "older\n");
@@ -59,7 +62,7 @@ public class StashShortcutTests
                 await vm.StashCommand.ExecutionTask;
                 Dispatcher.UIThread.RunJobs();
 
-                Assert.Equal("base\n", File.ReadAllText(Path.Combine(repo.Directory, "a.txt")));
+                Assert.Equal("base\n", File.ReadAllText(Path.Combine(repo.Directory, "a.txt")).Replace("\r\n", "\n", StringComparison.Ordinal));
                 Assert.Equal(2, repo.RunCapture("stash", "list").Split('\n', StringSplitOptions.RemoveEmptyEntries).Length);
                 Assert.False(tab.CanStash);
                 Assert.False(stash.IsEnabled);
@@ -73,7 +76,7 @@ public class StashShortcutTests
                 Assert.Contains("stash@{0}", dialogs.LastConfirmation, StringComparison.Ordinal);
                 Assert.NotNull(vm.PopLatestStashCommand.ExecutionTask);
                 await vm.PopLatestStashCommand.ExecutionTask;
-                Assert.Equal("latest\n", File.ReadAllText(Path.Combine(repo.Directory, "a.txt")));
+                Assert.Equal("latest\n", File.ReadAllText(Path.Combine(repo.Directory, "a.txt")).Replace("\r\n", "\n", StringComparison.Ordinal));
                 Assert.Contains("older stash", repo.RunCapture("stash", "list"), StringComparison.Ordinal);
                 Assert.Single(repo.RunCapture("stash", "list").Split('\n', StringSplitOptions.RemoveEmptyEntries));
                 Assert.True(tab.CanStash);
@@ -90,12 +93,15 @@ public class StashShortcutTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Repository_stash_menu_starts_disabled_and_tracks_the_active_repository(bool stashExists)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Repository_stash_menu_starts_disabled_and_tracks_the_active_repository(bool stashExists, bool autocrlf)
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
         using var repo = new TempRepo();
+        repo.Run("config", "core.autocrlf", autocrlf ? "true" : "false");
         repo.WriteFile("a.txt", "base\n");
         repo.CommitAll("first");
         if (stashExists)
@@ -144,7 +150,7 @@ public class StashShortcutTests
                 Assert.True(stash.IsEnabled);
                 Assert.Equal(stashExists, pop.IsEnabled);
 
-                repo.WriteFile("a.txt", "base\n");
+                repo.Run("restore", "--worktree", "--", "a.txt");
                 await tab.Refresh();
                 Dispatcher.UIThread.RunJobs();
                 Assert.False(stash.IsEnabled);
