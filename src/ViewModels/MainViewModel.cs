@@ -318,6 +318,12 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
     private Task PullLfs() => ActiveTab?.PullLfsCommand.ExecuteAsync(null) ?? Task.CompletedTask;
 
+    [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
+    private Task Pull() => ActiveTab?.PullCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+
+    [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
+    private Task Push() => ActiveTab?.PushCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
     private void ToggleCommands() => ActiveTab?.ToggleCommandsCommand.Execute(null);
 
@@ -447,6 +453,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         ApplyPatchCommand.NotifyCanExecuteChanged();
         FetchLfsCommand.NotifyCanExecuteChanged();
         PullLfsCommand.NotifyCanExecuteChanged();
+        PullCommand.NotifyCanExecuteChanged();
+        PushCommand.NotifyCanExecuteChanged();
         ToggleCommandsCommand.NotifyCanExecuteChanged();
         ToggleHistorySearchCommand.NotifyCanExecuteChanged();
         ToggleBranchViewCommand.NotifyCanExecuteChanged();

@@ -199,6 +199,22 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (AppGestures.Matches(e, Key.P, KeyModifiers.Shift))
+        {
+            e.Handled = true;
+            if (vm.CanRunRepositoryCommands)
+                vm.PushCommand.Execute(null);
+            return;
+        }
+
+        if (AppGestures.Matches(e, Key.U, KeyModifiers.Shift))
+        {
+            e.Handled = true;
+            if (vm.CanRunRepositoryCommands)
+                vm.PullCommand.Execute(null);
+            return;
+        }
+
         if (AppGestures.Matches(e, Key.F) && vm.ActiveTab is { } searchTab)
         {
             searchTab.ToggleHistorySearchCommand.Execute(null);

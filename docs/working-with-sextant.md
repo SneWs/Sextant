@@ -95,7 +95,7 @@ PNG, JPG, JPEG, GIF, BMP, WEBP, ICO, SVG, TIF, and TIFF open as a picture of eac
 
 ## Fetch, pull, and push
 
-Pull takes the upstream of the current branch. The menu on that button also offers Fetch, Fetch all, and Fetch all and clean up. Fetch all and clean up prunes remote-tracking branches that the remote has deleted.
+Pull takes the upstream of the current branch. The menu on that button also offers Fetch, Fetch all, and Fetch all and clean up. Fetch all and clean up prunes remote-tracking branches that the remote has deleted. Pull and Push also have shortcuts: Command/Ctrl+Shift+U and Command/Ctrl+Shift+P.
 
 Push sends the current branch. The menu offers Push ignoring local checks, which skips hooks, and Push with force-with-lease. Force-with-lease refuses to overwrite remote commits that you have not seen. It is not a plain force.
 
@@ -133,6 +133,8 @@ The command key is Command on macOS and Ctrl on Windows and Linux, except where 
 | Command palette | Command/Ctrl+P |
 | Search history | Command/Ctrl+F |
 | Commit | Command/Ctrl+Enter |
+| Pull | Command/Ctrl+Shift+U |
+| Push | Command/Ctrl+Shift+P |
 | Create branch | Command/Ctrl+B |
 | Stash | Command/Ctrl+S |
 | Pop latest stash | Command/Ctrl+Shift+S |
