@@ -22,6 +22,8 @@
                     <NativeMenuItem Header="Open from _WSL…" Command="{Binding OpenWslCommand}" IsVisible="{Binding HasWsl}"/>
                     <NativeMenuItem Header="_Clone repository…" Command="{Binding CloneCommand}"/>
                     <NativeMenuItem Header="_Init repository…" Command="{Binding InitCommand}"/>
+                    <NativeMenuItemSeparator/>
+                    <NativeMenuItem Header="E_xit" Command="{Binding ExitCommand}"/>
                 </NativeMenu>
             </NativeMenuItem>
             <NativeMenuItem Header="_View" IsEnabled="{Binding HasActiveTab}">

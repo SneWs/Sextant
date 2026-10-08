@@ -90,6 +90,8 @@ On 2026-10-07 the LFS tests share one cached asynchronous availability probe thr
 
 On 2026-10-07 view-model commands and callable actions that run asynchronous work return Task rather than discarding it from a void method. Tab activation, close, refresh, and palette execution await their repository work through the workspace host. The main window waits for repository cleanup before closing, and repeated shutdown requests share the same completion task, including tabs whose close is already in progress. Clipboard commands also await their writes. Framework event handlers remain void where Avalonia requires it, but await the underlying task.
 
+On 2026-10-08 File → Exit is the last item, after a separator. It closes the window, which saves the workspace and shuts down. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
@@ -398,7 +400,7 @@ Other keys: Ctrl/Cmd+O open repository, Ctrl+Tab next tab, Ctrl/Cmd+W close tab,
 
 Dialogs: open folder, clone (URL, parent directory, folder name, progress), init (pick a folder), create branch, confirmation for discard and for config writes.
 
-Open, clone, and init are in the File menu (Ctrl/Cmd+O opens a repository). View holds Toggle branch view. On Windows and Linux, About holds Get help, which opens the documentation, and About Sextant, which shows the version, the copyright, and the license. On macOS, Help holds Get help, and About Sextant is the first item of the Sextant application menu, before Settings. The menu is a `NativeMenu`. On macOS the platform shows the window menu in the menu bar at the top of the screen. The window does not draw a second menu bar there. On Windows, and on a Linux desktop that does not export a global menu, `NativeMenuBar` draws that same menu at the top of the window. An empty window centers the application icon, the name Sextant, and the line "Open a repository to start." Below that, Open, Clone, and Init each sit in their own column, with a short explanation under the button. Open chooses an existing repository folder. Clone copies a remote repository into a new folder and opens it. Init creates a repository in a chosen folder. There is no list of recently opened repositories.
+Open, clone, and init are in the File menu (Ctrl/Cmd+O opens a repository). Exit is the last File item, after a separator, and closes the window. View holds Toggle branch view. On Windows and Linux, About holds Get help, which opens the documentation, and About Sextant, which shows the version, the copyright, and the license. On macOS, Help holds Get help, and About Sextant is the first item of the Sextant application menu, before Settings. The menu is a `NativeMenu`. On macOS the platform shows the window menu in the menu bar at the top of the screen. The window does not draw a second menu bar there. On Windows, and on a Linux desktop that does not export a global menu, `NativeMenuBar` draws that same menu at the top of the window. An empty window centers the application icon, the name Sextant, and the line "Open a repository to start." Below that, Open, Clone, and Init each sit in their own column, with a short explanation under the button. Open chooses an existing repository folder. Clone copies a remote repository into a new folder and opens it. Init creates a repository in a chosen folder. There is no list of recently opened repositories.
 
 Operation feedback, per tab:
 

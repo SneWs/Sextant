@@ -227,4 +227,44 @@ public class TabBarTests
             Directory.Delete(directory, recursive: true);
         }
     }
+
+    [Fact]
+    public async Task File_menu_exit_is_last_and_closes_the_window()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-exit-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var store = new WorkspaceStore(directory);
+                var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner());
+                var window = new MainWindow { DataContext = vm, Width = 800, Height = 600 };
+                var closed = false;
+                window.Closed += (_, _) => closed = true;
+                window.Show();
+
+                var menu = NativeMenu.GetMenu(window);
+                Assert.NotNull(menu);
+                var file = Assert.IsType<NativeMenuItem>(Assert.Single(menu.Items, item => item is NativeMenuItem { Header: "_File" }));
+                var items = file.Menu!.Items;
+                Assert.IsType<NativeMenuItemSeparator>(items[^2]);
+                var exit = Assert.IsType<NativeMenuItem>(items[^1]);
+                Assert.Equal("E_xit", exit.Header);
+                Assert.Same(vm.ExitCommand, exit.Command);
+
+                exit.Command!.Execute(null);
+                Assert.False(closed);
+                await vm.Shutdown();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(closed);
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
 }

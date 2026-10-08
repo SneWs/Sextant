@@ -39,10 +39,13 @@ public partial class MainWindow : Window
         BringOnScreen();
         if (DataContext is not MainViewModel vm)
             return;
+        vm.ExitRequested += OnExitRequested;
         vm.PropertyChanged += OnViewModelPropertyChanged;
         vm.Attach(new AvaloniaDialogService(this));
         await vm.InitializeAsync();
     }
+
+    private void OnExitRequested(object? sender, EventArgs e) => Close();
 
     private bool _closing;
     private bool _shutdownComplete;
@@ -68,7 +71,10 @@ public partial class MainWindow : Window
     {
         _dragTab = null;
         if (DataContext is MainViewModel vm)
+        {
+            vm.ExitRequested -= OnExitRequested;
             vm.PropertyChanged -= OnViewModelPropertyChanged;
+        }
         base.OnClosed(e);
     }
 

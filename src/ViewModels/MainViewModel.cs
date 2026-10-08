@@ -274,6 +274,12 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     [RelayCommand(CanExecute = nameof(CanUseGit))]
     public Task Init() => InitAsync();
 
+    /// <summary>File → Exit. The window closes, which saves the workspace and shuts down.</summary>
+    public event EventHandler? ExitRequested;
+
+    [RelayCommand]
+    private void Exit() => ExitRequested?.Invoke(this, EventArgs.Empty);
+
     [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
     private Task CreateBranch() => ActiveTab?.CreateBranch() ?? Task.CompletedTask;
 
