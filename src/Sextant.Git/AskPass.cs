@@ -11,7 +11,7 @@ public enum AskPassKind : byte
     Message = 3,
 }
 
-public sealed record AskPassRequest(AskPassKind Kind, string Prompt);
+public sealed record AskPassRequest(AskPassKind Kind, string Prompt, string? CommandId = null);
 
 /// <summary>
 /// Answers <c>SSH_ASKPASS</c> for a git process that has no terminal.
@@ -116,15 +116,22 @@ public sealed class AskPassServer : IAsyncDisposable
 
 public static class AskPassProtocol
 {
-    public static async Task WriteRequestAsync(Stream stream, AskPassKind kind, string prompt, CancellationToken cancellationToken)
+    public static async Task WriteRequestAsync(Stream stream, AskPassKind kind, string prompt, CancellationToken cancellationToken, string? commandId = null)
     {
         var text = prompt.Replace("\r", " ", StringComparison.Ordinal).Replace("\n", " ", StringComparison.Ordinal);
         var bytes = Encoding.UTF8.GetBytes(text);
+        var command = Encoding.UTF8.GetBytes(commandId ?? "");
         var header = new byte[5];
         header[0] = (byte)kind;
         BinaryPrimitives.WriteInt32LittleEndian(header.AsSpan(1), bytes.Length);
         await stream.WriteAsync(header, cancellationToken).ConfigureAwait(false);
-        await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+        if (bytes.Length > 0)
+            await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
+        var commandHeader = new byte[4];
+        BinaryPrimitives.WriteInt32LittleEndian(commandHeader, command.Length);
+        await stream.WriteAsync(commandHeader, cancellationToken).ConfigureAwait(false);
+        if (command.Length > 0)
+            await stream.WriteAsync(command, cancellationToken).ConfigureAwait(false);
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -145,7 +152,17 @@ public static class AskPassProtocol
             (byte)AskPassKind.Message => AskPassKind.Message,
             _ => AskPassKind.Password,
         };
-        return new AskPassRequest(kind, Encoding.UTF8.GetString(body));
+        var commandHeader = new byte[4];
+        if (!await ReadExactAsync(stream, commandHeader, cancellationToken).ConfigureAwait(false))
+            return null;
+        var commandLength = BinaryPrimitives.ReadInt32LittleEndian(commandHeader);
+        if (commandLength < 0 || commandLength > 128)
+            return null;
+        var commandBytes = new byte[commandLength];
+        if (commandLength > 0 && !await ReadExactAsync(stream, commandBytes, cancellationToken).ConfigureAwait(false))
+            return null;
+        var commandId = commandLength == 0 ? null : Encoding.UTF8.GetString(commandBytes);
+        return new AskPassRequest(kind, Encoding.UTF8.GetString(body), commandId);
     }
 
     public static async Task WriteResponseAsync(Stream stream, string? secret, CancellationToken cancellationToken)
@@ -174,11 +191,11 @@ public static class AskPassProtocol
         return Encoding.UTF8.GetString(body);
     }
 
-    public static async Task<string?> ExchangeAsync(string pipeName, AskPassKind kind, string prompt, CancellationToken cancellationToken)
+    public static async Task<string?> ExchangeAsync(string pipeName, AskPassKind kind, string prompt, CancellationToken cancellationToken, string? commandId = null)
     {
         using var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
         await pipe.ConnectAsync(5_000, cancellationToken).ConfigureAwait(false);
-        await WriteRequestAsync(pipe, kind, prompt, cancellationToken).ConfigureAwait(false);
+        await WriteRequestAsync(pipe, kind, prompt, cancellationToken, commandId).ConfigureAwait(false);
         return await ReadResponseAsync(pipe, cancellationToken).ConfigureAwait(false);
     }
 
@@ -200,6 +217,8 @@ public static class AskPassProtocol
 public static class AskPassEnvironment
 {
     public const string Require = "force";
+
+    public const string CommandVariable = "SEXTANT_ASKPASS_COMMAND";
 
     public static Dictionary<string, string> ForWindowsGit(string executable, string pipeName) => new(StringComparer.Ordinal)
     {

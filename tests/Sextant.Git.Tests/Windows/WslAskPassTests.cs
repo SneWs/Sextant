@@ -7,7 +7,8 @@ public class WslAskPassTests
     {
         var script = WslAskPass.Script("/mnt/c/Program Files/Sextant.AskPass.exe", "sextant-askpass-abc");
         Assert.Contains("#!/bin/sh", script, StringComparison.Ordinal);
-        Assert.Contains("exec '/mnt/c/Program Files/Sextant.AskPass.exe' --pipe 'sextant-askpass-abc' --kind \"$kind\" \"$@\"", script, StringComparison.Ordinal);
+        Assert.Contains("command=${SEXTANT_ASKPASS_COMMAND:-}", script, StringComparison.Ordinal);
+        Assert.Contains("exec '/mnt/c/Program Files/Sextant.AskPass.exe' --pipe 'sextant-askpass-abc' --kind \"$kind\" --command \"$command\" \"$@\"", script, StringComparison.Ordinal);
         Assert.Equal("'a'\\''b'", WslAskPass.ShQuote("a'b"));
     }
 
@@ -16,6 +17,7 @@ public class WslAskPassTests
     {
         var environment = AskPassEnvironment.ForWslGit("/tmp/sextant-askpass-pipe");
         environment["PATH"] = @"C:\Windows";
+        environment[AskPassEnvironment.CommandVariable] = "abc";
         var request = new GitRequest
         {
             Executable = @"C:\Program Files\Git\cmd\git.exe",
@@ -28,6 +30,7 @@ public class WslAskPassTests
         var launched = WslLaunch.Prepare(request);
         Assert.Contains("SSH_ASKPASS=/tmp/sextant-askpass-pipe", launched.Arguments);
         Assert.Contains("SSH_ASKPASS_REQUIRE=force", launched.Arguments);
+        Assert.Contains("SEXTANT_ASKPASS_COMMAND=abc", launched.Arguments);
         Assert.DoesNotContain(launched.Arguments, argument => argument.StartsWith("PATH=", StringComparison.Ordinal));
         Assert.DoesNotContain(launched.Arguments, argument => argument.StartsWith("GIT_ASKPASS=", StringComparison.Ordinal));
         Assert.DoesNotContain("DISPLAY", string.Join(' ', launched.Arguments), StringComparison.Ordinal);

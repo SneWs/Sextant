@@ -44,6 +44,54 @@ public class AskPassTests
     }
 
     [Fact]
+    public void Remembered_passphrase_is_reused_until_the_same_command_rejects_it()
+    {
+        var session = new AskPassSession();
+        var prompt = "Enter passphrase for key '/home/user/.ssh/id_ed25519':";
+        Assert.Equal("/home/user/.ssh/id_ed25519", AskPassSession.KeyOf(prompt));
+        Assert.False(session.TryReuse("command-1", prompt, out _, out var rejected));
+        Assert.False(rejected);
+
+        session.Store("command-1", prompt, "secret", remember: true);
+        Assert.True(session.TryReuse("command-2", prompt, out var reused, out rejected));
+        Assert.Equal("secret", reused);
+        Assert.False(rejected);
+
+        Assert.False(session.TryReuse("command-2", prompt, out _, out rejected));
+        Assert.True(rejected);
+        Assert.False(session.TryReuse("command-3", prompt, out _, out _));
+    }
+
+    [Fact]
+    public void Different_keys_do_not_share_a_remembered_passphrase()
+    {
+        var session = new AskPassSession();
+        session.Store("command-1", "Enter passphrase for key '/home/user/.ssh/id_ed25519':", "one", remember: true);
+        session.Store("command-1", "Enter passphrase for /home/user/.ssh/id_rsa:", "two", remember: false);
+
+        Assert.True(session.TryReuse("command-2", "Enter passphrase for key '/home/user/.ssh/id_ed25519':", out var first, out _));
+        Assert.Equal("one", first);
+        Assert.False(session.TryReuse("command-2", "Enter passphrase for /home/user/.ssh/id_rsa:", out _, out _));
+    }
+
+    [Fact]
+    public async Task Command_id_round_trips_with_the_prompt()
+    {
+        await using var server = new AskPassServer();
+        string? seen = "unset";
+        server.Prompt = (request, _) =>
+        {
+            seen = request.CommandId;
+            return Task.FromResult<string?>("secret");
+        };
+        server.Start();
+
+        var secret = await AskPassProtocol.ExchangeAsync(server.PipeName, AskPassKind.Password, "Enter passphrase", CancellationToken.None, "abc");
+        Assert.Equal("secret", secret);
+        Assert.Equal("abc", seen);
+    }
+
+    [Fact]
     public async Task Helper_prints_the_secret_without_a_carriage_return()
     {
         var exe = HelperExecutable();
@@ -56,6 +104,26 @@ public class AskPassTests
         var stdout = await RunHelperAsync(exe, server.PipeName, "password", "Enter passphrase");
         Assert.Equal(0, stdout.ExitCode);
         Assert.Equal("s3cret\n"u8.ToArray(), stdout.Bytes);
+    }
+
+    [Fact]
+    public async Task Helper_forwards_the_command_id()
+    {
+        var exe = HelperExecutable();
+        Assert.NotNull(exe);
+
+        await using var server = new AskPassServer();
+        string? seen = null;
+        server.Prompt = (request, _) =>
+        {
+            seen = request.CommandId;
+            return Task.FromResult<string?>("s3cret");
+        };
+        server.Start();
+
+        var stdout = await RunHelperAsync(exe, server.PipeName, "password", "Enter passphrase", "abc");
+        Assert.Equal(0, stdout.ExitCode);
+        Assert.Equal("abc", seen);
     }
 
     [Fact]
@@ -85,7 +153,7 @@ public class AskPassTests
         return File.Exists(exe) ? exe : null;
     }
 
-    private static async Task<(int ExitCode, byte[] Bytes)> RunHelperAsync(string exe, string pipe, string kind, string prompt)
+    private static async Task<(int ExitCode, byte[] Bytes)> RunHelperAsync(string exe, string pipe, string kind, string prompt, string? command = null)
     {
         var info = new ProcessStartInfo
         {
@@ -99,6 +167,12 @@ public class AskPassTests
         info.ArgumentList.Add(pipe);
         info.ArgumentList.Add("--kind");
         info.ArgumentList.Add(kind);
+        if (command is not null)
+        {
+            info.ArgumentList.Add("--command");
+            info.ArgumentList.Add(command);
+        }
+
         info.ArgumentList.Add(prompt);
         using var process = Process.Start(info);
         Assert.NotNull(process);

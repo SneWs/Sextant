@@ -46,6 +46,7 @@ public sealed class GitProcessRunner
             {
                 foreach (var pair in AskPassEnvironment.ForWindowsGit(AskPass.Executable, AskPass.PipeName))
                     info.Environment[pair.Key] = pair.Value;
+                info.Environment[AskPassEnvironment.CommandVariable] = Guid.NewGuid().ToString("N");
             }
 
             // A macOS app launched from Finder does not inherit the shell PATH, so Homebrew's
@@ -122,7 +123,9 @@ public sealed class GitProcessRunner
         var script = await WslAskPass.EnsureAsync(request.Wsl, ask.Executable, ask.PipeName, cancellationToken).ConfigureAwait(false);
         if (script is null)
             return request;
-        return WithEnvironment(request, AskPassEnvironment.ForWslGit(script));
+        var askPass = AskPassEnvironment.ForWslGit(script);
+        askPass[AskPassEnvironment.CommandVariable] = Guid.NewGuid().ToString("N");
+        return WithEnvironment(request, askPass);
     }
 
     private static GitRequest WithEnvironment(GitRequest request, IReadOnlyDictionary<string, string> extra)

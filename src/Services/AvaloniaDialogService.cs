@@ -116,6 +116,37 @@ public sealed class AvaloniaDialogService : IDialogService
         return value;
     }
 
+    public async Task<SecretPrompt> PromptSessionSecretAsync(string title, string message, bool rememberChecked = false)
+    {
+        var window = Create(title);
+        var box = new TextBox { PasswordChar = '*', PlaceholderText = message };
+        var remember = new CheckBox
+        {
+            Content = "Remember for this session",
+            IsChecked = rememberChecked,
+        };
+        var note = new TextBlock
+        {
+            Text = "Kept in memory until Sextant closes. Not saved to disk.",
+            Opacity = 0.7,
+            TextWrapping = TextWrapping.Wrap,
+        };
+        string? value = null;
+        var keep = false;
+        var ok = new Button { Content = "Unlock", IsDefault = true };
+        var cancel = new Button { Content = "Cancel", IsCancel = true };
+        ok.Click += (_, _) =>
+        {
+            value = box.Text ?? "";
+            keep = remember.IsChecked == true;
+            window.Close();
+        };
+        cancel.Click += (_, _) => window.Close();
+        window.Content = Column(Message(message), box, remember, note, Buttons(cancel, ok));
+        await window.ShowDialog(_owner);
+        return new SecretPrompt(value, keep);
+    }
+
     public async Task<string?> SaveFileAsync(string title, string suggestedName)
     {
         var patch = new FilePickerFileType("Patch") { Patterns = ["*.patch"] };

@@ -58,7 +58,7 @@ Download `Sextant-win-x64.zip`, extract the whole zip, and run `Sextant.exe`. Ke
 
 To update, quit Sextant, download the new zip, and replace that folder. Settings stay in `%APPDATA%\Sextant`, which is `C:\Users\<you>\AppData\Roaming\Sextant`.
 
-On Windows 11, Sextant also looks for WSL2. When a distribution is installed, File → Open from WSL, and the empty window, offer that distribution. The folder comes from the distribution. That tab runs the distribution's `git`, so it uses that install's config, hooks, and credential helpers. A folder opened from `\\wsl.localhost\` or `\\wsl$\` is treated the same way. Windows Git is still used for repositories that live on Windows. A WSL or Windows git command can ask for the SSH key passphrase in a window; Sextant does not save it.
+On Windows 11, Sextant also looks for WSL2. When a distribution is installed, File → Open from WSL, and the empty window, offer that distribution. The folder comes from the distribution. That tab runs the distribution's `git`, so it uses that install's config, hooks, and credential helpers. A folder opened from `\\wsl.localhost\` or `\\wsl$\` is treated the same way. Windows Git is still used for repositories that live on Windows. A WSL or Windows git command can ask for the SSH key passphrase in a window. A checkbox on that window keeps it in memory until Sextant closes. It is not written to disk.
 
 ## Linux
 

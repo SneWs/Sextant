@@ -7,10 +7,12 @@ namespace Sextant.Services;
 
 /// <summary>
 /// Shows the SSH passphrase dialog for Windows git and for a WSL distribution's git.
-/// The passphrase is not stored. macOS and Linux are left to their own agents.
+/// A checked box keeps that passphrase in memory until the process exits. It is not written to disk.
+/// macOS and Linux are left to their own agents.
 /// </summary>
 public static class WindowsAskPass
 {
+    private static readonly AskPassSession Session = new();
     public static AskPassServer? Attach(GitProcessRunner runner, Window window)
     {
         if (!OperatingSystem.IsWindows())
@@ -77,6 +79,13 @@ public static class WindowsAskPass
             return yes ? "yes" : "no";
         }
 
-        return await dialogs.PromptSecretAsync("SSH passphrase", request.Prompt).ConfigureAwait(true);
+        if (Session.TryReuse(request.CommandId, request.Prompt, out var cached, out var rejectedRemembered))
+            return cached;
+
+        var entered = await dialogs.PromptSessionSecretAsync("SSH passphrase", request.Prompt, rejectedRemembered).ConfigureAwait(true);
+        if (entered.Value is null)
+            return null;
+        Session.Store(request.CommandId, request.Prompt, entered.Value, entered.RememberForSession);
+        return entered.Value;
     }
 }

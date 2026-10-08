@@ -10,7 +10,7 @@ if (parsed is null)
 string? secret;
 try
 {
-    secret = await AskPassProtocol.ExchangeAsync(parsed.Value.Pipe, parsed.Value.Kind, parsed.Value.Prompt, CancellationToken.None)
+    secret = await AskPassProtocol.ExchangeAsync(parsed.Value.Pipe, parsed.Value.Kind, parsed.Value.Prompt, CancellationToken.None, parsed.Value.Command)
         .ConfigureAwait(false);
 }
 catch (Exception)
@@ -31,10 +31,11 @@ using (var stdout = Console.OpenStandardOutput())
 
 return 0;
 
-static (string Pipe, AskPassKind Kind, string Prompt)? Parse(string[] args)
+static (string Pipe, AskPassKind Kind, string Prompt, string? Command)? Parse(string[] args)
 {
     string? pipe = null;
     string? kind = null;
+    string? command = null;
     var prompt = new List<string>();
     for (var i = 0; i < args.Length; i++)
     {
@@ -50,15 +51,22 @@ static (string Pipe, AskPassKind Kind, string Prompt)? Parse(string[] args)
             continue;
         }
 
+        if (args[i] == "--command" && i + 1 < args.Length)
+        {
+            command = args[++i];
+            continue;
+        }
+
         prompt.Add(args[i]);
     }
 
     pipe ??= Environment.GetEnvironmentVariable("SEXTANT_ASKPASS");
     kind ??= Environment.GetEnvironmentVariable("SSH_ASKPASS_PROMPT");
+    command ??= Environment.GetEnvironmentVariable(AskPassEnvironment.CommandVariable);
     if (string.IsNullOrWhiteSpace(pipe))
         return null;
     var text = string.Join(' ', prompt).Trim();
     if (text.Length == 0)
         text = "Enter the passphrase for the SSH key used by this repository.";
-    return (pipe, AskPassEnvironment.KindOf(kind), text);
+    return (pipe, AskPassEnvironment.KindOf(kind), text, string.IsNullOrEmpty(command) ? null : command);
 }
