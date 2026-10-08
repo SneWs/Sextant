@@ -108,6 +108,10 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     public bool CanStash => ActiveTab is { CanStash: true };
 
+    public bool CanStashUntracked => ActiveTab is { CanStashUntracked: true };
+
+    public bool CanStashStaged => ActiveTab is { CanStashStaged: true };
+
     public bool CanPopLatestStash => ActiveTab is { CanPopLatestStash: true };
 
     public bool CanStageAll => ActiveTab is { CanStageAll: true };
@@ -302,6 +306,21 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         ? tab.StashCommand.ExecuteAsync(null)
         : Task.CompletedTask;
 
+    [RelayCommand(CanExecute = nameof(CanStashUntracked))]
+    private Task StashUntracked() => ActiveTab is { } tab && tab.StashUntrackedCommand.CanExecute(null)
+        ? tab.StashUntrackedCommand.ExecuteAsync(null)
+        : Task.CompletedTask;
+
+    [RelayCommand(CanExecute = nameof(CanStash))]
+    private Task StashKeepIndex() => ActiveTab is { } tab && tab.StashKeepIndexCommand.CanExecute(null)
+        ? tab.StashKeepIndexCommand.ExecuteAsync(null)
+        : Task.CompletedTask;
+
+    [RelayCommand(CanExecute = nameof(CanStashStaged))]
+    private Task StashStaged() => ActiveTab is { } tab && tab.StashStagedCommand.CanExecute(null)
+        ? tab.StashStagedCommand.ExecuteAsync(null)
+        : Task.CompletedTask;
+
     [RelayCommand(CanExecute = nameof(CanPopLatestStash))]
     private Task PopLatestStash() => ActiveTab is { } tab && tab.PopLatestStashCommand.CanExecute(null)
         ? tab.PopLatestStashCommand.ExecuteAsync(null)
@@ -449,7 +468,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     private void OnMenuTabChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is not (nameof(RepositoryViewModel.CanRunCommands) or nameof(RepositoryViewModel.IsBusy)
-            or nameof(RepositoryViewModel.CanStash) or nameof(RepositoryViewModel.CanPopLatestStash)
+            or nameof(RepositoryViewModel.CanStash) or nameof(RepositoryViewModel.CanStashUntracked)
+            or nameof(RepositoryViewModel.CanStashStaged) or nameof(RepositoryViewModel.CanPopLatestStash)
             or nameof(RepositoryViewModel.CanStageAll) or nameof(RepositoryViewModel.CanUnstageAll)))
             return;
         OnPropertyChanged(nameof(CanRunRepositoryCommands));
@@ -459,9 +479,14 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     private void NotifyRepositoryCommands()
     {
         OnPropertyChanged(nameof(CanStash));
+        OnPropertyChanged(nameof(CanStashUntracked));
+        OnPropertyChanged(nameof(CanStashStaged));
         OnPropertyChanged(nameof(CanPopLatestStash));
         CreateBranchCommand.NotifyCanExecuteChanged();
         StashCommand.NotifyCanExecuteChanged();
+        StashUntrackedCommand.NotifyCanExecuteChanged();
+        StashKeepIndexCommand.NotifyCanExecuteChanged();
+        StashStagedCommand.NotifyCanExecuteChanged();
         PopLatestStashCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(CanStageAll));
         OnPropertyChanged(nameof(CanUnstageAll));

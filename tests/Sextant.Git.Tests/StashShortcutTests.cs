@@ -48,7 +48,8 @@ public class StashShortcutTests
 
                 var menu = NativeMenu.GetMenu(window)!;
                 var repository = menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Repository");
-                var stash = repository.Menu!.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Stash…");
+                var stashMenu = repository.Menu!.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Stash");
+                var stash = stashMenu.Menu!.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Stash…");
                 var pop = repository.Menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Pop latest stash…");
                 Assert.Equal(AppGestures.CommandKey(Key.S), stash.Gesture);
                 Assert.Equal(AppGestures.CommandKey(Key.S, KeyModifiers.Shift), pop.Gesture);
@@ -121,7 +122,8 @@ public class StashShortcutTests
             {
                 var menu = NativeMenu.GetMenu(window)!;
                 var repository = menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Repository");
-                var stash = repository.Menu!.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Stash…");
+                var stashMenu = repository.Menu!.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Stash");
+                var stash = stashMenu.Menu!.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Stash…");
                 var pop = repository.Menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Pop latest stash…");
                 Dispatcher.UIThread.RunJobs();
                 Assert.Equal(AppGestures.CommandKey(Key.S), stash.Gesture);
@@ -318,6 +320,101 @@ public class StashShortcutTests
         vm.Tabs.Add(tab);
         await vm.Activate(tab);
         return (vm, tab);
+    }
+
+    [Fact]
+    public async Task Advanced_stash_variants_cover_untracked_keep_index_and_staged()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "base\n");
+        repo.WriteFile("b.txt", "base\n");
+        repo.CommitAll("first");
+        var path = new Func<string, string>(name => Path.Combine(repo.Directory, name));
+
+        await session.Dispatch(async () =>
+        {
+            var dialogs = new StashDialogs();
+            var (vm, tab) = await Open(repo, dialogs);
+            var window = new MainWindow { DataContext = vm, Width = 1000, Height = 700 };
+            try
+            {
+                window.Show();
+                await vm.InitializeAsync();
+                // Showing the window attaches the real dialog service; the stub must come after it.
+                vm.Attach(dialogs);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                var until = DateTime.UtcNow.AddSeconds(5);
+                while (tab.IsBusy && DateTime.UtcNow < until)
+                    await Task.Delay(30);
+
+                var menu = NativeMenu.GetMenu(window)!;
+                var repository = menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Repository");
+                var stashMenu = repository.Menu!.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Stash");
+                var untrackedItem = stashMenu.Menu!.Items.OfType<NativeMenuItem>().Single(item => item.Header == "Stash (include _untracked)");
+                var keepIndexItem = stashMenu.Menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == "Stash (keep _index)");
+                var stagedItem = stashMenu.Menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == "Stash (_staged)");
+                Assert.Same(vm.StashUntrackedCommand, untrackedItem.Command);
+                Assert.Same(vm.StashKeepIndexCommand, keepIndexItem.Command);
+                Assert.Same(vm.StashStagedCommand, stagedItem.Command);
+
+                // Untracked files alone: only the include-untracked variant can run.
+                repo.WriteFile("new.txt", "fresh\n");
+                await tab.Refresh();
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(tab.CanStash);
+                Assert.True(tab.CanStashUntracked);
+                Assert.False(tab.CanStashStaged);
+                vm.StashUntrackedCommand.Execute(null);
+                if (vm.StashUntrackedCommand.ExecutionTask is { } StashUntrackedTask)
+                    await StashUntrackedTask;
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(File.Exists(path("new.txt")));
+                Assert.NotEqual("", repo.RunCapture("stash", "list").Trim());
+                repo.Run("stash", "clear");
+
+                // Keep index: the staged file stays staged, the unstaged edit goes to the stash.
+                repo.WriteFile("b.txt", "staged change\n");
+                repo.Run("add", "b.txt");
+                repo.WriteFile("a.txt", "unstaged change\n");
+                await tab.Refresh();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(tab.CanStash);
+                vm.StashKeepIndexCommand.Execute(null);
+                if (vm.StashKeepIndexCommand.ExecutionTask is { } StashKeepIndexTask)
+                    await StashKeepIndexTask;
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal("base\n", File.ReadAllText(path("a.txt")));
+                Assert.Equal("staged change\n", File.ReadAllText(path("b.txt")));
+                Assert.Contains("b.txt", repo.RunCapture("diff", "--cached", "--name-only"), StringComparison.Ordinal);
+                repo.Run("restore", "--staged", "--worktree", "--", ".");
+                repo.Run("stash", "clear");
+
+                // Staged only: the staged edit moves to the stash, the unstaged edit stays put.
+                repo.WriteFile("a.txt", "to stash\n");
+                repo.Run("add", "a.txt");
+                repo.WriteFile("b.txt", "keep me\n");
+                await tab.Refresh();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(tab.CanStashStaged);
+                vm.StashStagedCommand.Execute(null);
+                if (vm.StashStagedCommand.ExecutionTask is { } StashStagedTask)
+                    await StashStagedTask;
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal("base\n", File.ReadAllText(path("a.txt")));
+                Assert.Equal("", repo.RunCapture("diff", "--cached", "--name-only").Trim());
+                Assert.Equal("keep me\n", File.ReadAllText(path("b.txt")));
+                Assert.False(tab.HasBanner, tab.Banner);
+            }
+            finally
+            {
+                await vm.Shutdown();
+                window.DataContext = null;
+                window.Close();
+            }
+            return 0;
+        }, CancellationToken.None);
     }
 
     private sealed class StashDialogs : IDialogService

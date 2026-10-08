@@ -253,8 +253,15 @@ public partial class RepositoryViewModel
     private bool _hasUnmergedFiles;
     private StashEntry? _latestStash;
 
-    public bool CanStash => _session is not null && !IsBusy && !_lifetime.IsCancellationRequested
-        && !_hasUnmergedFiles && _hasStashableChanges;
+    private bool CanStashBase => _session is not null && !IsBusy && !_lifetime.IsCancellationRequested
+        && !_hasUnmergedFiles;
+
+    public bool CanStash => CanStashBase && _hasStashableChanges;
+
+    /// <summary>Untracked files alone are stashable when the untracked variant is used.</summary>
+    public bool CanStashUntracked => CanStashBase && (_hasStashableChanges || _hasUnstagedWork);
+
+    public bool CanStashStaged => CanStashBase && _hasStagedWork;
 
     public bool CanPopLatestStash => _session is not null && !IsBusy && !_lifetime.IsCancellationRequested
         && !_hasUnmergedFiles && _latestStash is not null;
@@ -262,13 +269,27 @@ public partial class RepositoryViewModel
     private void NotifyStashCommands()
     {
         OnPropertyChanged(nameof(CanStash));
+        OnPropertyChanged(nameof(CanStashUntracked));
+        OnPropertyChanged(nameof(CanStashStaged));
         OnPropertyChanged(nameof(CanPopLatestStash));
         StashCommand.NotifyCanExecuteChanged();
+        StashUntrackedCommand.NotifyCanExecuteChanged();
+        StashKeepIndexCommand.NotifyCanExecuteChanged();
+        StashStagedCommand.NotifyCanExecuteChanged();
         PopLatestStashCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand(CanExecute = nameof(CanStash))]
-    private Task Stash() => StashAsync();
+    private Task Stash() => StashAsync("Stashing…", false, false, false);
+
+    [RelayCommand(CanExecute = nameof(CanStashUntracked))]
+    private Task StashUntracked() => StashAsync("Stashing with untracked files…", true, false, false);
+
+    [RelayCommand(CanExecute = nameof(CanStash))]
+    private Task StashKeepIndex() => StashAsync("Stashing, keeping the index…", false, true, false);
+
+    [RelayCommand(CanExecute = nameof(CanStashStaged))]
+    private Task StashStaged() => StashAsync("Stashing staged changes…", false, false, true);
 
     [RelayCommand(CanExecute = nameof(CanPopLatestStash))]
     private Task PopLatestStash() =>
@@ -343,16 +364,17 @@ public partial class RepositoryViewModel
         return RunAsync("Loading file history…", ct => _session!.SetHistoryAsync(HistoryQuery.ForPath(path), ct));
     }
 
-    private Task StashAsync()
+    private Task StashAsync(string label, bool includeUntracked, bool keepIndex, bool staged)
     {
-        if (!CanStash || _host.Dialogs is not { } dialogs)
+        bool Allowed() => staged ? CanStashStaged : includeUntracked ? CanStashUntracked : CanStash;
+        if (!Allowed() || _host.Dialogs is not { } dialogs)
             return Task.CompletedTask;
         return HoldFocus(async () =>
         {
             var message = await dialogs.PromptAsync("Stash", "Stash message. Leave it blank to let git describe the stash.", allowEmpty: true);
-            if (message is null || !CanStash)
+            if (message is null || !Allowed())
                 return;
-            await RunAsync("Stashing…", ct => Session.StashPushAsync(message, ct));
+            await RunAsync(label, ct => Session.StashPushAsync(message, ct, includeUntracked, keepIndex, staged));
         });
     }
 

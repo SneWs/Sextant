@@ -180,9 +180,20 @@ public static class GitCommands
     public static IReadOnlyList<string> StashList(string toplevel) =>
         ["-C", toplevel, "--no-optional-locks", "stash", "list", "--format=%gd%x1f%H%x1f%gs"];
 
-    public static IReadOnlyList<string> StashPush(string toplevel, string? message)
+    public static IReadOnlyList<string> StashPush(
+        string toplevel,
+        string? message,
+        bool includeUntracked = false,
+        bool keepIndex = false,
+        bool staged = false)
     {
         var arguments = new List<string> { "-C", toplevel, "stash", "push" };
+        if (includeUntracked)
+            arguments.Add("--include-untracked");
+        if (keepIndex)
+            arguments.Add("--keep-index");
+        if (staged)
+            arguments.Add("--staged");
         if (!string.IsNullOrWhiteSpace(message))
         {
             arguments.Add("-m");

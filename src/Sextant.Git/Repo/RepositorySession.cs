@@ -458,8 +458,13 @@ public sealed partial class RepositorySession : IAsyncDisposable
         return _hiddenBranches.Contains("refs/heads/" + _branch.HeadName);
     }
 
-    public Task StashPushAsync(string? message, CancellationToken cancellationToken) =>
-        MutateAsync(GitCommands.StashPush(_toplevel, message), null, cancellationToken);
+    public Task StashPushAsync(
+        string? message,
+        CancellationToken cancellationToken,
+        bool includeUntracked = false,
+        bool keepIndex = false,
+        bool staged = false) =>
+        MutateAsync(GitCommands.StashPush(_toplevel, message, includeUntracked, keepIndex, staged), null, cancellationToken);
 
     public Task StashPopAsync(string stashRef, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.StashPop(_toplevel, stashRef), null, cancellationToken);
