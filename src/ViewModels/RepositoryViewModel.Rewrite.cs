@@ -8,7 +8,7 @@ public partial class RepositoryViewModel
     private readonly List<string> _selectedShas = [];
     private bool _amendAllowed;
 
-    public bool CanAmend => !IsBusy && ShowingWorkingCopy && _amendAllowed && !NothingStaged;
+    public bool CanAmend => !IsBusy && ShowingWorkingCopy && _amendAllowed && !NothingStaged && HasCommitter;
 
     public bool CanCommitOrAmend => CanCommit || CanAmend;
 
@@ -84,7 +84,16 @@ public partial class RepositoryViewModel
 
     private async Task AmendAsync()
     {
-        if (!CanAmend || _session is null || _host.Dialogs is null)
+        if (_session is null || _host.Dialogs is null)
+            return;
+        if (!HasCommitter)
+        {
+            // CanAmend already hides the menu item; this banner covers any other invocation.
+            if (!IsBusy && ShowingWorkingCopy && _amendAllowed && !NothingStaged)
+                Fail("Set the committer name and email before amending. Click the committer row under the commit box.");
+            return;
+        }
+        if (!CanAmend)
             return;
         var state = _session.Snapshot();
         var tip = state.Commits.FirstOrDefault(commit =>

@@ -94,6 +94,51 @@ public class CommitterTests
         }, CancellationToken.None);
     }
 
+    [Theory]
+    [InlineData("user.name")]
+    [InlineData("user.email")]
+    public async Task Commit_is_refused_when_the_committer_identity_is_incomplete(string missingKey)
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "base\n");
+        repo.CommitAll("first");
+        repo.Run("config", "--local", missingKey, "");
+
+        await session.Dispatch(async () =>
+        {
+            var dialogs = new CommitterDialogs(null, null);
+            var (vm, tab) = await Open(repo, dialogs);
+            try
+            {
+                var until = DateTime.UtcNow.AddSeconds(5);
+                while (tab.IsBusy && DateTime.UtcNow < until)
+                    await Task.Delay(30);
+
+                Assert.False(tab.HasCommitter);
+                repo.WriteFile("b.txt", "change\n");
+                repo.Run("add", ".");
+                await tab.Refresh();
+                tab.CommitMessage = "second";
+                Assert.False(tab.CanCommit);
+
+                tab.CommitCommand.Execute(null);
+                if (tab.CommitCommand.ExecutionTask is { } task)
+                    await task;
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.True(tab.HasBanner);
+                Assert.Contains("committer", tab.Banner, StringComparison.OrdinalIgnoreCase);
+                Assert.Equal("first", repo.RunCapture("log", "-1", "--format=%s").Trim());
+            }
+            finally
+            {
+                await vm.Shutdown();
+            }
+            return 0;
+        }, CancellationToken.None);
+    }
+
     private static async Task<(MainViewModel Vm, RepositoryViewModel Tab)> Open(TempRepo repo, CommitterDialogs dialogs)
     {
         var store = new WorkspaceStore(Path.Combine(repo.Directory, ".git", "sextant-workspace"));

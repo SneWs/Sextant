@@ -338,13 +338,31 @@ public partial class RepositoryViewModel : ViewModelBase
         (var name, var email) => $"{name} <{email}>",
     };
 
-    partial void OnCommitterNameChanged(string value) => OnPropertyChanged(nameof(CommitterText));
+    partial void OnCommitterNameChanged(string value)
+    {
+        OnPropertyChanged(nameof(CommitterText));
+        OnPropertyChanged(nameof(HasCommitter));
+        OnPropertyChanged(nameof(CanCommit));
+        OnPropertyChanged(nameof(CanCommitOrAmend));
+        OnPropertyChanged(nameof(CanAmend));
+    }
 
-    partial void OnCommitterEmailChanged(string value) => OnPropertyChanged(nameof(CommitterText));
+    partial void OnCommitterEmailChanged(string value)
+    {
+        OnPropertyChanged(nameof(CommitterText));
+        OnPropertyChanged(nameof(HasCommitter));
+        OnPropertyChanged(nameof(CanCommit));
+        OnPropertyChanged(nameof(CanCommitOrAmend));
+        OnPropertyChanged(nameof(CanAmend));
+    }
+
+    /// <summary>Git refuses to commit without both a name and an email, so the commit commands require them.</summary>
+    public bool HasCommitter =>
+        CommitterName.Trim().Length > 0 && CommitterEmail.Trim().Length > 0;
 
     public bool IsReady => _session is not null;
 
-    public bool CanCommit => !IsBusy && ShowingWorkingCopy && !NothingStaged && !string.IsNullOrWhiteSpace(CommitMessage);
+    public bool CanCommit => !IsBusy && ShowingWorkingCopy && !NothingStaged && !string.IsNullOrWhiteSpace(CommitMessage) && HasCommitter;
 
     public bool CanStageAll => !IsBusy && ShowingWorkingCopy && _hasUnstagedWork;
 
@@ -509,6 +527,11 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         if (_session is null || IsBusy || !ShowingWorkingCopy || NothingStaged)
             return;
+        if (!HasCommitter)
+        {
+            Fail("Set the committer name and email before committing. Click the committer row under the commit box.");
+            return;
+        }
         if (string.IsNullOrWhiteSpace(CommitMessage))
         {
             Fail("Enter a commit message. Amend, in the commit menu, can keep the current message.");

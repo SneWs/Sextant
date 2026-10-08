@@ -77,7 +77,7 @@ Stage all is Ctrl+Shift+A (Command+Shift+A on macOS) and Unstage all is Ctrl+Shi
 
 Stash saves changes to tracked files with Ctrl+S (Command+S on macOS). It is unavailable when there are no tracked changes to save, before the first commit, or while files have unresolved conflicts. Untracked files are left alone. Ctrl+Shift+S (Command+Shift+S) pops the latest stash after confirmation. Pop is unavailable when there is no stash or files have unresolved conflicts. Both actions are in the Repository menu and appear in the command palette when available.
 
-The commit box is above the file list. Write the message and press Commit, or Ctrl+Enter (Command+Enter). The commit menu also offers Commit without hooks, and Amend. Amend replaces the tip message and keeps unstaged work unstaged. Nothing staged leaves Commit disabled, and the box says so. Below the message box, the current committer is shown as name and email; click it to change the name and email, either for this repository only or globally.
+The commit box is above the file list. Write the message and press Commit, or Ctrl+Enter (Command+Enter). The commit menu also offers Commit without hooks, and Amend. Amend replaces the tip message and keeps unstaged work unstaged. Nothing staged leaves Commit disabled, and the box says so. Below the message box, the current committer is shown as name and email; click it to change the name and email, either for this repository only or globally. Committing and amending need both a name and an email, so Sextant refuses either without one and points you at that row.
 
 On a past commit, that area shows the SHA, author, date, and the size of the change instead of a message you can edit.
 
