@@ -17,8 +17,8 @@ public static class WslAskPass
     {
         return "#!/bin/sh\n"
             + "kind=${SSH_ASKPASS_PROMPT:-password}\n"
-            + "command=${" + AskPassEnvironment.CommandVariable + ":-}\n"
-            + "exec " + ShQuote(linuxExecutable) + " --pipe " + ShQuote(pipeName) + " --kind \"$kind\" --command \"$command\" \"$@\"\n";
+            + "repo=${" + AskPassEnvironment.RepositoryVariable + ":-}\n"
+            + "exec " + ShQuote(linuxExecutable) + " --pipe " + ShQuote(pipeName) + " --kind \"$kind\" --repo \"$repo\" \"$@\"\n";
     }
 
     public static async Task<string?> EnsureAsync(WslGit wsl, string windowsExecutable, string pipeName, CancellationToken cancellationToken)

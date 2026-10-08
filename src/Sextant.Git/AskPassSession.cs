@@ -2,15 +2,13 @@ namespace Sextant.Git;
 
 /// <summary>
 /// SSH passphrases kept for one Sextant process. Nothing is written to disk.
-/// The same prompt from the same git command means the previous answer was rejected.
+/// A checked passphrase is reused for later prompts in that repository, including
+/// Git LFS transfers started by the same git command.
 /// </summary>
 public sealed class AskPassSession
 {
-    private const int MaxCommands = 256;
     private readonly object _gate = new();
     private readonly Dictionary<string, string> _secrets = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, HashSet<string>> _asked = new(StringComparer.Ordinal);
-    private readonly Queue<string> _commands = new();
 
     public static string KeyOf(string prompt)
     {
@@ -29,23 +27,17 @@ public sealed class AskPassSession
     }
 
     /// <summary>
-    /// Returns a remembered passphrase. A second ask for the same key in one git command
-    /// forgets that passphrase and returns false so the dialog can be shown again.
+    /// Returns a passphrase remembered for this repository. A different prompt in the
+    /// same repository still matches, so a Git LFS transfer does not ask again.
     /// </summary>
-    public bool TryReuse(string? commandId, string prompt, out string? secret, out bool rejectedRemembered)
+    public bool TryReuse(string? repository, string prompt, out string? secret)
     {
         secret = null;
-        rejectedRemembered = false;
-        var key = KeyOf(prompt);
+        if (IsIdentityPrompt(prompt))
+            return false;
+        var key = CacheKey(repository, prompt);
         lock (_gate)
         {
-            if (AlreadyAsked(commandId, key))
-            {
-                rejectedRemembered = _secrets.Remove(key);
-                return false;
-            }
-
-            MarkAsked(commandId, key);
             if (!_secrets.TryGetValue(key, out var stored))
                 return false;
             secret = stored;
@@ -53,37 +45,34 @@ public sealed class AskPassSession
         }
     }
 
-    public void Store(string? commandId, string prompt, string secret, bool remember)
+    public void Store(string? repository, string prompt, string secret, bool remember)
     {
-        var key = KeyOf(prompt);
-        lock (_gate)
-        {
-            MarkAsked(commandId, key);
-            if (remember)
-                _secrets[key] = secret;
-        }
-    }
-
-    private bool AlreadyAsked(string? commandId, string key) =>
-        !string.IsNullOrEmpty(commandId)
-        && _asked.TryGetValue(commandId, out var keys)
-        && keys.Contains(key);
-
-    private void MarkAsked(string? commandId, string key)
-    {
-        if (string.IsNullOrEmpty(commandId))
+        if (!remember || IsIdentityPrompt(prompt))
             return;
-        if (!_asked.TryGetValue(commandId, out var keys))
-        {
-            keys = new HashSet<string>(StringComparer.Ordinal);
-            _asked[commandId] = keys;
-            _commands.Enqueue(commandId);
-            while (_commands.Count > MaxCommands && _commands.TryDequeue(out var old))
-                _asked.Remove(old);
-        }
-
-        keys.Add(key);
+        lock (_gate)
+            _secrets[CacheKey(repository, prompt)] = secret;
     }
+
+    internal static string CacheKey(string? repository, string prompt)
+    {
+        if (!string.IsNullOrWhiteSpace(repository))
+            return "repo\0" + Normalize(repository);
+        return "key\0" + KeyOf(prompt);
+    }
+
+    private static string Normalize(string repository)
+    {
+        var path = repository.Trim().Replace('/', '\\').TrimEnd('\\');
+        if (path.Length >= 2 && path[1] == ':' && char.IsAsciiLetter(path[0]))
+            return path.ToLowerInvariant();
+        if (path.StartsWith(@"\\", StringComparison.Ordinal))
+            return path.ToLowerInvariant();
+        return path;
+    }
+
+    private static bool IsIdentityPrompt(string prompt) =>
+        prompt.Contains("username", StringComparison.OrdinalIgnoreCase)
+        || prompt.Contains("user name", StringComparison.OrdinalIgnoreCase);
 
     private static string? Quoted(string text)
     {

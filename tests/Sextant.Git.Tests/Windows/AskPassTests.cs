@@ -44,34 +44,33 @@ public class AskPassTests
     }
 
     [Fact]
-    public void Remembered_passphrase_is_reused_until_the_same_command_rejects_it()
+    public void Remembered_passphrase_is_reused_for_later_prompts_in_the_same_repository()
     {
         var session = new AskPassSession();
+        var repo = @"C:\Repos\demo";
         var prompt = "Enter passphrase for key '/home/user/.ssh/id_ed25519':";
         Assert.Equal("/home/user/.ssh/id_ed25519", AskPassSession.KeyOf(prompt));
-        Assert.False(session.TryReuse("command-1", prompt, out _, out var rejected));
-        Assert.False(rejected);
+        Assert.False(session.TryReuse(repo, prompt, out _));
 
-        session.Store("command-1", prompt, "secret", remember: true);
-        Assert.True(session.TryReuse("command-2", prompt, out var reused, out rejected));
+        session.Store(repo, prompt, "secret", remember: true);
+        Assert.True(session.TryReuse(repo, "Password for 'git@github.com':", out var reused));
         Assert.Equal("secret", reused);
-        Assert.False(rejected);
-
-        Assert.False(session.TryReuse("command-2", prompt, out _, out rejected));
-        Assert.True(rejected);
-        Assert.False(session.TryReuse("command-3", prompt, out _, out _));
+        Assert.True(session.TryReuse(@"c:\repos\demo\", prompt, out reused));
+        Assert.Equal("secret", reused);
+        Assert.False(session.TryReuse(@"C:\Repos\other", prompt, out _));
+        Assert.False(session.TryReuse(repo, "Username for 'https://github.com':", out _));
     }
 
     [Fact]
-    public void Different_keys_do_not_share_a_remembered_passphrase()
+    public void Different_keys_do_not_share_a_remembered_passphrase_without_a_repository()
     {
         var session = new AskPassSession();
-        session.Store("command-1", "Enter passphrase for key '/home/user/.ssh/id_ed25519':", "one", remember: true);
-        session.Store("command-1", "Enter passphrase for /home/user/.ssh/id_rsa:", "two", remember: false);
+        session.Store(null, "Enter passphrase for key '/home/user/.ssh/id_ed25519':", "one", remember: true);
+        session.Store(null, "Enter passphrase for /home/user/.ssh/id_rsa:", "two", remember: false);
 
-        Assert.True(session.TryReuse("command-2", "Enter passphrase for key '/home/user/.ssh/id_ed25519':", out var first, out _));
+        Assert.True(session.TryReuse(null, "Enter passphrase for key '/home/user/.ssh/id_ed25519':", out var first));
         Assert.Equal("one", first);
-        Assert.False(session.TryReuse("command-2", "Enter passphrase for /home/user/.ssh/id_rsa:", out _, out _));
+        Assert.False(session.TryReuse(null, "Enter passphrase for /home/user/.ssh/id_rsa:", out _));
     }
 
     [Fact]
@@ -79,16 +78,19 @@ public class AskPassTests
     {
         await using var server = new AskPassServer();
         string? seen = "unset";
+        string? repo = null;
         server.Prompt = (request, _) =>
         {
             seen = request.CommandId;
+            repo = request.Repository;
             return Task.FromResult<string?>("secret");
         };
         server.Start();
 
-        var secret = await AskPassProtocol.ExchangeAsync(server.PipeName, AskPassKind.Password, "Enter passphrase", CancellationToken.None, "abc");
+        var secret = await AskPassProtocol.ExchangeAsync(server.PipeName, AskPassKind.Password, "Enter passphrase", CancellationToken.None, "abc", @"C:\Repos\demo");
         Assert.Equal("secret", secret);
         Assert.Equal("abc", seen);
+        Assert.Equal(@"C:\Repos\demo", repo);
     }
 
     [Fact]
@@ -107,7 +109,7 @@ public class AskPassTests
     }
 
     [Fact]
-    public async Task Helper_forwards_the_command_id()
+    public async Task Helper_forwards_the_repository()
     {
         var exe = HelperExecutable();
         Assert.NotNull(exe);
@@ -116,14 +118,14 @@ public class AskPassTests
         string? seen = null;
         server.Prompt = (request, _) =>
         {
-            seen = request.CommandId;
+            seen = request.Repository;
             return Task.FromResult<string?>("s3cret");
         };
         server.Start();
 
-        var stdout = await RunHelperAsync(exe, server.PipeName, "password", "Enter passphrase", "abc");
+        var stdout = await RunHelperAsync(exe, server.PipeName, "password", "Enter passphrase", repository: @"C:\Repos\demo");
         Assert.Equal(0, stdout.ExitCode);
-        Assert.Equal("abc", seen);
+        Assert.Equal(@"C:\Repos\demo", seen);
     }
 
     [Fact]
@@ -153,7 +155,7 @@ public class AskPassTests
         return File.Exists(exe) ? exe : null;
     }
 
-    private static async Task<(int ExitCode, byte[] Bytes)> RunHelperAsync(string exe, string pipe, string kind, string prompt, string? command = null)
+    private static async Task<(int ExitCode, byte[] Bytes)> RunHelperAsync(string exe, string pipe, string kind, string prompt, string? command = null, string? repository = null)
     {
         var info = new ProcessStartInfo
         {
@@ -171,6 +173,12 @@ public class AskPassTests
         {
             info.ArgumentList.Add("--command");
             info.ArgumentList.Add(command);
+        }
+
+        if (repository is not null)
+        {
+            info.ArgumentList.Add("--repo");
+            info.ArgumentList.Add(repository);
         }
 
         info.ArgumentList.Add(prompt);

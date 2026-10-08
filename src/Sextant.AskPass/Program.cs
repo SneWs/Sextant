@@ -10,7 +10,7 @@ if (parsed is null)
 string? secret;
 try
 {
-    secret = await AskPassProtocol.ExchangeAsync(parsed.Value.Pipe, parsed.Value.Kind, parsed.Value.Prompt, CancellationToken.None, parsed.Value.Command)
+    secret = await AskPassProtocol.ExchangeAsync(parsed.Value.Pipe, parsed.Value.Kind, parsed.Value.Prompt, CancellationToken.None, parsed.Value.Command, parsed.Value.Repository)
         .ConfigureAwait(false);
 }
 catch (Exception)
@@ -31,11 +31,12 @@ using (var stdout = Console.OpenStandardOutput())
 
 return 0;
 
-static (string Pipe, AskPassKind Kind, string Prompt, string? Command)? Parse(string[] args)
+static (string Pipe, AskPassKind Kind, string Prompt, string? Command, string? Repository)? Parse(string[] args)
 {
     string? pipe = null;
     string? kind = null;
     string? command = null;
+    string? repository = null;
     var prompt = new List<string>();
     for (var i = 0; i < args.Length; i++)
     {
@@ -57,16 +58,28 @@ static (string Pipe, AskPassKind Kind, string Prompt, string? Command)? Parse(st
             continue;
         }
 
+        if (args[i] == "--repo" && i + 1 < args.Length)
+        {
+            repository = args[++i];
+            continue;
+        }
+
         prompt.Add(args[i]);
     }
 
     pipe ??= Environment.GetEnvironmentVariable("SEXTANT_ASKPASS");
     kind ??= Environment.GetEnvironmentVariable("SSH_ASKPASS_PROMPT");
     command ??= Environment.GetEnvironmentVariable(AskPassEnvironment.CommandVariable);
+    repository ??= Environment.GetEnvironmentVariable(AskPassEnvironment.RepositoryVariable);
     if (string.IsNullOrWhiteSpace(pipe))
         return null;
     var text = string.Join(' ', prompt).Trim();
     if (text.Length == 0)
         text = "Enter the passphrase for the SSH key used by this repository.";
-    return (pipe, AskPassEnvironment.KindOf(kind), text, string.IsNullOrEmpty(command) ? null : command);
+    return (
+        pipe,
+        AskPassEnvironment.KindOf(kind),
+        text,
+        string.IsNullOrEmpty(command) ? null : command,
+        string.IsNullOrEmpty(repository) ? null : repository);
 }

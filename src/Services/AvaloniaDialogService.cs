@@ -122,12 +122,12 @@ public sealed class AvaloniaDialogService : IDialogService
         var box = new TextBox { PasswordChar = '*', PlaceholderText = message };
         var remember = new CheckBox
         {
-            Content = "Remember for this session",
+            Content = "Remember for this repository",
             IsChecked = rememberChecked,
         };
         var note = new TextBlock
         {
-            Text = "Kept in memory until Sextant closes. Not saved to disk.",
+            Text = "Used for later passphrase prompts in this repository, including Git LFS, until Sextant closes. Not saved to disk.",
             Opacity = 0.7,
             TextWrapping = TextWrapping.Wrap,
         };
