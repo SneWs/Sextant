@@ -49,6 +49,7 @@ public sealed class TempRepo : IDisposable
         RunIn(directory, "config", "user.name", "Test");
         RunIn(directory, "config", "commit.gpgsign", "false");
         RunIn(directory, "config", "tag.gpgSign", "false");
+        RunIn(directory, "config", "core.autocrlf", "false");
     }
 
     public void Run(params string[] args)

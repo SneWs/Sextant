@@ -31,14 +31,34 @@ public class PullRebaseTests
                 command.Arguments.Contains("pull")
                 && command.Arguments.Contains("--rebase")
                 && command.Arguments.Contains("--autostash"));
-            Assert.Equal("note edited\n", File.ReadAllText(Path.Combine(clone, "notes.txt")));
+            Assert.Equal("note edited\n", File.ReadAllText(Path.Combine(clone, "notes.txt")).Replace("\r\n", "\n"));
             var log = GitInCapture(origin, clone, "log", "--format=%s", "-2");
             Assert.Equal(new[] { "local", "second" }, log.Split('\n', StringSplitOptions.RemoveEmptyEntries));
         }
         finally
         {
-            if (Directory.Exists(clone))
-                Directory.Delete(clone, recursive: true);
+            DeleteDirectory(clone);
+        }
+    }
+
+    // Git marks object files read-only, which makes recursive delete fail on Windows.
+    private static void DeleteDirectory(string path)
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            try
+            {
+                if (!Directory.Exists(path))
+                    return;
+                foreach (var entry in new DirectoryInfo(path).EnumerateFileSystemInfos("*", SearchOption.AllDirectories))
+                    entry.Attributes = FileAttributes.Normal;
+                Directory.Delete(path, recursive: true);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Thread.Sleep(40);
+            }
         }
     }
 
