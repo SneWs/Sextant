@@ -146,7 +146,6 @@ public class CommandPaletteTests
                 vm.PaletteQuery = "toggle";
                 Assert.Equal(
                     [
-                        "Toggle all files",
                         "Toggle blame",
                         "Toggle command log",
                         "Toggle ignore whitespace",
@@ -154,6 +153,17 @@ public class CommandPaletteTests
                         "Toggle side-by-side diff",
                     ],
                     vm.PaletteMatches.Select(item => item.Title).ToList());
+
+                vm.ClosePalette();
+                tab.ShowingWorkingCopy = false;
+                vm.TogglePalette();
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Toggle all files");
+
+                vm.ClosePalette();
+                tab.ShowingWorkingCopy = true;
+                tab.ShowingBlame = true;
+                vm.TogglePalette();
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Toggle all files");
 
                 await vm.Shutdown();
                 window.DataContext = null;

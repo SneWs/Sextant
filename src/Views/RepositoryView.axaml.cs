@@ -224,7 +224,9 @@ public partial class RepositoryView : UserControl
     {
         foreach (var item in DiffList.Items)
         {
-            if (item is DiffFileRow row && MatchesFile(row.Path.Length > 0 ? row.Path : row.Label, path, original))
+            if (item is DiffFileRow row && MatchesFile(row.Path.Length > 0 ? row.Path : row.Label, path, original)
+                && (row.StagingFile is null || DataContext is not RepositoryViewModel { SelectedFile: { } selected }
+                    || row.StagingFile.FromStagedList == selected.FromStagedList))
                 return row;
         }
 

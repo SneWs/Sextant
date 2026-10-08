@@ -94,7 +94,7 @@ A `.xaml` or `.axaml` file in the themes folder is listed with those themes. The
 
 The command palette can flip the last two without opening Settings: Toggle side-by-side diff, and Toggle ignore whitespace.
 
-**Toggle all files** switches the diff between every file in the selection and the one file selected in the file list. All files is the default. In that view, file headers fold. Expand all is Ctrl+Shift+E, or Command+Shift+E on macOS. Collapse all is Ctrl+Shift+C, or Command+Shift+C.
+**Toggle all files** switches past-commit diffs, commit-range diffs, and blame between every file in the selection and the one file selected in the file list. All files is the default. The working-copy diff always shows both staged and unstaged files, regardless of file selection or this setting. File headers fold in the all-files and working-copy diffs. Expand all is Ctrl+Shift+E, or Command+Shift+E on macOS. Collapse all is Ctrl+Shift+C, or Command+Shift+C.
 
 ## Git
 

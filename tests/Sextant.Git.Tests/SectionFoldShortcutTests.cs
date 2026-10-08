@@ -63,11 +63,11 @@ public class SectionFoldShortcutTests
             vm.AllFiles = false;
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
-            Assert.False(vm.ShowSectionFolds);
-            Assert.False(expand.IsEffectivelyVisible);
-            Assert.False(vm.ExpandAllSectionsCommand.CanExecute(null));
+            Assert.True(vm.ShowSectionFolds);
+            Assert.True(expand.IsEffectivelyVisible);
+            Assert.True(vm.ExpandAllSectionsCommand.CanExecute(null));
             Press(window, expand.HotKey!);
-            Assert.Equal(0, OpenCount(vm));
+            Assert.Equal(FoldCount(vm), OpenCount(vm));
 
             vm.AllFiles = true;
             view.UpdateLayout();

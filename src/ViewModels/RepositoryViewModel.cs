@@ -40,7 +40,6 @@ public partial class RepositoryViewModel : ViewModelBase
     private string _refSignature = "";
     private string _commandSignature = "";
     private string? _rawPatch;
-    private bool _viewingStaged;
     private FileRowViewModel? _keptFile;
     private bool _diffReady;
     private bool _allFilesShown;
@@ -59,7 +58,9 @@ public partial class RepositoryViewModel : ViewModelBase
     private string? _foldScope;
     private List<DiffRow>? _rowSink;
 
-    public bool ShowSectionFolds => AllFiles && ShowingDiff && _sections.Count > 0;
+    private bool AllDiffFiles => AllFiles || (!ShowingBlame && ShowingWorkingCopy);
+
+    public bool ShowSectionFolds => AllDiffFiles && ShowingDiff && _sections.Count > 0;
 
     private void NoteSectionFolds()
     {
@@ -655,6 +656,7 @@ public partial class RepositoryViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanAmend));
         OnPropertyChanged(nameof(CanCommitOrAmend));
         NotifyBulkStage();
+        NoteSectionFolds();
     }
 
     partial void OnNothingStagedChanged(bool value)
@@ -722,7 +724,7 @@ public partial class RepositoryViewModel : ViewModelBase
         if (await TryRevealOpenFile(value))
             return;
         _allowLarge = false;
-        if (AllFiles && value is not null)
+        if (AllDiffFiles && value is not null)
         {
             _armJump = true;
             _jumpPath = value.Path;
@@ -744,9 +746,7 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private async Task<bool> TryRevealOpenFile(FileRowViewModel? value)
     {
-        if (!AllFiles || !_diffReady || !_allFilesShown || value is not { IsHeader: false } file)
-            return false;
-        if (!SameOpenDiff(file))
+        if (!AllDiffFiles || !_diffReady || !_allFilesShown || value is not { IsHeader: false } file)
             return false;
         if (!DiffHasFile(file) && !ImageHasFile(file))
             return false;
@@ -756,20 +756,12 @@ public partial class RepositoryViewModel : ViewModelBase
         return true;
     }
 
-    private bool SameOpenDiff(FileRowViewModel file)
-    {
-        if (ShowingBlame)
-            return true;
-        var range = _rangeOlder is not null && _rangeNewer is not null;
-        var workingCopy = !range && (SelectedGraphRow is null || SelectedGraphRow.IsWorkingCopy);
-        return !workingCopy || file.FromStagedList == _viewingStaged;
-    }
-
     private bool DiffHasFile(FileRowViewModel file)
     {
         foreach (var row in DiffRows)
         {
-            if (row is DiffFileRow header && HeaderMatches(header, file))
+            if (row is DiffFileRow header && HeaderMatches(header, file)
+                && (header.StagingFile is null || header.StagingFile.FromStagedList == file.FromStagedList))
                 return true;
         }
 
@@ -780,7 +772,8 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         foreach (var row in ImageCompares)
         {
-            if (HeaderMatches(row.Path, file))
+            if (HeaderMatches(row.Path, file)
+                && (row.StagingFile is null || row.StagingFile.FromStagedList == file.FromStagedList))
                 return true;
         }
 
@@ -2229,7 +2222,7 @@ public partial class RepositoryViewModel : ViewModelBase
         var row = SelectedGraphRow;
         var range = _rangeOlder is not null && _rangeNewer is not null;
         var workingCopy = !range && (row is null || row.IsWorkingCopy);
-        if (_session is null || (!AllFiles && file is null))
+        if (_session is null || (!AllDiffFiles && file is null))
         {
             ClearDiff(workingCopy ? "Select a file." : "");
             _diffReady = true;
@@ -2239,7 +2232,7 @@ public partial class RepositoryViewModel : ViewModelBase
 
         var merge = workingCopy
             && file is { Kind: ChangeKind.Unmerged }
-            && (!AllFiles || UseInAppMerge());
+            && (!AllDiffFiles || UseInAppMerge());
         if (!merge)
             ClearMerge();
 
@@ -2257,36 +2250,35 @@ public partial class RepositoryViewModel : ViewModelBase
             }
 
             DiffDocument? document;
+            DiffDocument? stagedDocument = null;
             if (range)
             {
-                _viewingStaged = false;
                 document = await _session.RangeDiffAsync(
                     _rangeOlder!,
                     _rangeNewer!,
-                    AllFiles ? null : file!.Path,
+                    AllDiffFiles ? null : file!.Path,
                     allowLarge,
                     ignoreWhitespace,
                     token);
             }
             else if (workingCopy)
             {
-                _viewingStaged = file?.FromStagedList == true;
-                document = AllFiles
-                    ? await _session.WorktreeDiffAsync(_viewingStaged, allowLarge, ignoreWhitespace, token)
-                    : await _session.WorkingDiffAsync(file!.Path, file.FromStagedList, file.Untracked, allowLarge, token, ignoreWhitespace);
+                stagedDocument = await _session.WorktreeDiffAsync(true, allowLarge, ignoreWhitespace, token);
+                if (stagedDocument is null || token.IsCancellationRequested)
+                    return;
+                document = await _session.WorktreeDiffAsync(false, allowLarge, ignoreWhitespace, token);
             }
             else
             {
-                _viewingStaged = false;
                 var parent = _diffParent ?? (row?.Commit?.Parents.Count > 0 ? row.Commit.Parents[0] : null);
-                document = await _session.CommitDiffAsync(row!.Sha!, parent, AllFiles ? null : file!.Path, allowLarge, token, ignoreWhitespace);
+                document = await _session.CommitDiffAsync(row!.Sha!, parent, AllDiffFiles ? null : file!.Path, allowLarge, token, ignoreWhitespace);
             }
 
             if (document is null || token.IsCancellationRequested)
                 return;
-            RememberObjects(range, workingCopy, file);
-            RenderDiff(document, file, workingCopy);
-            if (armJump && AllFiles && jumpPath is { Length: > 0 })
+            RememberObjects(range, workingCopy);
+            RenderDiff(document, file, workingCopy, stagedDocument);
+            if (armJump && AllDiffFiles && jumpPath is { Length: > 0 })
             {
                 var opening = OpenForJump(jumpPath, jumpOriginal);
                 JumpToFile?.Invoke(jumpPath, jumpOriginal);
@@ -2352,16 +2344,19 @@ public partial class RepositoryViewModel : ViewModelBase
         MergePath = "";
     }
 
-    private void RenderDiff(DiffDocument document, FileRowViewModel? file, bool workingCopy)
+    private void RenderDiff(DiffDocument document, FileRowViewModel? file, bool workingCopy, DiffDocument? stagedDocument = null)
     {
         ClearSections();
         ClearMerge();
         ClearPreview();
         DiffRows.Clear();
-        _rawPatch = document.RawPatch;
-        NoteLfs(document, !AllFiles);
-        ShowLoadDiff = document.IsTooLarge;
-        if (document.IsTooLarge)
+        _rawPatch = (stagedDocument?.RawPatch ?? "") + document.RawPatch;
+        NoteLfs(stagedDocument is null ? document : document with
+        {
+            LfsFiles = stagedDocument.LfsFiles.Concat(document.LfsFiles).ToArray(),
+        }, !AllDiffFiles);
+        ShowLoadDiff = document.IsTooLarge || stagedDocument?.IsTooLarge == true;
+        if (ShowLoadDiff)
         {
             HasDiffNotice = true;
             DiffNotice = "This diff is large. Load it only if you need the whole file.";
@@ -2370,12 +2365,14 @@ public partial class RepositoryViewModel : ViewModelBase
             return;
         }
 
-        if (AllFiles)
+        if (AllDiffFiles)
         {
             NoteChangelist();
             _allFilesShown = true;
-            var files = string.IsNullOrEmpty(document.RawPatch) ? [] : DiffParser.ParseFiles(document.RawPatch);
-            if (files.Count == 0)
+            if (stagedDocument is not null)
+                AppendDiffSections(stagedDocument, workingCopy, staged: true);
+            AppendDiffSections(document, workingCopy, staged: false);
+            if (_sections.Count == 0)
             {
                 HasDiffNotice = true;
                 DiffNotice = "No textual changes.";
@@ -2385,48 +2382,6 @@ public partial class RepositoryViewModel : ViewModelBase
 
             HasDiffNotice = false;
             DiffNotice = "";
-            foreach (var entry in files)
-            {
-                var label = string.IsNullOrEmpty(entry.Path) ? "Diff" : entry.Path;
-                var key = entry.Path.Length > 0 ? entry.Path : label;
-                var trackedFile = MarkedLfs(entry.Path);
-                var header = new DiffFileRow
-                {
-                    Path = entry.Path,
-                    Label = label,
-                    LfsTracked = trackedFile,
-                    CanFold = true,
-                    Expanded = IsFoldOpen(key),
-                    FileMenu = FileMenuFor(entry.Path, trackedFile),
-                };
-                var section = new DiffSection(key, header);
-                header.ToggleCommand = new AsyncRelayCommand(() => SetExpanded(section, !header.Expanded), AsyncRelayCommandOptions.AllowConcurrentExecutions);
-                _rowSink = section.Body;
-                try
-                {
-                    NoteFormat(document, entry.Path, banner: false);
-                    AppendFileDiff(
-                        entry.Document,
-                        workingCopy,
-                        KindForDiff(entry.Document),
-                        path: entry.Path,
-                        notes: document.LfsFiles,
-                        formatted: IsFormatted(document, entry.Path));
-                }
-                finally
-                {
-                    _rowSink = null;
-                }
-
-                _sections.Add(section);
-                DiffRows.Add(header);
-                if (header.Expanded)
-                {
-                    foreach (var row in section.Body)
-                        DiffRows.Add(row);
-                }
-            }
-
             _diffReady = true;
             NoteSectionFolds();
             return;
@@ -2445,6 +2400,66 @@ public partial class RepositoryViewModel : ViewModelBase
         _diffReady = true;
     }
 
+    private void AppendDiffSections(DiffDocument document, bool workingCopy, bool staged)
+    {
+        var files = string.IsNullOrEmpty(document.RawPatch) ? [] : DiffParser.ParseFiles(document.RawPatch);
+        foreach (var entry in files)
+        {
+            var label = string.IsNullOrEmpty(entry.Path) ? "Diff" : entry.Path;
+            var stagingFile = workingCopy ? StagingFileForDiff(entry.Path, staged) : null;
+            var key = FileSectionKey(entry.Path.Length > 0 ? entry.Path : label, stagingFile?.FromStagedList);
+            var trackedFile = MarkedLfs(entry.Path);
+            var header = new DiffFileRow
+            {
+                Path = entry.Path,
+                Label = label,
+                LfsTracked = trackedFile,
+                CanFold = true,
+                Expanded = IsFoldOpen(key),
+                FileMenu = FileMenuFor(entry.Path, trackedFile),
+                StagingFile = stagingFile,
+            };
+            var section = new DiffSection(key, header) { BeforePath = RenameSource(entry.Document.RawPatch) };
+            header.ToggleCommand = new AsyncRelayCommand(() => SetExpanded(section, !header.Expanded), AsyncRelayCommandOptions.AllowConcurrentExecutions);
+            _rowSink = section.Body;
+            try
+            {
+                NoteFormat(document, entry.Path, banner: false);
+                AppendFileDiff(
+                    entry.Document,
+                    workingCopy,
+                    KindForDiff(entry.Document),
+                    path: entry.Path,
+                    notes: document.LfsFiles,
+                    formatted: IsFormatted(document, entry.Path),
+                    staged: staged);
+            }
+            finally
+            {
+                _rowSink = null;
+            }
+
+            _sections.Add(section);
+            DiffRows.Add(header);
+            if (header.Expanded)
+            {
+                foreach (var bodyRow in section.Body)
+                    DiffRows.Add(bodyRow);
+            }
+        }
+    }
+
+    private FileRowViewModel? StagingFileForDiff(string path, bool staged = false)
+    {
+        if (!ShowingDiff || _rangeOlder is not null || _rangeNewer is not null || SelectedGraphRow is { IsWorkingCopy: false })
+            return null;
+        return _workingFiles.FirstOrDefault(file =>
+            !file.IsHeader && file.FromStagedList == staged && HeaderMatches(path, file));
+    }
+
+    private static string FileSectionKey(string path, bool? staged) =>
+        staged is null ? path : (staged.Value ? "staged\n" : "unstaged\n") + path;
+
     private void AppendFileDiff(
         DiffDocument document,
         bool workingCopy,
@@ -2452,7 +2467,8 @@ public partial class RepositoryViewModel : ViewModelBase
         bool notice = false,
         string? path = null,
         IReadOnlyList<LfsFileNote>? notes = null,
-        bool formatted = false)
+        bool formatted = false,
+        bool staged = false)
     {
         _linePath = path;
         if (document.IsBinary)
@@ -2480,8 +2496,8 @@ public partial class RepositoryViewModel : ViewModelBase
 
         var parts = !formatted && CanStageParts(workingCopy, kind, document);
         var patch = formatted ? "" : document.RawPatch;
-        var hunkLabel = _viewingStaged ? "Unstage hunk" : "Stage hunk";
-        var lineLabel = _viewingStaged ? "Unstage line" : "Stage line";
+        var hunkLabel = staged ? "Unstage hunk" : "Stage hunk";
+        var lineLabel = staged ? "Unstage line" : "Stage line";
         for (var index = 0; index < document.Hunks.Count; index++)
         {
             var hunk = document.Hunks[index];
@@ -2492,13 +2508,13 @@ public partial class RepositoryViewModel : ViewModelBase
                 ShowAction = parts,
                 ActionLabel = hunkLabel,
                 ActionCommand = parts
-                    ? new AsyncRelayCommand(() => ApplyShownHunkAsync(patch, hunkIndex))
+                    ? new AsyncRelayCommand(() => ApplyShownHunkAsync(patch, hunkIndex, staged))
                     : UiCommands.Disabled,
             });
             if (SideBySide)
                 AppendSideBySide(hunk);
             else
-                AppendInline(hunk, parts, patch, hunkIndex, lineLabel);
+                AppendInline(hunk, parts, patch, hunkIndex, lineLabel, staged);
         }
     }
 
@@ -2555,7 +2571,7 @@ public partial class RepositoryViewModel : ViewModelBase
         AddRow(new DiffLineRow { Text = message, Background = DiffColors.Clear });
     }
 
-    private void AppendInline(DiffHunk hunk, bool parts, string patch, int hunkIndex, string lineLabel)
+    private void AppendInline(DiffHunk hunk, bool parts, string patch, int hunkIndex, string lineLabel, bool staged)
     {
         var oldLine = hunk.OldStart;
         var newLine = hunk.NewStart;
@@ -2572,7 +2588,7 @@ public partial class RepositoryViewModel : ViewModelBase
             var show = parts && line.Kind is DiffLineKind.Added or DiffLineKind.Removed;
             var captured = lineIndex;
             var command = show
-                ? new AsyncRelayCommand(() => ApplyShownLineAsync(patch, hunkIndex, captured))
+                ? new AsyncRelayCommand(() => ApplyShownLineAsync(patch, hunkIndex, captured, staged))
                 : UiCommands.Disabled;
             var number = DiffLineNumbers.For(line.Kind, ref oldLine, ref newLine);
             lines.AddRange(FoldEditorLines(line.Text, number.Old, number.New, "", kind, show, lineLabel, command));
@@ -2675,19 +2691,17 @@ public partial class RepositoryViewModel : ViewModelBase
         return ChangeKind.Modified;
     }
 
-    private async Task ApplyShownHunkAsync(string patch, int index)
+    private async Task ApplyShownHunkAsync(string patch, int index, bool reverse)
     {
         if (_session is null || string.IsNullOrEmpty(patch))
             return;
-        var reverse = _viewingStaged;
         await RunAsync(reverse ? "Unstaging hunk…" : "Staging hunk…", ct => _session.ApplyHunkAsync(patch, index, reverse, ct));
     }
 
-    private async Task ApplyShownLineAsync(string patch, int hunkIndex, int lineIndex)
+    private async Task ApplyShownLineAsync(string patch, int hunkIndex, int lineIndex, bool reverse)
     {
         if (_session is null || string.IsNullOrEmpty(patch))
             return;
-        var reverse = _viewingStaged;
         try
         {
             await RunAsync(reverse ? "Unstaging line…" : "Staging line…", ct => _session.ApplyLineAsync(patch, hunkIndex, lineIndex, reverse, ct));
@@ -2731,11 +2745,11 @@ public partial class RepositoryViewModel : ViewModelBase
         return expanded ? RequestBlame(section) : Task.CompletedTask;
     }
 
-    private Task ToggleFileSection(string path)
+    private Task ToggleFileSection(string path, bool? staged = null)
     {
         foreach (var section in _sections)
         {
-            if (!SectionMatches(section, path, null))
+            if (!SectionMatches(section, path, null, staged))
                 continue;
             return SetExpanded(section, !section.Header.Expanded);
         }
@@ -2745,12 +2759,13 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private Task OpenForJump(string path, string? original)
     {
-        SetFold(path, true);
+        var staged = ShowingDiff && ShowingWorkingCopy ? SelectedFile?.FromStagedList : null;
+        SetFold(FileSectionKey(path, staged), true);
         if (original is { Length: > 0 } old)
-            SetFold(old, true);
+            SetFold(FileSectionKey(old, staged), true);
         foreach (var section in _sections)
         {
-            if (!SectionMatches(section, path, original))
+            if (!SectionMatches(section, path, original, staged))
                 continue;
             return SetExpanded(section, true);
         }
@@ -2759,11 +2774,12 @@ public partial class RepositoryViewModel : ViewModelBase
         return Task.CompletedTask;
     }
 
-    private static bool SectionMatches(DiffSection section, string path, string? original) =>
-        DiffParser.SameFile(section.Key, path)
+    private static bool SectionMatches(DiffSection section, string path, string? original, bool? staged = null) =>
+        (staged is null || section.Header.StagingFile?.FromStagedList == staged)
+        && (DiffParser.SameFile(section.Key, path)
         || DiffParser.SameFile(section.Header.Path, path)
         || (original is { Length: > 0 } old
-            && (DiffParser.SameFile(section.Key, old) || DiffParser.SameFile(section.Header.Path, old)));
+            && (DiffParser.SameFile(section.Key, old) || DiffParser.SameFile(section.Header.Path, old))));
 
     // The hotkey stays registered while the command bar is hidden, so this is what keeps the keys from running.
     private bool CanFoldSections() => ShowSectionFolds;
@@ -2826,7 +2842,7 @@ public partial class RepositoryViewModel : ViewModelBase
     private void ApplyImageFolds()
     {
         foreach (var row in ImageCompares)
-            row.IsOpen = !IsCollapsed(row.Path);
+            row.IsOpen = !IsCollapsed(FileSectionKey(row.Path, row.StagingFile?.FromStagedList));
     }
 
     private void NoteChangelist()
@@ -2839,14 +2855,14 @@ public partial class RepositoryViewModel : ViewModelBase
         _foldExceptions.Clear();
     }
 
-    /// <summary>Working copy, index, one commit, and a commit range each start collapsed.</summary>
+    /// <summary>The working copy, one commit, and a commit range each start collapsed.</summary>
     private string FoldScope()
     {
         if (_rangeOlder is not null && _rangeNewer is not null)
             return "range\n" + _rangeOlder + "\n" + _rangeNewer;
         var row = SelectedGraphRow;
         if (row is null || row.IsWorkingCopy)
-            return _viewingStaged ? "staged" : "unstaged";
+            return "working-copy";
         return "commit\n" + (row.Sha ?? "") + "\n" + (_diffParent ?? "");
     }
 
@@ -3389,6 +3405,8 @@ public partial class RepositoryViewModel : ViewModelBase
         public string Key { get; }
 
         public DiffFileRow Header { get; }
+
+        public string? BeforePath { get; init; }
 
         public List<DiffRow> Body { get; } = [];
 

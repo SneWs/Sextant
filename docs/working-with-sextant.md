@@ -81,7 +81,9 @@ On a past commit, that area shows the SHA, author, date, and the size of the cha
 
 ## Diffs, blame, and previews
 
-The Diff and Blame tabs sit above the patch. Blame annotates the selected file. Diff is the patch for the selected file, or for every file when all-files mode is on.
+The Diff and Blame tabs sit above the patch. Blame annotates the selected file. The working-copy diff always includes both staged and unstaged files. Selecting a file in the staging list opens and scrolls to its header without hiding the other files. A partially staged file has separate Staged and Unstaged sections. For past commits and commit ranges, Diff can show the selected file or every file.
+
+Each working-copy file header has Stage file or Unstage file for that section.
 
 Changed lines can be staged or unstaged one hunk or one line at a time, from the working copy, when the patch is Git's own text. A formatted file-type diff does not offer that, because the lines on screen are not the lines in the repository. See [Configuration](configuration.md) for the formatter.
 

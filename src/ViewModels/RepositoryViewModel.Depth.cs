@@ -228,28 +228,12 @@ public partial class RepositoryViewModel
         return _host.OpenRepositoryAsync(full);
     }
 
-    private void RememberObjects(bool range, bool workingCopy, FileRowViewModel? file)
+    private void RememberObjects(bool range, bool workingCopy)
     {
         if (range)
         {
             _objectBefore = _rangeOlder;
             _objectAfter = _rangeNewer;
-            _afterIsWorktree = false;
-            return;
-        }
-
-        if (workingCopy && file?.Untracked == true && !AllFiles && !_viewingStaged)
-        {
-            _objectBefore = null;
-            _objectAfter = null;
-            _afterIsWorktree = true;
-            return;
-        }
-
-        if (workingCopy && _viewingStaged)
-        {
-            _objectBefore = "HEAD";
-            _objectAfter = "";
             _afterIsWorktree = false;
             return;
         }
@@ -391,7 +375,7 @@ public partial class RepositoryViewModel
         var rows = new List<ImageCompareRow>(targets.Count);
         foreach (var target in targets)
         {
-            var row = CreateImageRow(target.Path);
+            var row = CreateImageRow(target.Path, stagingFile: target.StagingFile);
             row.IsLoading = true;
             rows.Add(row);
         }
@@ -410,11 +394,11 @@ public partial class RepositoryViewModel
                 var beforeRevision = range ? _rangeOlder : _objectBefore;
                 var afterRevision = range ? _rangeNewer : _objectAfter;
                 var afterWorktree = !range && _afterIsWorktree;
-                if (!AllFiles && workingCopy && file?.Untracked == true && !_viewingStaged)
+                if (workingCopy && target.StagingFile is { } stagingFile)
                 {
-                    beforeRevision = null;
-                    afterRevision = null;
-                    afterWorktree = true;
+                    beforeRevision = stagingFile.FromStagedList ? "HEAD" : stagingFile.Untracked ? null : "";
+                    afterRevision = stagingFile.FromStagedList ? "" : null;
+                    afterWorktree = !stagingFile.FromStagedList;
                 }
 
                 var previewTask = _session.PreviewImageAsync(
@@ -537,7 +521,7 @@ public partial class RepositoryViewModel
         DetachImageRow(row);
         ImageCompares.Remove(row);
         ShowingImages = ImageCompares.Count > 0;
-        NoteMissingPreview(row.Path);
+        NoteMissingPreview(row.Path, row.StagingFile?.FromStagedList);
     }
 
     private async Task OnUi(Action action)
@@ -551,35 +535,33 @@ public partial class RepositoryViewModel
         await Dispatcher.UIThread.InvokeAsync(action);
     }
 
-    private List<(string Path, string? BeforePath)> ImageTargets(FileRowViewModel? file)
+    private List<(string Path, string? BeforePath, FileRowViewModel? StagingFile)> ImageTargets(FileRowViewModel? file)
     {
-        var targets = new List<(string Path, string? BeforePath)>();
-        void Add(string? path, string? before)
+        var targets = new List<(string Path, string? BeforePath, FileRowViewModel? StagingFile)>();
+        void Add(string? path, string? before, FileRowViewModel? stagingFile = null)
         {
             if (string.IsNullOrEmpty(path) || !PreviewPath(path))
                 return;
-            if (targets.Exists(item => string.Equals(item.Path, path, StringComparison.Ordinal)))
+            if (targets.Exists(item => string.Equals(item.Path, path, StringComparison.Ordinal)
+                && item.StagingFile?.FromStagedList == stagingFile?.FromStagedList))
                 return;
             if (string.Equals(before, path, StringComparison.Ordinal))
                 before = null;
-            targets.Add((path, before));
+            targets.Add((path, before, stagingFile));
         }
 
-        if (!AllFiles)
+        if (!AllDiffFiles)
         {
             if (file is not null)
                 Add(file.Path, file.OriginalPath ?? (_rawPatch is null ? null : RenameSource(_rawPatch)));
             return targets;
         }
 
-        if (!string.IsNullOrEmpty(_rawPatch))
+        foreach (var section in _sections)
         {
-            foreach (var entry in DiffParser.ParseFiles(_rawPatch))
-                Add(entry.Path, RenameSource(entry.Document.RawPatch));
+            Add(section.Header.Path, section.BeforePath, section.Header.StagingFile);
         }
 
-        if (file is { Untracked: true })
-            Add(file.Path, null);
         return targets;
     }
 
@@ -694,6 +676,7 @@ public partial class RepositoryViewModel
             Label = path + "  (loaded)",
             LfsTracked = MarkedLfs(path),
             FileMenu = FileMenuFor(path),
+            StagingFile = StagingFileForDiff(path),
         });
         var endsWithNewline = text.EndsWith('\n');
         var editorLines = new List<EditorLine>();
@@ -755,13 +738,13 @@ public partial class RepositoryViewModel
             return;
 
         var wrapped = new DiffImageRow { Image = row };
-        if (!AllFiles)
+        if (!AllDiffFiles)
         {
             DiffRows.Add(wrapped);
             return;
         }
 
-        var section = FindImageSection(row.Path) ?? CreateImageSection(row.Path);
+        var section = FindImageSection(row.Path, row.StagingFile?.FromStagedList) ?? CreateImageSection(row.Path, row.StagingFile);
         section.Body.Insert(0, wrapped);
         if (!section.Header.Expanded)
             return;
@@ -813,30 +796,32 @@ public partial class RepositoryViewModel
         return false;
     }
 
-    private DiffSection? FindImageSection(string path)
+    private DiffSection? FindImageSection(string path, bool? staged = null)
     {
         foreach (var section in _sections)
         {
-            if (SectionMatches(section, path, null))
+            if (SectionMatches(section, path, null, staged))
                 return section;
         }
 
         return null;
     }
 
-    private DiffSection CreateImageSection(string path)
+    private DiffSection CreateImageSection(string path, FileRowViewModel? stagingFile)
     {
         var tracked = MarkedLfs(path);
+        var key = FileSectionKey(path, stagingFile?.FromStagedList);
         var header = new DiffFileRow
         {
             Path = path,
             Label = path,
             LfsTracked = tracked,
             CanFold = true,
-            Expanded = IsFoldOpen(path),
+            Expanded = IsFoldOpen(key),
             FileMenu = FileMenuFor(path, tracked),
+            StagingFile = stagingFile,
         };
-        var section = new DiffSection(path, header);
+        var section = new DiffSection(key, header);
         header.ToggleCommand = new AsyncRelayCommand(() => SetExpanded(section, !header.Expanded), AsyncRelayCommandOptions.AllowConcurrentExecutions);
         _sections.Add(section);
         DiffRows.Add(header);
@@ -844,9 +829,9 @@ public partial class RepositoryViewModel
         return section;
     }
 
-    private void NoteMissingPreview(string path)
+    private void NoteMissingPreview(string path, bool? staged)
     {
-        if (!AllFiles)
+        if (!AllDiffFiles)
         {
             if (!HasDiffNotice)
             {
@@ -857,7 +842,7 @@ public partial class RepositoryViewModel
             return;
         }
 
-        var section = FindImageSection(path);
+        var section = FindImageSection(path, staged);
         if (section is null || section.Body.Count > 0)
             return;
         var line = new DiffLineRow { Text = "Binary file.", Background = DiffColors.Clear };
@@ -869,11 +854,12 @@ public partial class RepositoryViewModel
             DiffRows.Insert(index + 1, line);
     }
 
-    private ImageCompareRow CreateImageRow(string path, string beforeNotice = "", string afterNotice = "") =>
+    private ImageCompareRow CreateImageRow(string path, string beforeNotice = "", string afterNotice = "", FileRowViewModel? stagingFile = null) =>
         new(path, null, null, beforeNotice, afterNotice)
         {
             FileMenu = FileMenuFor(path),
-            ToggleCommand = new AsyncRelayCommand(() => ToggleFileSection(path), AsyncRelayCommandOptions.AllowConcurrentExecutions),
+            StagingFile = stagingFile,
+            ToggleCommand = new AsyncRelayCommand(() => ToggleFileSection(path, stagingFile?.FromStagedList), AsyncRelayCommandOptions.AllowConcurrentExecutions),
         };
 
     private void PlaceImage(string path, Bitmap bitmap)
@@ -975,6 +961,8 @@ public sealed class ImageCompareRow : ObservableObject
     }
 
     public string Path { get; }
+
+    public FileRowViewModel? StagingFile { get; init; }
 
     public WorktreeFileMenu? FileMenu { get; set; }
 

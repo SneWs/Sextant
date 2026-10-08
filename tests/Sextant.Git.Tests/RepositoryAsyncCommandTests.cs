@@ -1,4 +1,6 @@
+using Avalonia;
 using Avalonia.Headless;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using Sextant.Services;
@@ -89,6 +91,281 @@ public class RepositoryAsyncCommandTests
                 var error = new InvalidOperationException("Clipboard unavailable");
                 dialogs.Pending.SetException(error);
                 Assert.Same(error, await Assert.ThrowsAsync<InvalidOperationException>(() => failing));
+            }
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Working_diff_keeps_both_staging_states_when_selection_or_file_mode_changes()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("staged.txt", "one\n");
+        repo.WriteFile("unstaged.txt", "one\n");
+        repo.WriteFile("partial.txt", "one\n");
+        repo.CommitAll("first");
+        repo.WriteFile("staged.txt", "two\n");
+        repo.WriteFile("partial.txt", "two\n");
+        repo.Run("add", "staged.txt", "partial.txt");
+        repo.WriteFile("unstaged.txt", "two\n");
+        repo.WriteFile("partial.txt", "three\n");
+        repo.WriteFile("new.txt", "new\n");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new AsyncHost { GitExecutable = repo.Git }, repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                var headers = vm.DiffRows.OfType<DiffFileRow>().ToArray();
+                Assert.Equal(5, headers.Length);
+                Assert.Equal(2, headers.Count(row => row.StagingFile?.FromStagedList == true));
+                Assert.Equal(3, headers.Count(row => row.StagingFile?.FromStagedList == false));
+                foreach (var file in vm.Files.Where(row => !row.IsHeader))
+                {
+                    vm.SelectedFile = file;
+                    await vm.RevealSelectedFile();
+                    Assert.Equal(headers, vm.DiffRows.OfType<DiffFileRow>());
+                    var selected = headers.Single(row => row.Path == file.Path && row.StagingFile?.FromStagedList == file.FromStagedList);
+                    Assert.True(selected.Expanded);
+                    Assert.Same(file.FromStagedList ? file.UnstageCommand : file.StageCommand, selected.ActionCommand);
+                }
+
+                vm.CollapseAllSectionsCommand.Execute(null);
+                var unstagedPartial = vm.Files.Single(row => row.Path == "partial.txt" && !row.FromStagedList);
+                vm.SelectedFile = unstagedPartial;
+                await vm.RevealSelectedFile();
+                Assert.True(headers.Single(row => row.Path == "partial.txt" && row.StagingFile?.FromStagedList == false).Expanded);
+                Assert.False(headers.Single(row => row.Path == "partial.txt" && row.StagingFile?.FromStagedList == true).Expanded);
+
+                await vm.ToggleAllFilesCommand.ExecuteAsync(null);
+                Assert.False(vm.AllFiles);
+                Assert.Equal(5, vm.DiffRows.OfType<DiffFileRow>().Count());
+                Assert.True(vm.ShowSectionFolds);
+                await vm.Refresh();
+                Assert.Equal(5, vm.DiffRows.OfType<DiffFileRow>().Count());
+                Assert.False(vm.HasBanner, vm.Banner);
+            }
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Combined_diff_actions_keep_their_staging_direction_after_selection_changes(bool staged, bool lineAction)
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "base\n");
+        repo.CommitAll("first");
+        repo.WriteFile("a.txt", "base\nstaged\n");
+        repo.Run("add", "a.txt");
+        repo.WriteFile("a.txt", "base\nstaged\nunstaged\n");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new AsyncHost { GitExecutable = repo.Git }, repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                await vm.ExpandAllSectionsCommand.ExecuteAsync(null);
+                var header = vm.DiffRows.OfType<DiffFileRow>().Single(row => row.StagingFile?.FromStagedList == staged);
+                var body = vm.DiffRows.Skip(vm.DiffRows.IndexOf(header) + 1).TakeWhile(row => row is not DiffFileRow).ToArray();
+                var action = lineAction
+                    ? body.OfType<DiffEditorRow>().SelectMany(row => row.Lines).Single(row => row.Kind == EditorLineKind.Added && row.ShowAction).ActionCommand
+                    : Assert.Single(body.OfType<DiffHunkRow>()).ActionCommand;
+                vm.SelectedFile = vm.Files.Single(row => !row.IsHeader && row.FromStagedList != staged);
+                await vm.RevealSelectedFile();
+                Assert.Contains(header, vm.DiffRows);
+                await Assert.IsAssignableFrom<IAsyncRelayCommand>(action).ExecuteAsync(null);
+                Assert.False(vm.HasBanner, vm.Banner);
+                var index = repo.RunCapture("show", ":a.txt").Replace("\r\n", "\n", StringComparison.Ordinal);
+                Assert.Equal(staged ? "base\n" : "base\nstaged\nunstaged\n", index);
+                Assert.Equal("base\nstaged\nunstaged\n", File.ReadAllText(Path.Combine(repo.Directory, "a.txt")));
+            }
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Working_diff_in_an_unborn_repository_includes_staged_and_untracked_files()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("staged.txt", "staged\n");
+        repo.Run("add", "staged.txt");
+        repo.WriteFile("untracked.txt", "untracked\n");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new AsyncHost { GitExecutable = repo.Git }, repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                var headers = vm.DiffRows.OfType<DiffFileRow>().ToArray();
+                Assert.Equal(2, headers.Length);
+                Assert.Contains(headers, row => row.Path == "staged.txt" && row.ActionLabel == "Unstage file");
+                Assert.Contains(headers, row => row.Path == "untracked.txt" && row.ActionLabel == "Stage file");
+                Assert.False(vm.HasBanner, vm.Banner);
+            }
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Partially_staged_image_has_separate_previews_and_folds()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DiffPreviewApp));
+        using var repo = new TempRepo();
+        static string Svg(string color) =>
+            $"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"8\"><rect width=\"8\" height=\"8\" fill=\"{color}\"/></svg>\n";
+        repo.WriteFile("image.svg", Svg("#ff0000"));
+        repo.CommitAll("first");
+        repo.WriteFile("image.svg", Svg("#00ff00"));
+        repo.Run("add", "image.svg");
+        repo.WriteFile("image.svg", Svg("#0000ff"));
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new AsyncHost { GitExecutable = repo.Git }, repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                Assert.Equal(2, vm.ImageCompares.Count);
+                var staged = vm.ImageCompares.Single(row => row.StagingFile?.FromStagedList == true);
+                var unstaged = vm.ImageCompares.Single(row => row.StagingFile?.FromStagedList == false);
+                Assert.NotNull(staged.Before);
+                Assert.NotNull(staged.After);
+                Assert.NotNull(unstaged.Before);
+                Assert.NotNull(unstaged.After);
+                static byte[] Png(Bitmap bitmap)
+                {
+                    using var stream = new MemoryStream();
+                    bitmap.Save(stream, PngBitmapEncoderOptions.Default);
+                    return stream.ToArray();
+                }
+                Assert.Equal(Png(staged.After), Png(unstaged.Before));
+                Assert.False(Png(staged.Before).SequenceEqual(Png(staged.After)));
+                Assert.False(Png(unstaged.Before).SequenceEqual(Png(unstaged.After)));
+
+                await vm.ExpandAllSectionsCommand.ExecuteAsync(null);
+                await Assert.IsAssignableFrom<IAsyncRelayCommand>(staged.ToggleCommand).ExecuteAsync(null);
+                Assert.False(staged.IsOpen);
+                Assert.True(unstaged.IsOpen);
+                Assert.DoesNotContain(vm.DiffRows.OfType<DiffImageRow>(), row => ReferenceEquals(row.Image, staged));
+                Assert.Contains(vm.DiffRows.OfType<DiffImageRow>(), row => ReferenceEquals(row.Image, unstaged));
+                vm.SelectedFile = vm.Files.Single(row => row.Path == "image.svg" && !row.FromStagedList);
+                await vm.RevealSelectedFile();
+                Assert.Same(staged, vm.ImageCompares.Single(row => row.StagingFile?.FromStagedList == true));
+                Assert.Same(unstaged, vm.ImageCompares.Single(row => row.StagingFile?.FromStagedList == false));
+                Assert.False(vm.HasBanner, vm.Banner);
+            }
+
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Diff_file_actions_are_hidden_for_blame_commits_and_ranges()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("first");
+        repo.WriteFile("a.txt", "two\n");
+        repo.CommitAll("second");
+        repo.WriteFile("a.txt", "three\n");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new AsyncHost { GitExecutable = repo.Git }, repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                Assert.True(Assert.Single(vm.DiffRows.OfType<DiffFileRow>()).ShowAction);
+                await vm.ShowBlameCommand.ExecuteAsync(null);
+                var blame = Assert.Single(vm.DiffRows.OfType<DiffFileRow>());
+                Assert.False(blame.ShowAction);
+                Assert.False(blame.ActionCommand.CanExecute(null));
+
+                await vm.ShowDiffCommand.ExecuteAsync(null);
+                var newest = vm.Rows.Single(row => row.Subject == "second");
+                var oldest = vm.Rows.Single(row => row.Subject == "first");
+                vm.SelectedGraphRow = newest;
+                Dispatcher.UIThread.RunJobs();
+                await vm.LoadDetailsCommand.ExecutionTask!;
+                var commit = Assert.Single(vm.DiffRows.OfType<DiffFileRow>());
+                Assert.False(commit.ShowAction);
+                Assert.False(commit.ActionCommand.CanExecute(null));
+
+                await vm.NoteGraphSelection([newest, oldest]);
+                var range = Assert.Single(vm.DiffRows.OfType<DiffFileRow>());
+                Assert.False(range.ShowAction);
+                Assert.False(range.ActionCommand.CanExecute(null));
+                Assert.False(vm.HasBanner, vm.Banner);
+            }
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    [Theory]
+    [InlineData("new.txt", "new\n", true)]
+    [InlineData("empty.txt", "", true)]
+    [InlineData("binary.bin", "changed\0bytes", false)]
+    [InlineData("image.svg", "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"8\"><rect width=\"8\" height=\"8\" fill=\"#00ff00\"/></svg>\n", true)]
+    public async Task Diff_file_header_can_stage_new_and_binary_files(string path, string contents, bool untracked)
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("existing.txt", "one\n");
+        if (!untracked)
+            repo.WriteFile(path, "original\0bytes");
+        repo.CommitAll("first");
+        repo.WriteFile(path, contents);
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new AsyncHost { GitExecutable = repo.Git }, repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                var header = Assert.Single(vm.DiffRows.OfType<DiffFileRow>());
+                Assert.Equal(path, header.Path);
+                Assert.True(header.ShowAction);
+                Assert.Equal("Stage file", header.ActionLabel);
+                Assert.Same(vm.Files.Single(row => row.Path == path).StageCommand, header.ActionCommand);
+                await Assert.IsAssignableFrom<IAsyncRelayCommand>(header.ActionCommand).ExecuteAsync(null);
+                Assert.Equal(path, repo.RunCapture("diff", "--cached", "--name-only").Trim());
+                Assert.Contains(vm.Files, row => row.Path == path && row.FromStagedList);
+                Assert.False(vm.HasBanner, vm.Banner);
             }
             finally
             {
@@ -297,6 +574,14 @@ public class RepositoryAsyncCommandTests
             Assert.False(vm.IsBusy);
             return 0;
         }, CancellationToken.None);
+    }
+
+    public class DiffPreviewApp : Application
+    {
+        public static AppBuilder BuildAvaloniaApp() =>
+            AppBuilder.Configure<DiffPreviewApp>()
+                .UseSkia()
+                .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false });
     }
 
     private sealed class AsyncHost : IWorkspaceHost

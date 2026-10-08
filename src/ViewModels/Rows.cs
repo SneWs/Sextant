@@ -452,6 +452,18 @@ public sealed class DiffFileRow : DiffRow, INotifyPropertyChanged
 
     public required string Label { get; init; }
 
+    public FileRowViewModel? StagingFile { get; init; }
+
+    public bool ShowAction => StagingFile is { ShowStage: true } or { ShowUnstage: true };
+
+    public string StagingLabel => StagingFile is { FromStagedList: true } ? "Staged" : "Unstaged";
+
+    public string ActionLabel => StagingFile is { ShowUnstage: true } ? "Unstage file" : "Stage file";
+
+    public ICommand ActionCommand => StagingFile is { ShowUnstage: true } file
+        ? file.UnstageCommand
+        : StagingFile?.StageCommand ?? UiCommands.Disabled;
+
     /// <summary>All-files headers fold. A loaded-file banner does not.</summary>
     public bool CanFold { get; init; }
 
