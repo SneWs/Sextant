@@ -4,7 +4,6 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using AvaloniaEdit;
-using Sextant.Git;
 using Sextant.Git.Diff;
 
 namespace Sextant;
@@ -43,7 +42,7 @@ public static class DiffFont
         Changed?.Invoke();
     }
 
-    static void Paint(Visual root)
+    private static void Paint(Visual root)
     {
         foreach (var visual in root.GetVisualDescendants())
         {

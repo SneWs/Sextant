@@ -34,7 +34,9 @@ public static class FbxPreview
         var orbit = Load(data);
         if (!orbit.CanTurn)
             return new FbxStill(null, orbit.Summary, orbit.Error);
+        
         var png = orbit.Render(DefaultYaw, DefaultPitch, DefaultZoom);
+        
         return png is null
             ? new FbxStill(null, orbit.Summary, "This FBX has no area to draw.")
             : new FbxStill(png, orbit.Summary, "");
@@ -49,7 +51,10 @@ public static class FbxPreview
             using var context = new AssimpContext();
             Scene imported;
             using (var stream = new MemoryStream(data, writable: false))
+            {
                 imported = context.ImportFileFromStream(stream, PostProcessSteps.Triangulate, "fbx");
+            }
+            
             if (imported?.RootNode is null)
                 return new Orbit([], "", "This FBX could not be read.");
 

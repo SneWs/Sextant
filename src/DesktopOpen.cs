@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using Sextant.Git;
 using Sextant.Git.Repo;
 
 namespace Sextant;
@@ -28,11 +27,14 @@ public static class DesktopOpen
     {
         if (string.IsNullOrWhiteSpace(relative))
             return null;
+        
         var trimmed = relative.TrimEnd('/', '\\');
         if (trimmed.Length == 0)
             return null;
+        
         var index = trimmed.LastIndexOfAny(['/', '\\']);
         var name = index < 0 ? trimmed : trimmed[(index + 1)..];
+        
         return string.IsNullOrEmpty(name) ? null : name;
     }
 
@@ -121,8 +123,11 @@ public static class DesktopOpen
             FileName = launch.FileName,
             UseShellExecute = launch.UseShellExecute,
         };
+        
         if (launch.Arguments is not null)
+        {
             info.Arguments = launch.Arguments;
+        }
         else
         {
             foreach (var argument in launch.ArgumentList)
@@ -138,8 +143,10 @@ public static class DesktopOpen
         var index = trimmed.LastIndexOfAny(['/', '\\']);
         if (index < 0)
             return fullPath;
+        
         if (index == 0)
             return trimmed[..1];
+        
         return trimmed[..index];
     }
 
@@ -149,12 +156,3 @@ public static class DesktopOpen
             throw new InvalidOperationException("That path cannot be opened.");
     }
 }
-
-public enum DesktopKind
-{
-    Windows,
-    Mac,
-    Linux,
-}
-
-public readonly record struct ShellLaunch(string FileName, string? Arguments, IReadOnlyList<string> ArgumentList, bool UseShellExecute);
