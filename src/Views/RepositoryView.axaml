@@ -451,8 +451,8 @@
                                     </SplitButton.Flyout>
                                 </SplitButton>
                             </StackPanel>
-                            <TextBox Text="{Binding CommitMessage}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64"
-                                     PlaceholderText="Commit message" KeyDown="OnCommitKeyDown"/>
+                            <TextBox x:Name="CommitMessageInput" Text="{Binding CommitMessage}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64"
+                                     PlaceholderText="Commit message"/>
                         </DockPanel>
                     </Border>
                     <StackPanel IsVisible="{Binding ShowingCommit}" Margin="8,6,8,4" Spacing="2">
