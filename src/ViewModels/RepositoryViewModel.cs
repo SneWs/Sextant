@@ -1287,7 +1287,8 @@ public partial class RepositoryViewModel : ViewModelBase
             Author = commit.Commit.AuthorName,
             When = Relative(commit.Commit.AuthorUnixSeconds),
             IsHead = head,
-            Detail = CommitDetail(commit.Commit, RefLabel(commit.Commit.Sha, state.Refs, state.HiddenBranches), head),
+            Detail = CommitDetail(commit.Commit),
+            Refs = RefNames(commit.Commit.Sha, state.Refs, state.HiddenBranches, head),
             Tags = TagNames(commit.Commit.Sha, state.Refs, state.HiddenBranches),
             ShowCheckout = checkout,
             ShowRewrite = true,
@@ -2988,7 +2989,7 @@ public partial class RepositoryViewModel : ViewModelBase
         return builder.ToString();
     }
 
-    private static string CommitDetail(CommitRecord commit, string refs, bool head)
+    private static string CommitDetail(CommitRecord commit)
     {
         var parts = new List<string>();
         if (commit.AuthorName.Length > 0)
@@ -2998,10 +2999,6 @@ public partial class RepositoryViewModel : ViewModelBase
         var sha = Short(commit.Sha);
         if (sha.Length > 0)
             parts.Add(sha);
-        if (head)
-            parts.Add("HEAD");
-        if (refs.Length > 0)
-            parts.Add(refs);
         return string.Join("  ·  ", parts);
     }
 
@@ -3147,9 +3144,11 @@ public partial class RepositoryViewModel : ViewModelBase
         _host.Save();
     }
 
-    private static string RefLabel(string sha, IReadOnlyList<GitRef> refs, IReadOnlySet<string> hidden)
+    private static IReadOnlyList<string> RefNames(string sha, IReadOnlyList<GitRef> refs, IReadOnlySet<string> hidden, bool head)
     {
         var names = new List<string>();
+        if (head)
+            names.Add("HEAD");
         foreach (var reference in refs)
         {
             if (hidden.Contains(reference.Name))
@@ -3164,11 +3163,11 @@ public partial class RepositoryViewModel : ViewModelBase
             names.Add(ShortRef(reference.Name));
         }
 
-        if (names.Count == 0)
-            return "";
         if (names.Count <= 4)
-            return string.Join("  ", names);
-        return string.Join("  ", names.Take(4)) + $"  +{names.Count - 4}";
+            return names;
+        var shown = names.Take(4).ToList();
+        shown.Add($"+{names.Count - 4}");
+        return shown;
     }
 
     private static IReadOnlyList<string> TagNames(string sha, IReadOnlyList<GitRef> refs, IReadOnlySet<string> hidden)

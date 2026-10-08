@@ -57,6 +57,11 @@ public partial class GraphRowViewModel : ObservableObject
 
     public bool HasTags => Tags.Count > 0;
 
+    /// <summary>HEAD and branch names drawn as accent labels on the right of the history row.</summary>
+    public IReadOnlyList<string> Refs { get; init; } = [];
+
+    public bool HasRefs => Refs.Count > 0;
+
     [ObservableProperty]
     public partial bool IsHead { get; set; }
 

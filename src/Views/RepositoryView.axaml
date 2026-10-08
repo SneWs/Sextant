@@ -325,22 +325,43 @@
                                         <TextBlock Text="{Binding Subject}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
                                         <TextBlock Text="{Binding Detail}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" FontSize="12" Opacity="0.65" Margin="0,1,0,0"/>
                                     </StackPanel>
-                                    <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}"
-                                                  VerticalAlignment="Center" Margin="8,0,4,0">
-                                        <ItemsControl.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <StackPanel Orientation="Horizontal" Spacing="4"/>
-                                            </ItemsPanelTemplate>
-                                        </ItemsControl.ItemsPanel>
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="x:String">
-                                                <Border Classes="taglabel" Padding="6,0" CornerRadius="3" BorderThickness="1"
-                                                        Background="#40E6B450" BorderBrush="#E6B450">
-                                                    <TextBlock Text="{Binding}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                    <StackPanel Orientation="Horizontal" Spacing="4" Margin="8,0,4,0" VerticalAlignment="Center">
+                                        <ItemsControl ItemsSource="{Binding Refs}" IsVisible="{Binding HasRefs}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" Spacing="4"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="x:String">
+                                                    <Border Classes="reflabel" Padding="6,0" CornerRadius="3" BorderThickness="1">
+                                                        <Border.Background>
+                                                            <SolidColorBrush Color="{DynamicResource SystemAccentColor}" Opacity="0.25"/>
+                                                        </Border.Background>
+                                                        <Border.BorderBrush>
+                                                            <SolidColorBrush Color="{DynamicResource SystemAccentColor}"/>
+                                                        </Border.BorderBrush>
+                                                        <TextBlock Text="{Binding}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasTags}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" Spacing="4"/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="x:String">
+                                                    <Border Classes="taglabel" Padding="6,0" CornerRadius="3" BorderThickness="1"
+                                                            Background="#40E6B450" BorderBrush="#E6B450">
+                                                        <TextBlock Text="{Binding}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
                                 </controls:GraphRowPanel>
                             </Border>
                         </DataTemplate>
