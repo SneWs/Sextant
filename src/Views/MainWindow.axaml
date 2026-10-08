@@ -22,6 +22,8 @@
                     <NativeMenuItem Header="Open from _WSL…" Command="{Binding OpenWslCommand}" IsVisible="{Binding HasWsl}"/>
                     <NativeMenuItem Header="_Clone repository…" Command="{Binding CloneCommand}"/>
                     <NativeMenuItem Header="_Init repository…" Command="{Binding InitCommand}"/>
+                    <NativeMenuItemSeparator />
+                    <NativeMenuItem Header="Apply _patch…" Command="{Binding ApplyPatchCommand}"/>
                     <NativeMenuItemSeparator IsVisible="{Binding ShowWindowExitMenu}"/>
                     <NativeMenuItem Header="E_xit" Command="{Binding ExitCommand}" IsVisible="{Binding ShowWindowExitMenu}"/>
                 </NativeMenu>
@@ -29,6 +31,7 @@
             <NativeMenuItem Header="_View" IsEnabled="{Binding HasActiveTab}">
                 <NativeMenu>
                     <NativeMenuItem Header="Toggle _locations" Command="{Binding ToggleBranchViewCommand}"/>
+                    <NativeMenuItem Header="Command _log" Command="{Binding ToggleCommandsCommand}"/>
                 </NativeMenu>
             </NativeMenuItem>
             <NativeMenuItem Header="_Settings" IsVisible="{Binding ShowWindowSettingsMenu}">
@@ -38,7 +41,12 @@
             </NativeMenuItem>
             <NativeMenuItem Header="_Repository" IsEnabled="{Binding HasActiveTab}">
                 <NativeMenu>
-                    <NativeMenuItem Header="_Branch…" Command="{Binding CreateBranchCommand}" Gesture="{app:CommandGesture Key=B}"/>
+                    <NativeMenuItem Header="_Create Branch" Command="{Binding CreateBranchCommand}" Gesture="{app:CommandGesture Key=B}"/>
+                    <NativeMenuItem Header="_Pull" Command="{Binding PullCommand}" Gesture="{app:CommandGesture Key=U, Shift=True}"/>
+                    <NativeMenuItem Header="_Push" Command="{Binding PushCommand}" Gesture="{app:CommandGesture Key=P, Shift=True}"/>
+                    <NativeMenuItem Header="Stage _all" Command="{Binding StageAllCommand}" IsEnabled="{Binding CanStageAll}" Gesture="{app:CommandGesture Key=A, Shift=True}"/>
+                    <NativeMenuItem Header="_Unstage all" Command="{Binding UnstageAllCommand}" IsEnabled="{Binding CanUnstageAll}" Gesture="{app:CommandGesture Key=R, Shift=True}"/>
+                    <NativeMenuItemSeparator/>
                     <NativeMenuItem Header="_Stash">
                         <NativeMenu>
                             <NativeMenuItem Header="_Stash…" Command="{Binding StashCommand}" IsEnabled="{Binding CanStash}" Gesture="{app:CommandGesture Key=S}"/>
@@ -48,16 +56,12 @@
                         </NativeMenu>
                     </NativeMenuItem>
                     <NativeMenuItem Header="_Pop latest stash…" Command="{Binding PopLatestStashCommand}" IsEnabled="{Binding CanPopLatestStash}" Gesture="{app:CommandGesture Key=S, Shift=True}"/>
-                    <NativeMenuItem Header="Stage _all" Command="{Binding StageAllCommand}" IsEnabled="{Binding CanStageAll}" Gesture="{app:CommandGesture Key=A, Shift=True}"/>
-                    <NativeMenuItem Header="_Unstage all" Command="{Binding UnstageAllCommand}" IsEnabled="{Binding CanUnstageAll}" Gesture="{app:CommandGesture Key=R, Shift=True}"/>
-                    <NativeMenuItem Header="_Pull" Command="{Binding PullCommand}" Gesture="{app:CommandGesture Key=U, Shift=True}"/>
-                    <NativeMenuItem Header="_Push" Command="{Binding PushCommand}" Gesture="{app:CommandGesture Key=P, Shift=True}"/>
+                    <NativeMenuItemSeparator/>
                     <NativeMenuItem Header="Add _remote…" Command="{Binding AddRemoteCommand}"/>
                     <NativeMenuItem Header="Add _worktree…" Command="{Binding AddWorktreeCommand}"/>
-                    <NativeMenuItem Header="Apply _patch…" Command="{Binding ApplyPatchCommand}"/>
+                    <NativeMenuItemSeparator/>
                     <NativeMenuItem Header="_Fetch LFS objects" Command="{Binding FetchLfsCommand}"/>
                     <NativeMenuItem Header="_Pull LFS files" Command="{Binding PullLfsCommand}"/>
-                    <NativeMenuItem Header="Command _log" Command="{Binding ToggleCommandsCommand}"/>
                     <NativeMenuItemSeparator/>
                     <NativeMenuItem Header="_Search" Command="{Binding ToggleHistorySearchCommand}" Gesture="{app:CommandGesture Key=F}"/>
                 </NativeMenu>
