@@ -35,6 +35,10 @@ public class StashShortcutTests
                 vm.Attach(dialogs);
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
+                var until = DateTime.UtcNow.AddSeconds(5);
+                while (tab.IsBusy && DateTime.UtcNow < until)
+                    await Task.Delay(30);
+                Assert.False(tab.IsBusy);
 
                 var menu = NativeMenu.GetMenu(window)!;
                 var repository = menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Repository");
@@ -74,6 +78,77 @@ public class StashShortcutTests
                 Assert.Single(repo.RunCapture("stash", "list").Split('\n', StringSplitOptions.RemoveEmptyEntries));
                 Assert.True(tab.CanStash);
                 Assert.False(tab.HasBanner, tab.Banner);
+            }
+            finally
+            {
+                await vm.Shutdown();
+                window.DataContext = null;
+                window.Close();
+            }
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Repository_stash_menu_starts_disabled_and_tracks_the_active_repository(bool stashExists)
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "base\n");
+        repo.CommitAll("first");
+        if (stashExists)
+        {
+            repo.WriteFile("a.txt", "saved\n");
+            repo.Run("stash", "push", "-m", "saved");
+        }
+
+        await session.Dispatch(async () =>
+        {
+            var (vm, tab) = await Open(repo, new StashDialogs());
+            var window = new MainWindow { DataContext = vm, Width = 1000, Height = 700 };
+            try
+            {
+                var menu = NativeMenu.GetMenu(window)!;
+                var repository = menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Repository");
+                var stash = repository.Menu!.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Stash…");
+                var pop = repository.Menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Pop latest stash…");
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal(AppGestures.CommandKey(Key.S), stash.Gesture);
+                Assert.Equal(AppGestures.CommandKey(Key.S, KeyModifiers.Shift), pop.Gesture);
+                Assert.False(stash.IsEnabled);
+                Assert.Equal(stashExists, pop.IsEnabled);
+
+                repo.WriteFile("a.txt", "changed\n");
+                await tab.Refresh();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(stash.IsEnabled);
+                Assert.Equal(stashExists, pop.IsEnabled);
+
+                tab.IsBusy = true;
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(stash.IsEnabled);
+                Assert.False(pop.IsEnabled);
+                tab.IsBusy = false;
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(stash.IsEnabled);
+                Assert.Equal(stashExists, pop.IsEnabled);
+
+                vm.ActiveTab = null;
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(stash.IsEnabled);
+                Assert.False(pop.IsEnabled);
+                vm.ActiveTab = tab;
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(stash.IsEnabled);
+                Assert.Equal(stashExists, pop.IsEnabled);
+
+                repo.WriteFile("a.txt", "base\n");
+                await tab.Refresh();
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(stash.IsEnabled);
+                Assert.Equal(stashExists, pop.IsEnabled);
             }
             finally
             {
