@@ -981,6 +981,35 @@ public sealed partial class RepositorySession : IAsyncDisposable
     public Task SetLocalConfigAsync(string key, string value, CancellationToken cancellationToken) =>
         SetLocalConfigsAsync([(key, value)], cancellationToken);
 
+    /// <summary>Writes user.name and user.email, then reloads the config so the row under the commit box updates.</summary>
+    public Task SetCommitterAsync(string name, string email, bool global, CancellationToken cancellationToken) =>
+        RunAsync(async ct =>
+        {
+            GitCommandFailedException? failure = null;
+            try
+            {
+                await _scheduler.WriteAsync(async token =>
+                {
+                    foreach (var (key, value) in new (string, string)[] { ("user.name", name), ("user.email", email) })
+                    {
+                        var arguments = global ? GitCommands.SetGlobal(key, value) : GitCommands.SetLocal(_toplevel, key, value);
+                        Checked(await ExecuteAsync(arguments, null, token).ConfigureAwait(false));
+                    }
+
+                    return 0;
+                }, ct).ConfigureAwait(false);
+            }
+            catch (GitCommandFailedException exception)
+            {
+                failure = exception;
+            }
+
+            await ReloadConfigAsync(ct).ConfigureAwait(false);
+            if (failure is not null)
+                throw failure;
+            return 0;
+        }, cancellationToken);
+
     public Task SetLocalConfigsAsync(
         IReadOnlyList<(string Key, string Value)> settings,
         CancellationToken cancellationToken) =>

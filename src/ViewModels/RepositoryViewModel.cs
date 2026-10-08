@@ -323,6 +323,25 @@ public partial class RepositoryViewModel : ViewModelBase
     [ObservableProperty]
     public partial LocationItem? SelectedLocation { get; set; }
 
+    [ObservableProperty]
+    public partial string CommitterName { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string CommitterEmail { get; set; } = "";
+
+    /// <summary>The identity row under the commit box. Clicking it opens the committer dialog.</summary>
+    public string CommitterText => (CommitterName, CommitterEmail) switch
+    {
+        ("", "") => "Set committer",
+        ("", var email) => email,
+        (var name, "") => name,
+        (var name, var email) => $"{name} <{email}>",
+    };
+
+    partial void OnCommitterNameChanged(string value) => OnPropertyChanged(nameof(CommitterText));
+
+    partial void OnCommitterEmailChanged(string value) => OnPropertyChanged(nameof(CommitterText));
+
     public bool IsReady => _session is not null;
 
     public bool CanCommit => !IsBusy && ShowingWorkingCopy && !NothingStaged && !string.IsNullOrWhiteSpace(CommitMessage);
@@ -466,6 +485,22 @@ public partial class RepositoryViewModel : ViewModelBase
 
     [RelayCommand]
     public Task Commit() => CommitCoreAsync(noVerify: false);
+
+    [RelayCommand]
+    private Task EditCommitter()
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)
+            return Task.CompletedTask;
+        // HoldFocus keeps the activation that closes the dialog from starting
+        // a refresh that takes IsBusy and drops the save below.
+        return HoldFocus(async () =>
+        {
+            var edit = await dialogs.PromptCommitterAsync(CommitterName, CommitterEmail);
+            if (edit is null || _session is null)
+                return;
+            await RunAsync("Saving committer…", ct => _session.SetCommitterAsync(edit.Name, edit.Email, edit.Global, ct));
+        });
+    }
 
     [RelayCommand]
     private Task CommitWithoutHooks() => CommitCoreAsync(noVerify: true);
@@ -1156,6 +1191,8 @@ public partial class RepositoryViewModel : ViewModelBase
             HistoryCaption = state.HistoryLabel ?? "";
             HasHistoryFilter = state.HistoryLabel is { Length: > 0 };
             HasHistoryQuery = state.HasHistoryQuery;
+            CommitterName = state.Config.GetValueOrDefault("user.name", "");
+            CommitterEmail = state.Config.GetValueOrDefault("user.email", "");
             if (state.Sequencer != SequencerKind.None && !_wasMerge && string.IsNullOrWhiteSpace(CommitMessage) && !string.IsNullOrWhiteSpace(state.MergeMessage))
                 CommitMessage = state.MergeMessage.Trim();
             _wasMerge = state.Sequencer != SequencerKind.None;

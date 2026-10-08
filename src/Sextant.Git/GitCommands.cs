@@ -636,6 +636,9 @@ public static class GitCommands
     public static IReadOnlyList<string> SetLocal(string toplevel, string key, string value) =>
         ["-C", toplevel, "config", "--local", key, value];
 
+    public static IReadOnlyList<string> SetGlobal(string key, string value) =>
+        ["config", "--global", key, value];
+
     public static IReadOnlyList<string> AddSafeDirectory(string path) =>
         ["config", "--global", "--add", "safe.directory", path];
 

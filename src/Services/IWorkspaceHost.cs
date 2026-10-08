@@ -35,6 +35,13 @@ public interface IDialogService
 
     Task<string?> SaveFileAsync(string title, string suggestedName);
 
+    /// <summary>
+    /// Prompts for the committer name and email, and whether to write the global config or the repository's.
+    /// Cancel returns null. The default implementation cancels.
+    /// </summary>
+    Task<CommitterEdit?> PromptCommitterAsync(string? name, string? email) =>
+        Task.FromResult<CommitterEdit?>(null);
+
     Task<string?> PickFileAsync(string title, string typeName, IReadOnlyList<string> patterns);
 
     Task<CloneRequest?> PromptCloneAsync();
@@ -66,6 +73,8 @@ public sealed record SettingsDraft(
 public sealed record SecretPrompt(string? Value, bool RememberForSession);
 
 public sealed record CloneRequest(string Url, string Destination);
+
+public sealed record CommitterEdit(string Name, string Email, bool Global);
 
 public sealed record PerformanceChoice(bool ManyFiles, bool FileSystemMonitor);
 

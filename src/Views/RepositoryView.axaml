@@ -472,6 +472,11 @@
                                     </SplitButton.Flyout>
                                 </SplitButton>
                             </StackPanel>
+                            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,4,0,0">
+                                <Button Classes="flat" Content="{Binding CommitterText}" Command="{Binding EditCommitterCommand}"
+                                        Padding="4,2" MinHeight="0" FontSize="12" Opacity="0.85"
+                                        ToolTip.Tip="Change the committer name and email"/>
+                            </StackPanel>
                             <TextBox x:Name="CommitMessageInput" Text="{Binding CommitMessage}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64"
                                      PlaceholderText="Commit message"/>
                         </DockPanel>

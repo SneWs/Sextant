@@ -148,6 +148,43 @@ public sealed class AvaloniaDialogService : IDialogService
         return new SecretPrompt(value, keep);
     }
 
+    public async Task<CommitterEdit?> PromptCommitterAsync(string? name, string? email)
+    {
+        var window = Create("Committer");
+        var nameBox = new TextBox { Text = name, PlaceholderText = "Name" };
+        var emailBox = new TextBox { Text = email, PlaceholderText = "email@example.com" };
+        var repoRadio = new RadioButton { Content = "This repository only", IsChecked = true };
+        var globalRadio = new RadioButton { Content = "Global, all repositories" };
+        var scope = new StackPanel { Spacing = 4, Margin = new Thickness(0, 4, 0, 0) };
+        scope.Children.Add(repoRadio);
+        scope.Children.Add(globalRadio);
+        CommitterEdit? edit = null;
+        var ok = new Button { Content = "Save", IsDefault = true };
+        var cancel = new Button { Content = "Cancel", IsCancel = true };
+        var error = new TextBlock { Foreground = Brushes.IndianRed, TextWrapping = TextWrapping.Wrap };
+        ok.Click += (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(nameBox.Text) || string.IsNullOrWhiteSpace(emailBox.Text))
+            {
+                error.Text = "Enter a name and an email.";
+                return;
+            }
+
+            edit = new CommitterEdit(nameBox.Text.Trim(), emailBox.Text.Trim(), globalRadio.IsChecked == true);
+            window.Close();
+        };
+        cancel.Click += (_, _) => window.Close();
+        window.Content = Column(
+            Message("Shown on your commits as the author. Saved with git config."),
+            Labeled("Name", nameBox),
+            Labeled("Email", emailBox),
+            Labeled("Apply to", scope),
+            error,
+            Buttons(cancel, ok));
+        await window.ShowDialog(_owner);
+        return edit;
+    }
+
     public async Task<string?> SaveFileAsync(string title, string suggestedName)
     {
         var patch = new FilePickerFileType("Patch") { Patterns = ["*.patch"] };
