@@ -73,7 +73,7 @@ The same menu offers Open in editor and Open in Finder, File Explorer, or File M
 
 The working-copy list is grouped into Conflicts, then Staged, then Unstaged. Empty groups are omitted. Each group title is a bar. The rows under it are the files, with a status letter and Stage, Unstage, Discard, or History.
 
-Stage all, Unstage all, and Discard all are in the command palette. Discard all asks before it restores tracked files and removes untracked files.
+Stage all is Ctrl+Shift+A (Command+Shift+A on macOS) and Unstage all is Ctrl+Shift+R (Command+Shift+R). Stage all is unavailable when there is nothing to stage, and Unstage all when nothing is staged. Both are also in the Repository menu and the command palette. Discard all is in the command palette. Discard all asks before it restores tracked files and removes untracked files.
 
 Stash saves changes to tracked files with Ctrl+S (Command+S on macOS). It is unavailable when there are no tracked changes to save, before the first commit, or while files have unresolved conflicts. Untracked files are left alone. Ctrl+Shift+S (Command+Shift+S) pops the latest stash after confirmation. Pop is unavailable when there is no stash or files have unresolved conflicts. Both actions are in the Repository menu and appear in the command palette when available.
 
@@ -95,7 +95,7 @@ PNG, JPG, JPEG, GIF, BMP, WEBP, ICO, SVG, TIF, and TIFF open as a picture of eac
 
 ## Fetch, pull, and push
 
-Pull takes the upstream of the current branch. The menu on that button also offers Fetch, Fetch all, and Fetch all and clean up. Fetch all and clean up prunes remote-tracking branches that the remote has deleted. Pull and Push also have shortcuts: Command/Ctrl+Shift+U and Command/Ctrl+Shift+P.
+Pull takes the upstream of the current branch. The menu on that button also offers Fetch, Fetch all, and Fetch all and clean up. Fetch all and clean up prunes remote-tracking branches that the remote has deleted. Pull is Ctrl+Shift+U (Command+Shift+U on macOS) and Push is Ctrl+Shift+P (Command+Shift+P). Both are also in the Repository menu.
 
 Push sends the current branch. The menu offers Push ignoring local checks, which skips hooks, and Push with force-with-lease. Force-with-lease refuses to overwrite remote commits that you have not seen. It is not a plain force.
 
@@ -140,9 +140,13 @@ The command key is Command on macOS and Ctrl on Windows and Linux, except where 
 | Pop latest stash | Command/Ctrl+Shift+S |
 | Stage all | Command/Ctrl+Shift+A |
 | Unstage all | Command/Ctrl+Shift+R |
+| Expand all diff sections | Command/Ctrl+Shift+E |
+| Collapse all diff sections | Command/Ctrl+Shift+C |
 | Close tab | Command/Ctrl+W |
 | Next tab | Ctrl+Tab |
+| Switch to tab by number | Command/Ctrl+0 to Command/Ctrl+9 |
 | Refresh | F5 |
 | Settings | Command+, on macOS |
 
 Escape in the history search box hides it and clears the query. Escape in the locations filter closes that box.
+In the command palette, Up and Down move through the matches, Enter runs the selected command, and Escape closes the palette.
