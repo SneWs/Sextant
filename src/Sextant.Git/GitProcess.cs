@@ -6,33 +6,55 @@ namespace Sextant.Git;
 
 public sealed class GitProcessRunner
 {
+    /// <summary>Windows only. Set when the app can show an SSH passphrase dialog.</summary>
+    public AskPassLaunch? AskPass { get; set; }
+
     public async Task<GitOutput> RunAsync(GitRequest request, CancellationToken cancellationToken)
     {
+        var useWsl = OperatingSystem.IsWindows() && request.Wsl is not null;
+        if (!useWsl && request.Wsl is not null)
+            request = ClearWsl(request);
+        if (useWsl && AskPass is not null)
+            request = await WithWslAskPassAsync(request, AskPass, cancellationToken).ConfigureAwait(false);
+        var launched = useWsl ? WslLaunch.Prepare(request) : request;
         var start = Stopwatch.StartNew();
         var info = new ProcessStartInfo
         {
-            FileName = request.Executable,
+            FileName = launched.Executable,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             RedirectStandardInput = true,
             CreateNoWindow = true,
         };
-        if (!string.IsNullOrEmpty(request.WorkingDirectory))
-            info.WorkingDirectory = request.WorkingDirectory;
-        foreach (var argument in request.Arguments)
+        if (!string.IsNullOrEmpty(launched.WorkingDirectory))
+            info.WorkingDirectory = launched.WorkingDirectory;
+        foreach (var argument in launched.Arguments)
             info.ArgumentList.Add(argument);
-        info.Environment["GIT_TERMINAL_PROMPT"] = "0";
-        if (request.Environment is not null)
+        if (useWsl)
+            info.Environment["WSL_UTF8"] = "1";
+        if (!useWsl)
         {
-            foreach (var pair in request.Environment)
-                info.Environment[pair.Key] = pair.Value;
-        }
+            info.Environment["GIT_TERMINAL_PROMPT"] = "0";
+            if (request.Environment is not null)
+            {
+                foreach (var pair in request.Environment)
+                    info.Environment[pair.Key] = pair.Value;
+            }
 
-        // A macOS app launched from Finder does not inherit the shell PATH, so Homebrew's
-        // git-lfs is invisible. git then fails the smudge with "git-lfs: command not found".
-        info.Environment.TryGetValue("PATH", out var path);
-        info.Environment["PATH"] = ToolPath(path, request.Executable);
+            if (OperatingSystem.IsWindows() && AskPass is not null && !info.Environment.ContainsKey("SSH_ASKPASS"))
+            {
+                foreach (var pair in AskPassEnvironment.ForWindowsGit(AskPass.Executable, AskPass.PipeName))
+                    info.Environment[pair.Key] = pair.Value;
+                if (!string.IsNullOrWhiteSpace(request.WorkingDirectory))
+                    info.Environment[AskPassEnvironment.RepositoryVariable] = request.WorkingDirectory;
+            }
+
+            // A macOS app launched from Finder does not inherit the shell PATH, so Homebrew's
+            // git-lfs is invisible. git then fails the smudge with "git-lfs: command not found".
+            info.Environment.TryGetValue("PATH", out var path);
+            info.Environment["PATH"] = ToolPath(path, request.Executable);
+        }
 
         using var process = new Process { StartInfo = info, EnableRaisingEvents = true };
         if (!process.Start())
@@ -72,18 +94,82 @@ public sealed class GitProcessRunner
         var stderr = await stderrTask.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         start.Stop();
+        var error = stderr.Error;
+        if (request.Wsl is not null && process.ExitCode != 0)
+        {
+            var note = WslLaunch.LauncherNote(stdout);
+            if (note is not null)
+            {
+                error = string.IsNullOrWhiteSpace(error) ? note : error + Environment.NewLine + note;
+                stdout = [];
+            }
+        }
 
-        var display = new List<string>(request.Arguments.Count + 1) { "git" };
-        display.AddRange(ArgumentRedactor.RedactAll(request.Arguments));
+        var display = DisplayOf(request);
         return new GitOutput
         {
             ExitCode = process.ExitCode,
             Stdout = stdout,
-            StandardError = stderr.Error,
+            StandardError = error,
             Progress = stderr.Progress,
             Duration = start.Elapsed,
             DisplayArguments = display,
         };
+    }
+
+    private static async Task<GitRequest> WithWslAskPassAsync(GitRequest request, AskPassLaunch ask, CancellationToken cancellationToken)
+    {
+        if (request.Wsl is null || request.Environment?.ContainsKey("SSH_ASKPASS") == true)
+            return request;
+        var script = await WslAskPass.EnsureAsync(request.Wsl, ask.Executable, ask.PipeName, cancellationToken).ConfigureAwait(false);
+        if (script is null)
+            return request;
+        var askPass = AskPassEnvironment.ForWslGit(script);
+        if (!string.IsNullOrWhiteSpace(request.WorkingDirectory))
+            askPass[AskPassEnvironment.RepositoryVariable] = request.WorkingDirectory;
+        return WithEnvironment(request, askPass);
+    }
+
+    private static GitRequest WithEnvironment(GitRequest request, IReadOnlyDictionary<string, string> extra)
+    {
+        var merged = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (request.Environment is not null)
+        {
+            foreach (var pair in request.Environment)
+                merged[pair.Key] = pair.Value;
+        }
+
+        foreach (var pair in extra)
+            merged[pair.Key] = pair.Value;
+        return Copy(request, merged, request.Wsl);
+    }
+
+    private static GitRequest ClearWsl(GitRequest request) => Copy(request, request.Environment, null);
+
+    private static GitRequest Copy(GitRequest request, IReadOnlyDictionary<string, string>? environment, WslGit? wsl) =>
+        new()
+        {
+            Executable = request.Executable,
+            Arguments = request.Arguments,
+            WorkingDirectory = request.WorkingDirectory,
+            Progress = request.Progress,
+            Environment = environment,
+            StandardInput = request.StandardInput,
+            Wsl = wsl,
+        };
+
+    private static List<string> DisplayOf(GitRequest request)
+    {
+        if (request.Wsl is null)
+        {
+            var native = new List<string>(request.Arguments.Count + 1) { "git" };
+            native.AddRange(ArgumentRedactor.RedactAll(request.Arguments));
+            return native;
+        }
+
+        var display = new List<string> { "wsl", "-d", request.Wsl.Distribution, "git" };
+        display.AddRange(ArgumentRedactor.RedactAll(WslLaunch.TranslateArguments(request.Arguments, request.Wsl.Distribution)));
+        return display;
     }
 
     /// <summary>

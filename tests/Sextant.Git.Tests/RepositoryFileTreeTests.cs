@@ -552,9 +552,10 @@ public class RepositoryFileTreeTests
                 await BeforeConfirm();
             return Accept;
         }
-        public Task<string?> PickFolderAsync(string title) => throw new NotSupportedException();
+        public Task<string?> PickFolderAsync(string title, string? startDirectory = null) => throw new NotSupportedException();
         public Task<string?> PickGitExecutableAsync() => throw new NotSupportedException();
         public Task<string?> PromptAsync(string title, string message, string initial = "", bool allowEmpty = false) => throw new NotSupportedException();
+        public Task<string?> PromptSecretAsync(string title, string message) => throw new NotSupportedException();
         public Task<string?> SaveFileAsync(string title, string suggestedName) => throw new NotSupportedException();
         public Task<string?> PickFileAsync(string title, string typeName, IReadOnlyList<string> patterns) => throw new NotSupportedException();
         public Task<CloneRequest?> PromptCloneAsync() => throw new NotSupportedException();

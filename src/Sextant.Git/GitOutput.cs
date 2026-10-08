@@ -28,6 +28,9 @@ public sealed class GitRequest
     public IReadOnlyDictionary<string, string>? Environment { get; init; }
 
     public byte[]? StandardInput { get; init; }
+
+    /// <summary>When set, git runs inside this WSL2 distribution instead of the Windows executable.</summary>
+    public WslGit? Wsl { get; init; }
 }
 
 public sealed class RepositoryActionException : Exception

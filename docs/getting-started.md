@@ -58,6 +58,8 @@ Download `Sextant-win-x64.zip`, extract the whole zip, and run `Sextant.exe`. Ke
 
 To update, quit Sextant, download the new zip, and replace that folder. Settings stay in `%APPDATA%\Sextant`, which is `C:\Users\<you>\AppData\Roaming\Sextant`.
 
+On Windows 11, Sextant also looks for WSL2. When a distribution is installed, File → Open from WSL, and the empty window, offer that distribution. The folder comes from the distribution. That tab runs the distribution's `git`, so it uses that install's config, hooks, and credential helpers. A folder opened from `\\wsl.localhost\` or `\\wsl$\` is treated the same way. Windows Git is still used for repositories that live on Windows. A WSL or Windows git command can ask for the SSH key passphrase in a window. A checkbox on that window keeps it for later prompts in that repository, including Git LFS, until Sextant closes. It is not written to disk.
+
 ## Linux
 
 Install `git` and `git-lfs` from your distribution, then run `git lfs install` once.
@@ -74,9 +76,10 @@ To update a build you published yourself, quit Sextant and replace that folder. 
 
 ## First launch
 
-The empty window offers Open, Clone, and Init.
+The empty window offers Open, Clone, and Init. On Windows 11 it also offers Open from WSL when a WSL2 distribution is installed.
 
 - **Open** chooses a folder that is already a Git repository.
+- **Open from WSL** chooses a WSL2 distribution, then a folder inside it. That tab uses the distribution's Git.
 - **Clone** copies a remote repository into a new folder and opens it. The remote URL and credentials are handled by your Git credential helper, the same way `git clone` works in a terminal.
 - **Init** creates a new repository in a folder you choose.
 

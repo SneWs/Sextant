@@ -141,7 +141,8 @@ jobs:
           }
           $files = @(
             (Join-Path $env:Publish_Directory "Sextant.exe"),
-            (Join-Path $env:Publish_Directory "Sextant.Git.dll")
+            (Join-Path $env:Publish_Directory "Sextant.Git.dll"),
+            (Join-Path $env:Publish_Directory "Sextant.AskPass.exe")
           )
           foreach ($file in $files) {
             & $signtool.FullName sign /fd SHA256 /f $pfx /p $env:PFX_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $file

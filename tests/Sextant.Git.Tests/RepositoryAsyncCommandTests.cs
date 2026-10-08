@@ -325,10 +325,11 @@ public class RepositoryAsyncCommandTests
             return Pending.Task;
         }
 
-        public Task<string?> PickFolderAsync(string title) => Task.FromResult<string?>(null);
+        public Task<string?> PickFolderAsync(string title, string? startDirectory = null) => Task.FromResult<string?>(null);
         public Task<string?> PickGitExecutableAsync() => Task.FromResult<string?>(null);
         public Task<bool> ConfirmAsync(string title, string message, string confirm = "OK") => Task.FromResult(false);
         public Task<string?> PromptAsync(string title, string message, string initial = "", bool allowEmpty = false) => Task.FromResult<string?>(null);
+        public Task<string?> PromptSecretAsync(string title, string message) => Task.FromResult<string?>(null);
         public Task<string?> SaveFileAsync(string title, string suggestedName) => Task.FromResult<string?>(null);
         public Task<string?> PickFileAsync(string title, string typeName, IReadOnlyList<string> patterns) => Task.FromResult<string?>(null);
         public Task<CloneRequest?> PromptCloneAsync() => Task.FromResult<CloneRequest?>(null);

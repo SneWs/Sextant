@@ -5,13 +5,31 @@ namespace Sextant.Services;
 
 public interface IDialogService
 {
-    Task<string?> PickFolderAsync(string title);
+    Task<string?> PickFolderAsync(string title, string? startDirectory = null);
 
     Task<string?> PickGitExecutableAsync();
 
     Task<bool> ConfirmAsync(string title, string message, string confirm = "OK");
 
     Task<string?> PromptAsync(string title, string message, string initial = "", bool allowEmpty = false);
+
+    /// <summary>Masked prompt. Cancel returns null. Confirming an empty field returns an empty string.</summary>
+    Task<string?> PromptSecretAsync(string title, string message);
+
+    /// <summary>
+    /// Masked prompt with a session checkbox. Cancel returns a null value.
+    /// The default implementation has no checkbox and does not remember.
+    /// </summary>
+    Task<SecretPrompt> PromptSessionSecretAsync(string title, string message, bool rememberChecked = false)
+    {
+        return PromptWithoutRemember(title, message);
+
+        async Task<SecretPrompt> PromptWithoutRemember(string promptTitle, string promptMessage)
+        {
+            var value = await PromptSecretAsync(promptTitle, promptMessage).ConfigureAwait(false);
+            return new SecretPrompt(value, false);
+        }
+    }
 
     Task<string?> SaveFileAsync(string title, string suggestedName);
 
@@ -42,6 +60,8 @@ public sealed record SettingsDraft(
     string? Palette = null,
     string? DiffFont = null,
     double DiffFontSize = DiffFontPreference.DefaultSize);
+
+public sealed record SecretPrompt(string? Value, bool RememberForSession);
 
 public sealed record CloneRequest(string Url, string Destination);
 

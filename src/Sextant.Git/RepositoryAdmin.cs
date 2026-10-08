@@ -37,12 +37,14 @@ public static class RepositoryAdmin
         GitProcessRunner runner,
         string executable,
         string path,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        WslGit? wsl = null)
     {
         var output = await runner.RunAsync(new GitRequest
         {
             Executable = executable,
             Arguments = GitCommands.AddSafeDirectory(RepoPath.Normalize(path)),
+            Wsl = wsl is { CanRun: true } ? wsl : null,
         }, cancellationToken).ConfigureAwait(false);
         if (output.ExitCode != 0)
             throw new GitCommandFailedException(output);

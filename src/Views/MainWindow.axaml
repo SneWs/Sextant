@@ -19,6 +19,7 @@
             <NativeMenuItem Header="_File">
                 <NativeMenu>
                     <NativeMenuItem Header="_Open repository…" Command="{Binding OpenFolderCommand}" Gesture="{app:CommandGesture Key=O}"/>
+                    <NativeMenuItem Header="Open from _WSL…" Command="{Binding OpenWslCommand}" IsVisible="{Binding HasWsl}"/>
                     <NativeMenuItem Header="_Clone repository…" Command="{Binding CloneCommand}"/>
                     <NativeMenuItem Header="_Init repository…" Command="{Binding InitCommand}"/>
                 </NativeMenu>
@@ -135,6 +136,12 @@
                                                TextWrapping="Wrap" TextAlignment="Center" Opacity="0.75"/>
                                 </StackPanel>
                             </Grid>
+                            <StackPanel Spacing="10" Margin="0,28,0,0" IsVisible="{Binding HasWsl}" HorizontalAlignment="Center" MaxWidth="420">
+                                <Button Content="Open from WSL" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                        Padding="12,8" Command="{Binding OpenWslCommand}" IsEnabled="{Binding CanOpenWsl}"/>
+                                <TextBlock Text="Open a repository from a WSL2 distribution. That tab uses that distribution's git and configuration."
+                                           TextWrapping="Wrap" TextAlignment="Center" Opacity="0.75"/>
+                            </StackPanel>
                         </StackPanel>
                     </Grid>
                     <Border x:Name="PaneRuleLeft" Height="1" VerticalAlignment="Top" HorizontalAlignment="Left"

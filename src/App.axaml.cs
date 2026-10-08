@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Sextant.Git;
+using Sextant.Services;
 using Sextant.ViewModels;
 using Sextant.Views;
 
@@ -9,6 +10,8 @@ namespace Sextant;
 
 public partial class App : Application
 {
+    private AskPassServer? _askPass;
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -22,9 +25,17 @@ public partial class App : Application
             var settings = store.LoadSettings();
             AppTheme.Apply(settings.Theme, settings.Palette);
             DiffFont.Apply(settings.DiffFont, settings.DiffFontSize);
+            var runner = new GitProcessRunner();
             var window = new MainWindow
             {
-                DataContext = new MainViewModel(store, store.LoadWorkspace(), settings, new GitProcessRunner()),
+                DataContext = new MainViewModel(store, store.LoadWorkspace(), settings, runner),
+            };
+            if (OperatingSystem.IsWindows())
+                _askPass = WindowsAskPass.Attach(runner, window);
+            desktop.ShutdownRequested += (_, _) =>
+            {
+                if (_askPass is not null)
+                    _ = _askPass.DisposeAsync().AsTask();
             };
             desktop.MainWindow = window;
         }

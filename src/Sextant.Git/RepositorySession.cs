@@ -7,6 +7,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
 {
     private readonly GitProcessRunner _runner;
     private readonly string _executable;
+    private readonly WslGit? _wsl;
     private readonly RepositoryScheduler _scheduler = new();
     private readonly CancellationTokenSource _lifetime = new();
     private readonly object _stateLock = new();
@@ -40,10 +41,11 @@ public sealed partial class RepositorySession : IAsyncDisposable
     private PerformanceSuggestion? _suggestion;
     private string _tipSignature = "";
 
-    private RepositorySession(GitProcessRunner runner, string executable)
+    private RepositorySession(GitProcessRunner runner, string executable, WslGit? wsl = null)
     {
         _runner = runner;
         _executable = executable;
+        _wsl = wsl is { CanRun: true } ? wsl : null;
     }
 
     public string Toplevel => _toplevel;
@@ -64,9 +66,10 @@ public sealed partial class RepositorySession : IAsyncDisposable
         string executable,
         string path,
         CancellationToken cancellationToken,
-        IReadOnlyCollection<string>? hiddenBranches = null)
+        IReadOnlyCollection<string>? hiddenBranches = null,
+        WslGit? wsl = null)
     {
-        var session = new RepositorySession(runner, executable);
+        var session = new RepositorySession(runner, executable, wsl);
         if (hiddenBranches is not null)
         {
             foreach (var name in hiddenBranches)
@@ -537,7 +540,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
             {
                 await _scheduler.WriteAsync(async token =>
                 {
-                    var editor = RebaseEditor.Create(_gitDirectory, steps);
+                    var editor = RebaseEditor.Create(_gitDirectory, steps, GitPath);
                     var environment = new Dictionary<string, string>
                     {
                         ["GIT_SEQUENCE_EDITOR"] = editor,
@@ -1021,8 +1024,8 @@ public sealed partial class RepositorySession : IAsyncDisposable
         {
             var top = Checked(await ExecuteInAsync(GitCommands.TopLevel(path), path, ct).ConfigureAwait(false));
             var dir = Checked(await ExecuteInAsync(GitCommands.GitDir(path), path, ct).ConfigureAwait(false));
-            _toplevel = RepoPath.Normalize(Encoding.UTF8.GetString(top.Stdout).Trim());
-            _gitDirectory = RepoPath.Normalize(Encoding.UTF8.GetString(dir.Stdout).Trim());
+            _toplevel = RepoPath.Normalize(HostPath(Encoding.UTF8.GetString(top.Stdout).Trim()));
+            _gitDirectory = RepoPath.Normalize(HostPath(Encoding.UTF8.GetString(dir.Stdout).Trim()));
             await ReloadConfigAsync(ct).ConfigureAwait(false);
             var statusTask = QueryStatusAsync(ct);
             var refsTask = QueryRefsAsync(ct);
@@ -1164,7 +1167,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
             var worktreeOutput = await ExecuteAsync(GitCommands.WorktreeList(_toplevel), null, token).ConfigureAwait(false);
             Track(worktreeOutput);
             var worktrees = worktreeOutput.ExitCode == 0
-                ? WorktreeParser.Parse(Encoding.UTF8.GetString(worktreeOutput.Stdout))
+                ? HostWorktrees(WorktreeParser.Parse(Encoding.UTF8.GetString(worktreeOutput.Stdout)))
                 : Array.Empty<WorktreeEntry>();
             parsed = await ApplyLocalUpstreamAsync(parsed, token).ConfigureAwait(false);
             return new RefLoad(parsed, names, stashes, submodules, worktrees);
@@ -1449,7 +1452,35 @@ public sealed partial class RepositorySession : IAsyncDisposable
             Progress = progress,
             Environment = environment,
             StandardInput = standardInput,
+            Wsl = _wsl,
         }, cancellationToken);
+
+    private string? GitPath(string path) => _wsl is null ? null : WslPath.ToLinux(_wsl.Distribution, path);
+
+    private string HostPath(string path)
+    {
+        if (_wsl is null || string.IsNullOrWhiteSpace(path))
+            return path;
+        if (WslPath.IsWindowsAbsolute(path))
+            return WslPath.CanonicalWindows(path);
+        if (path.StartsWith('/'))
+            return WslPath.ToWindows(_wsl.Distribution, path);
+        return path;
+    }
+
+    private IReadOnlyList<WorktreeEntry> HostWorktrees(IReadOnlyList<WorktreeEntry> entries)
+    {
+        if (_wsl is null)
+            return entries;
+        var host = new WorktreeEntry[entries.Count];
+        for (var i = 0; i < entries.Count; i++)
+        {
+            var entry = entries[i];
+            host[i] = entry with { Path = HostPath(entry.Path) };
+        }
+
+        return host;
+    }
 
     private GitOutput Checked(GitOutput output)
     {

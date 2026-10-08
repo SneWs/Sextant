@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Windows git and WSL ssh call this helper. It is not built for macOS or Linux. -->
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Sextant.AskPass</RootNamespace>
+    <AssemblyName>Sextant.AskPass</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sextant.Git\Sextant.Git.csproj" />
+  </ItemGroup>
+
+  <Target Name="AskPassIsWindowsOnly" BeforeTargets="Restore;Build;Publish" Condition="!$([MSBuild]::IsOSPlatform('Windows'))">
+    <Error Text="Sextant.AskPass is only built on Windows." />
+  </Target>
+</Project>
