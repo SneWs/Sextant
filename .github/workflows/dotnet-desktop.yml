@@ -119,6 +119,18 @@ jobs:
     - name: Publish the application
       run: dotnet publish $env:Project_Path --configuration Release --runtime $env:Runtime --self-contained true --output $env:Publish_Directory "-p:Version=$env:SEXTANT_VERSION" "-p:InformationalVersion=$env:SEXTANT_VERSION" "-p:IncludeSourceRevisionInInformationalVersion=false"
 
+    - name: Check the published SSH prompt helper
+      shell: pwsh
+      run: |
+        $PSNativeCommandUseErrorActionPreference = $false
+        $env:SEXTANT_ASKPASS = ""
+        $helper = Join-Path $env:Publish_Directory "Sextant.AskPass.exe"
+        # Without a pipe, the helper must exit quietly with code 1, not fail to load.
+        $output = & $helper 2>&1
+        if ($LASTEXITCODE -ne 1 -or $output) {
+          throw "The published SSH prompt helper failed its startup check (exit $LASTEXITCODE): $output"
+        }
+
     - name: Sign the application
       shell: pwsh
       env:

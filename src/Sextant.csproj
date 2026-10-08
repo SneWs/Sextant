@@ -107,7 +107,7 @@
     <RemoveDir Directories="$(_AskPassStage)" />
     <MakeDir Directories="$(_AskPassStage)" />
     <Delete Files="$(MSBuildThisFileDirectory)Sextant.AskPass\obj\project.assets.json;$(MSBuildThisFileDirectory)Sextant.AskPass\obj\project.nuget.cache" />
-    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)Sextant.AskPass\Sextant.AskPass.csproj&quot; --configuration $(Configuration) --runtime $(RuntimeIdentifier) --self-contained true --output &quot;$(_AskPassStageCmd)&quot; -p:PublishSingleFile=false" />
+    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)Sextant.AskPass\Sextant.AskPass.csproj&quot; --configuration $(Configuration) --runtime $(RuntimeIdentifier) --self-contained true --output &quot;$(_AskPassStageCmd)&quot; -p:PublishSingleFile=false &quot;-p:Version=$(Version)&quot; &quot;-p:AssemblyVersion=$(AssemblyVersion)&quot; &quot;-p:FileVersion=$(FileVersion)&quot; &quot;-p:InformationalVersion=$(InformationalVersion)&quot; &quot;-p:IncludeSourceRevisionInInformationalVersion=$(IncludeSourceRevisionInInformationalVersion)&quot;" />
     <Error Condition="!Exists('$(_AskPassStage)Sextant.AskPass.exe')" Text="Sextant.AskPass.exe was not published." />
     <ItemGroup>
       <_AskPassPublished Include="$(_AskPassStage)Sextant.AskPass.exe" />
