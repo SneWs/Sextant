@@ -1,0 +1,64 @@
+#!/bin/bash
+# Packs a published linux-x64 self-contained build into a .deb for Ubuntu
+# and Debian. The app lives in /opt/Sextant, /usr/bin/Sextant is a symlink,
+# and the desktop file and icon go where the menu systems look for them.
+#
+# Usage: make-deb.sh <publish-dir> <version> <output-file>
+# The version is the imprint from resolve-version.sh, such as 0.1.3-beta.
+# dpkg accepts that shape: upstream 0.1.3, revision beta.
+set -euo pipefail
+
+publish_dir="${1:?Usage: make-deb.sh <publish-dir> <version> <output-file>}"
+version="${2:?Usage: make-deb.sh <publish-dir> <version> <output-file>}"
+output="${3:?Usage: make-deb.sh <publish-dir> <version> <output-file>}"
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+if [[ ! -x "$publish_dir/Sextant" ]]; then
+  echo "No executable Sextant in $publish_dir. Publish linux-x64 first." >&2
+  exit 1
+fi
+
+if [[ ! "$version" =~ ^[0-9] ]]; then
+  echo "A dpkg Version must start with a digit. Got: $version" >&2
+  exit 1
+fi
+
+stage="$(mktemp -d)"
+trap 'rm -rf "$stage"' EXIT
+pkg="$stage/pkg"
+
+install -d "$pkg/DEBIAN" "$pkg/opt/Sextant" "$pkg/usr/bin" \
+  "$pkg/usr/share/applications" "$pkg/usr/share/icons/hicolor/256x256/apps"
+
+cp -a "$publish_dir/." "$pkg/opt/Sextant/"
+ln -sf /opt/Sextant/Sextant "$pkg/usr/bin/Sextant"
+
+# The publish folder carries both files. Fall back to the sources.
+desktop="$publish_dir/sextant.desktop"
+[[ -f "$desktop" ]] || desktop="$repo_root/src/sextant.desktop"
+install -m 0644 "$desktop" "$pkg/usr/share/applications/sextant.desktop"
+
+icon="$publish_dir/sextant.png"
+[[ -f "$icon" ]] || icon="$repo_root/src/Assets/sextant.png"
+install -m 0644 "$icon" "$pkg/usr/share/icons/hicolor/256x256/apps/sextant.png"
+
+# The self-contained runtime links the system OpenSSL and zlib.
+cat > "$pkg/DEBIAN/control" << EOF
+Package: sextant
+Version: $version
+Section: vcs
+Priority: optional
+Architecture: amd64
+Maintainer: Marcus Grenängen <marcus@grenangen.se>
+Homepage: https://github.com/SneWs/Sextant
+Depends: libssl3 | libssl1.1, zlib1g
+Description: A Git client for large repositories
+ Sextant is a desktop Git client for large repositories,
+ built with Avalonia.
+EOF
+
+mkdir -p "$(dirname "$output")"
+rm -f "$output"
+dpkg-deb --root-owner-group --build "$pkg" "$output"
+echo "Built $output"
