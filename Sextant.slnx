@@ -9,5 +9,4 @@
   <Folder Name="/tests/">
     <Project Path="tests/Sextant.Git.Tests/Sextant.Git.Tests.csproj" />
   </Folder>
-  <Project Path="src/Sextant.AskPass/Sextant.AskPass.csproj" />
 </Solution>
