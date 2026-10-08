@@ -57,6 +57,13 @@
 # A push or a pull request to master runs only when src/ or tests/ changes.
 # workflow_dispatch still starts a build by hand, and a tag release is not
 # limited to those folders.
+#
+# The two Linux jobs publish the same self-contained linux-x64 app and pack
+# it twice: make-deb.sh builds a .deb for Ubuntu and Debian with dpkg-deb,
+# and make-rpm.sh builds an .rpm for Fedora with rpmbuild, which the rpm
+# package provides on the Ubuntu runner. Both install the app to
+# /opt/Sextant with a /usr/bin/Sextant symlink, the desktop file, and the
+# icon. The artifacts are Sextant-linux-x64.deb and Sextant-linux-x64.rpm.
 
 name: Build all Platforms
 
@@ -243,5 +250,125 @@ jobs:
       with:
         # archive: false ignores name and uses the filename as the artifact name.
         path: artifacts/Sextant-osx-arm64.tar
+        archive: false
+        if-no-files-found: error
+
+  build-linux-deb:
+    name: Linux deb x64
+    runs-on: ubuntu-latest
+
+    env:
+      Solution_Name: Sextant.slnx
+      Project_Path: src/Sextant.csproj
+      Publish_Directory: artifacts/linux-x64
+      Runtime: linux-x64
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Resolve the version from the tag
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+      run: bash src/tools/resolve-version.sh
+
+    - name: Install .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Execute unit tests
+      run: dotnet test "$Solution_Name" --configuration Release --verbosity normal
+
+    - name: Publish the application
+      run: dotnet publish "$Project_Path" --configuration Release --runtime "$Runtime" --self-contained true --output "$Publish_Directory" -p:Version="$SEXTANT_VERSION" -p:InformationalVersion="$SEXTANT_VERSION" -p:IncludeSourceRevisionInInformationalVersion=false
+
+    - name: Build the deb package
+      run: bash src/tools/make-deb.sh "$Publish_Directory" "$SEXTANT_VERSION" artifacts/Sextant-linux-x64.deb
+
+    - name: Check the deb package
+      run: |
+        set -euo pipefail
+        deb=artifacts/Sextant-linux-x64.deb
+        dpkg-deb --info "$deb" | grep -F "Version: $SEXTANT_VERSION"
+        contents="$(dpkg-deb --contents "$deb" | sed 's/ -> .*//' | awk '{ print $NF }')"
+        echo "$contents" | grep -F -x './opt/Sextant/Sextant'
+        echo "$contents" | grep -F -x './usr/bin/Sextant'
+        echo "$contents" | grep -F -x './usr/share/applications/sextant.desktop'
+        echo "$contents" | grep -F -x './usr/share/icons/hicolor/256x256/apps/sextant.png'
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v7
+      with:
+        # archive: false ignores name and uses the filename as the artifact name.
+        path: artifacts/Sextant-linux-x64.deb
+        archive: false
+        if-no-files-found: error
+
+  build-linux-rpm:
+    name: Linux rpm x64
+    runs-on: ubuntu-latest
+
+    env:
+      Solution_Name: Sextant.slnx
+      Project_Path: src/Sextant.csproj
+      Publish_Directory: artifacts/linux-x64
+      Runtime: linux-x64
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        fetch-tags: true
+
+    - name: Resolve the version from the tag
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+      run: bash src/tools/resolve-version.sh
+
+    - name: Install .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Execute unit tests
+      run: dotnet test "$Solution_Name" --configuration Release --verbosity normal
+
+    - name: Publish the application
+      run: dotnet publish "$Project_Path" --configuration Release --runtime "$Runtime" --self-contained true --output "$Publish_Directory" -p:Version="$SEXTANT_VERSION" -p:InformationalVersion="$SEXTANT_VERSION" -p:IncludeSourceRevisionInInformationalVersion=false
+
+    - name: Install rpm tooling
+      run: sudo apt-get update && sudo apt-get install -y rpm
+
+    - name: Build the rpm package
+      run: bash src/tools/make-rpm.sh "$Publish_Directory" "$SEXTANT_VERSION" artifacts/Sextant-linux-x64.rpm
+
+    - name: Check the rpm package
+      run: |
+        set -euo pipefail
+        rpm=artifacts/Sextant-linux-x64.rpm
+        query="$(rpm -qp --queryformat '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' "$rpm")"
+        ver="${SEXTANT_VERSION%%-*}"
+        rel="1"
+        if [[ "$SEXTANT_VERSION" == *-* ]]; then
+          rel="${SEXTANT_VERSION#*-}"
+        fi
+        if [[ "$query" != "sextant $ver $rel x86_64" ]]; then
+          echo "Unexpected rpm metadata: $query (expected sextant $ver $rel x86_64)" >&2
+          exit 1
+        fi
+        rpm -qpl "$rpm" | grep -F -x '/opt/Sextant/Sextant'
+        rpm -qpl "$rpm" | grep -F -x '/usr/bin/Sextant'
+        rpm -qpl "$rpm" | grep -F -x '/usr/share/applications/sextant.desktop'
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v7
+      with:
+        # archive: false ignores name and uses the filename as the artifact name.
+        path: artifacts/Sextant-linux-x64.rpm
         archive: false
         if-no-files-found: error

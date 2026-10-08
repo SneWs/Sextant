@@ -1,8 +1,9 @@
 # Publishes a GitHub release when a tag named like v0.1.1 or v0.1.3-beta is pushed.
-# The Windows and macOS builds stay in dotnet-desktop.yml. This workflow
+# The Windows, macOS, and Linux builds stay in dotnet-desktop.yml. This workflow
 # passes that tag as the version. The leading v only selects the workflow;
-# the build imprints the rest. It then attaches Sextant-osx-arm64.tar and
-# Sextant-win-x64.zip. Branch pushes and pull requests do not run this workflow.
+# the build imprints the rest. It then attaches Sextant-osx-arm64.tar,
+# Sextant-win-x64.zip, Sextant-linux-x64.deb, and Sextant-linux-x64.rpm.
+# Branch pushes and pull requests do not run this workflow.
 
 name: Release
 
@@ -71,6 +72,18 @@ jobs:
             exit 1
             ;;
         esac
+        deb="$(find release-artifacts -type f -name 'Sextant-linux-x64.deb' -print -quit)"
+        if [[ -z "$deb" ]]; then
+          echo "The deb package was not in the downloaded artifacts." >&2
+          exit 1
+        fi
+        cp "$deb" dist/Sextant-linux-x64.deb
+        rpm_pkg="$(find release-artifacts -type f -name 'Sextant-linux-x64.rpm' -print -quit)"
+        if [[ -z "$rpm_pkg" ]]; then
+          echo "The rpm package was not in the downloaded artifacts." >&2
+          exit 1
+        fi
+        cp "$rpm_pkg" dist/Sextant-linux-x64.rpm
 
     - name: Publish the GitHub release
       env:
@@ -85,15 +98,19 @@ jobs:
 
         - **macOS arm64:** `Sextant-osx-arm64.tar`. Extract with `tar -xf Sextant-osx-arm64.tar`, then open `Sextant.app`.
         - **Windows x64:** `Sextant-win-x64.zip`. Extract it and run `Sextant.exe`.
+        - **Ubuntu/Debian x64:** `Sextant-linux-x64.deb`. Install with `sudo apt install ./Sextant-linux-x64.deb`.
+        - **Fedora x64:** `Sextant-linux-x64.rpm`. Install with `sudo dnf install ./Sextant-linux-x64.rpm`.
         EOF
         if gh release view "$tag" >/dev/null 2>&1; then
-          gh release upload "$tag" dist/Sextant-osx-arm64.tar dist/Sextant-win-x64.zip --clobber
+          gh release upload "$tag" dist/Sextant-osx-arm64.tar dist/Sextant-win-x64.zip dist/Sextant-linux-x64.deb dist/Sextant-linux-x64.rpm --clobber
         else
           gh release create "$tag" \
             --title "Sextant $tag" \
             --notes-file "$notes" \
             dist/Sextant-osx-arm64.tar \
-            dist/Sextant-win-x64.zip
+            dist/Sextant-win-x64.zip \
+            dist/Sextant-linux-x64.deb \
+            dist/Sextant-linux-x64.rpm
           generated="$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases/generate-notes" -f tag_name="$tag" --jq .body 2>/dev/null || true)"
           if [[ -n "$generated" ]]; then
             {
