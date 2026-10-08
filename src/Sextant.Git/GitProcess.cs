@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
+using Sextant.Git.AskPass;
+using Sextant.Git.Wsl;
 
 namespace Sextant.Git;
 

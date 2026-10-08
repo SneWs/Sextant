@@ -5,6 +5,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Sextant.Git;
+using Sextant.Git.Repo;
 using Sextant.Services;
 using Sextant.ViewModels;
 using Sextant.Views;

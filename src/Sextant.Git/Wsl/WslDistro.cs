@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Sextant.Git;
+namespace Sextant.Git.Wsl;
 
 public sealed record WslDistro(string Name, string State, bool IsDefault, int Version);
 

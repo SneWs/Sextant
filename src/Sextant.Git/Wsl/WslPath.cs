@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Sextant.Git;
+namespace Sextant.Git.Wsl;
 
 /// <summary>
 /// Maps a WSL distribution's files between the Linux path git sees and the

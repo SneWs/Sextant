@@ -1,4 +1,4 @@
-namespace Sextant.Git;
+namespace Sextant.Git.Staging;
 
 public static class HunkPatch
 {

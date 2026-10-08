@@ -1,5 +1,7 @@
 using System.Text;
+using Sextant.Git.Models;
 using Sextant.Git.Parsing;
+using Sextant.Git.Repo;
 
 namespace Sextant.Git.Tests;
 

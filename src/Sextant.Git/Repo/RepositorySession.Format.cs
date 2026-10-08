@@ -1,7 +1,9 @@
 using System.Text;
+using Sextant.Git.Diff;
+using Sextant.Git.Models;
 using Sextant.Git.Parsing;
 
-namespace Sextant.Git;
+namespace Sextant.Git.Repo;
 
 public sealed partial class RepositorySession
 {

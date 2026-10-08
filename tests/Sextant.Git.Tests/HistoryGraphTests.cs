@@ -8,6 +8,7 @@ using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
 using Sextant.Controls;
 using Sextant.Git;
+using Sextant.Git.Models;
 using Sextant.Services;
 using Sextant.ViewModels;
 using Sextant.Views;

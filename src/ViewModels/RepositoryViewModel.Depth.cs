@@ -7,6 +7,9 @@ using Sextant.Git;
 using Sextant.Git.Parsing;
 using System.Text;
 using System.Windows.Input;
+using Sextant.Git.Diff;
+using Sextant.Git.Models;
+using Sextant.Git.Repo;
 
 namespace Sextant.ViewModels;
 

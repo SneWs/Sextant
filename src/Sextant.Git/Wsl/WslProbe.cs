@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 
-namespace Sextant.Git;
+namespace Sextant.Git.Wsl;
 
 public sealed record WslRepository(
     string Distribution,

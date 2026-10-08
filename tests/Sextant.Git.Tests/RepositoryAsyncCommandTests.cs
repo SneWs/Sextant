@@ -3,6 +3,8 @@ using Avalonia.Headless;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
+using Sextant.Git.Models;
+using Sextant.Git.Repo;
 using Sextant.Services;
 using Sextant.ViewModels;
 

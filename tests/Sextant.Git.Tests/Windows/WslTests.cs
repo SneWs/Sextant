@@ -1,4 +1,5 @@
 using System.Text;
+using Sextant.Git.Wsl;
 
 namespace Sextant.Git.Tests;
 
@@ -53,15 +54,15 @@ public class WslTests
     public void Windows_and_linux_paths_round_trip_for_one_distribution()
     {
         var linux = "/home/user/repo";
-        var windows = WslPath.ToWindows("Ubuntu", linux);
+        var windows = Wsl.WslPath.ToWindows("Ubuntu", linux);
         Assert.Equal(@"\\wsl.localhost\Ubuntu\home\user\repo", windows);
-        Assert.True(WslPath.TryParseUnc(@"\\wsl$\Ubuntu\home\user\repo", out var distribution, out var parsed));
+        Assert.True(Wsl.WslPath.TryParseUnc(@"\\wsl$\Ubuntu\home\user\repo", out var distribution, out var parsed));
         Assert.Equal("Ubuntu", distribution);
         Assert.Equal(linux, parsed);
-        Assert.Equal(windows, WslPath.CanonicalWindows(@"\\wsl$\Ubuntu\home\user\repo"));
-        Assert.Equal(linux, WslPath.ToLinux("Ubuntu", windows));
-        Assert.Equal("/mnt/c/Users/me/Temp/msg", WslPath.ToLinux("Ubuntu", @"C:\Users\me\Temp\msg"));
-        Assert.Equal(@"C:\Users\me\Temp\msg", WslPath.ToWindows("Ubuntu", "/mnt/c/Users/me/Temp/msg"));
+        Assert.Equal(windows, Wsl.WslPath.CanonicalWindows(@"\\wsl$\Ubuntu\home\user\repo"));
+        Assert.Equal(linux, Wsl.WslPath.ToLinux("Ubuntu", windows));
+        Assert.Equal("/mnt/c/Users/me/Temp/msg", Wsl.WslPath.ToLinux("Ubuntu", @"C:\Users\me\Temp\msg"));
+        Assert.Equal(@"C:\Users\me\Temp\msg", Wsl.WslPath.ToWindows("Ubuntu", "/mnt/c/Users/me/Temp/msg"));
     }
 
     [Fact]

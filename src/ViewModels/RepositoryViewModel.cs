@@ -10,6 +10,10 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text;
 using System.Windows.Input;
+using Sextant.Git.Diff;
+using Sextant.Git.Models;
+using Sextant.Git.Repo;
+using Sextant.Git.Wsl;
 
 namespace Sextant.ViewModels;
 

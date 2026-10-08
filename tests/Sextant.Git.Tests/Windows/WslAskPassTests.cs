@@ -1,3 +1,6 @@
+using Sextant.Git.AskPass;
+using Sextant.Git.Wsl;
+
 namespace Sextant.Git.Tests;
 
 public class WslAskPassTests

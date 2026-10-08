@@ -1,7 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Sextant.Git.Diff;
+using Sextant.Git.Repo;
 
-namespace Sextant.Git;
+namespace Sextant.Git.Workspace;
 
 public sealed class WorkspaceState
 {

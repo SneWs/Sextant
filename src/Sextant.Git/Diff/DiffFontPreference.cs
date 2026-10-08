@@ -1,4 +1,4 @@
-namespace Sextant.Git;
+namespace Sextant.Git.Diff;
 
 /// <summary>The font used for diff text and the merge editor. Empty means the built-in stack.</summary>
 public static class DiffFontPreference

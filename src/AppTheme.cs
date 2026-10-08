@@ -4,6 +4,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
 using Sextant.Git;
+using Sextant.Git.Workspace;
 
 namespace Sextant;
 

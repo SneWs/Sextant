@@ -1,9 +1,10 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using Sextant.Git.Models;
 using Sextant.Git.Parsing;
 
-namespace Sextant.Git;
+namespace Sextant.Git.Diff;
 
 /// <summary>
 /// One file extension converted before a diff, and restored when a merge of that type is saved.

@@ -2,6 +2,8 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Sextant.Git;
+using Sextant.Git.AskPass;
+using Sextant.Git.Workspace;
 using Sextant.Services;
 using Sextant.ViewModels;
 using Sextant.Views;

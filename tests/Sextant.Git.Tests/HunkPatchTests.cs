@@ -1,3 +1,5 @@
+using Sextant.Git.Staging;
+
 namespace Sextant.Git.Tests;
 
 public class HunkPatchTests

@@ -6,6 +6,10 @@ using Sextant.Git.Parsing;
 using Sextant.Services;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using Sextant.Git.Diff;
+using Sextant.Git.Repo;
+using Sextant.Git.Workspace;
+using Sextant.Git.Wsl;
 
 namespace Sextant.ViewModels;
 

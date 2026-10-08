@@ -1,3 +1,5 @@
+using Sextant.Git.Wsl;
+
 namespace Sextant.Git;
 
 public sealed class GitOutput

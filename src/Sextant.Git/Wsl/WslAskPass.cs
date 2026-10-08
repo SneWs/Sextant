@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Text;
+using Sextant.Git.AskPass;
 
-namespace Sextant.Git;
+namespace Sextant.Git.Wsl;
 
 /// <summary>
 /// WSL ssh cannot prompt, and a Windows executable started from the distribution

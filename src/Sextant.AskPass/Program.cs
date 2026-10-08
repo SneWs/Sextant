@@ -1,5 +1,6 @@
 using System.Text;
 using Sextant.Git;
+using Sextant.Git.AskPass;
 
 // Console helper for SSH_ASKPASS. ssh reads the passphrase from this process's stdout.
 // A GUI subsystem executable does not give ssh a reliable stdout handle.

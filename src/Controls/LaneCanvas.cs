@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
 using Sextant.Git;
+using Sextant.Git.Models;
 
 namespace Sextant.Controls;
 

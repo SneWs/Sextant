@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Sextant.Git.Models;
 
 namespace Sextant.Git.Parsing;
 

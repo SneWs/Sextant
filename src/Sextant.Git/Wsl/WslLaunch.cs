@@ -1,4 +1,4 @@
-namespace Sextant.Git;
+namespace Sextant.Git.Wsl;
 
 /// <summary>
 /// Git inside one WSL2 distribution. Commands run as that distribution's default

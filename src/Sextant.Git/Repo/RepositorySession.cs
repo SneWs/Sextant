@@ -1,7 +1,12 @@
 using System.Text;
+using Sextant.Git.Diff;
+using Sextant.Git.Graph;
+using Sextant.Git.Models;
 using Sextant.Git.Parsing;
+using Sextant.Git.Staging;
+using Sextant.Git.Wsl;
 
-namespace Sextant.Git;
+namespace Sextant.Git.Repo;
 
 public sealed partial class RepositorySession : IAsyncDisposable
 {
@@ -750,7 +755,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
 
     public Task ApplyLineAsync(string rawPatch, int hunkIndex, int lineIndex, bool reverse, CancellationToken cancellationToken)
     {
-        var patch = LinePatch.Slice(rawPatch, hunkIndex, lineIndex);
+        var patch = Staging.LinePatch.Slice(rawPatch, hunkIndex, lineIndex);
         if (patch is null)
             throw new InvalidOperationException("That line cannot be staged on its own.");
         return ApplyPatchTextAsync(patch, reverse, cancellationToken);
@@ -1455,16 +1460,16 @@ public sealed partial class RepositorySession : IAsyncDisposable
             Wsl = _wsl,
         }, cancellationToken);
 
-    private string? GitPath(string path) => _wsl is null ? null : WslPath.ToLinux(_wsl.Distribution, path);
+    private string? GitPath(string path) => _wsl is null ? null : Wsl.WslPath.ToLinux(_wsl.Distribution, path);
 
     private string HostPath(string path)
     {
         if (_wsl is null || string.IsNullOrWhiteSpace(path))
             return path;
-        if (WslPath.IsWindowsAbsolute(path))
-            return WslPath.CanonicalWindows(path);
+        if (Wsl.WslPath.IsWindowsAbsolute(path))
+            return Wsl.WslPath.CanonicalWindows(path);
         if (path.StartsWith('/'))
-            return WslPath.ToWindows(_wsl.Distribution, path);
+            return Wsl.WslPath.ToWindows(_wsl.Distribution, path);
         return path;
     }
 

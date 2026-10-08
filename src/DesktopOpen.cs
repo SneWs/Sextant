@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Sextant.Git;
+using Sextant.Git.Repo;
 
 namespace Sextant;
 

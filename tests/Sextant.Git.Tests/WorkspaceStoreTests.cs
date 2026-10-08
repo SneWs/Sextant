@@ -1,3 +1,6 @@
+using Sextant.Git.Diff;
+using Sextant.Git.Workspace;
+
 namespace Sextant.Git.Tests;
 
 public class WorkspaceStoreTests

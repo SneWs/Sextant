@@ -4,7 +4,9 @@ using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Sextant;
 using Sextant.Git;
+using Sextant.Git.Diff;
 using Sextant.Git.Parsing;
+using Sextant.Git.Workspace;
 using Sextant.Services;
 
 namespace Sextant.Views;

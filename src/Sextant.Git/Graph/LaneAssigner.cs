@@ -1,4 +1,6 @@
-namespace Sextant.Git;
+using Sextant.Git.Models;
+
+namespace Sextant.Git.Graph;
 
 public sealed class LaneAssigner
 {

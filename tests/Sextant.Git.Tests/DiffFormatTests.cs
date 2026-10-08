@@ -1,4 +1,7 @@
+using Sextant.Git.Diff;
 using Sextant.Git.Parsing;
+using Sextant.Git.Repo;
+using Sextant.Git.Workspace;
 
 namespace Sextant.Git.Tests;
 

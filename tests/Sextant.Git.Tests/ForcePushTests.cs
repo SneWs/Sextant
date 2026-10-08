@@ -1,3 +1,5 @@
+using Sextant.Git.Repo;
+
 namespace Sextant.Git.Tests;
 
 public class ForcePushTests

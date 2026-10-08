@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Sextant.Git;
+namespace Sextant.Git.Staging;
 
 /// <summary>
 /// Builds a one-change patch from a single added or removed line inside a hunk.

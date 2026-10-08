@@ -5,6 +5,8 @@ using Sextant.Git;
 using Sextant.Git.Parsing;
 using System.Globalization;
 using System.Text;
+using Sextant.Git.Diff;
+using Sextant.Git.Models;
 
 namespace Sextant.ViewModels;
 

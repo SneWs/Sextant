@@ -3,6 +3,8 @@ using Avalonia.Headless;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Sextant.Git;
+using Sextant.Git.Repo;
+using Sextant.Git.Workspace;
 using Sextant.ViewModels;
 using Sextant.Views;
 

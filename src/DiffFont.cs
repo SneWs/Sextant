@@ -5,6 +5,7 @@ using Avalonia.Media;
 using Avalonia.VisualTree;
 using AvaloniaEdit;
 using Sextant.Git;
+using Sextant.Git.Diff;
 
 namespace Sextant;
 

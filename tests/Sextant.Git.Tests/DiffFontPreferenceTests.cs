@@ -4,6 +4,7 @@ using Sextant;
 using Avalonia.Headless;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
+using Sextant.Git.Diff;
 
 namespace Sextant.Git.Tests;
 

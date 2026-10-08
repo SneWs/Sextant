@@ -2,6 +2,7 @@ using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sextant.Git;
+using Sextant.Git.Models;
 
 namespace Sextant.ViewModels;
 

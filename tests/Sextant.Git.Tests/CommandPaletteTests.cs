@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Sextant.Git;
+using Sextant.Git.Workspace;
 using Sextant.ViewModels;
 using Sextant.Views;
 

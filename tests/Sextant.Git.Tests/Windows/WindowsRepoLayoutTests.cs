@@ -1,3 +1,5 @@
+using Sextant.Git.Workspace;
+
 namespace Sextant.Git.Tests;
 
 public class WindowsRepoLayoutTests

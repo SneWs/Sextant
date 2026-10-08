@@ -1,4 +1,4 @@
-namespace Sextant.Git;
+namespace Sextant.Git.AskPass;
 
 /// <summary>
 /// SSH passphrases kept for one Sextant process. Nothing is written to disk.

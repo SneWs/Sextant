@@ -1,4 +1,5 @@
 using System.Globalization;
+using Sextant.Git.Models;
 using Sextant.Git.Parsing;
 
 namespace Sextant.Git;

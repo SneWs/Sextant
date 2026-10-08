@@ -1,3 +1,5 @@
+using Sextant.Git.Models;
+
 namespace Sextant.Git;
 
 public static class PerformanceAdvisor

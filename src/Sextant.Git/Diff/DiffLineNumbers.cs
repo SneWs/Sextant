@@ -1,4 +1,6 @@
-namespace Sextant.Git;
+using Sextant.Git.Models;
+
+namespace Sextant.Git.Diff;
 
 /// <summary>
 /// Line numbers for one hunk. A start of 0, which git uses for a new or deleted side, stays blank.

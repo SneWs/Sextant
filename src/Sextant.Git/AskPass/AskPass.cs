@@ -2,7 +2,7 @@ using System.Buffers.Binary;
 using System.IO.Pipes;
 using System.Text;
 
-namespace Sextant.Git;
+namespace Sextant.Git.AskPass;
 
 public enum AskPassKind : byte
 {

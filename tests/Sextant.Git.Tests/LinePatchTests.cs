@@ -16,7 +16,7 @@ public class LinePatchTests
              line3
             +line4
             """;
-        var sliced = LinePatch.Slice(patch.Replace("\r\n", "\n", StringComparison.Ordinal), 0, 4);
+        var sliced = Staging.LinePatch.Slice(patch.Replace("\r\n", "\n", StringComparison.Ordinal), 0, 4);
         Assert.NotNull(sliced);
         Assert.Contains("@@ -1,3 +1,4 @@", sliced, StringComparison.Ordinal);
         Assert.Contains("+line4", sliced, StringComparison.Ordinal);

@@ -8,6 +8,7 @@ using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using Sextant.Git;
+using Sextant.Git.Models;
 using Sextant.Views;
 
 namespace Sextant.Services;

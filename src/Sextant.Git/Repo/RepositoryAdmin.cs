@@ -1,4 +1,6 @@
-namespace Sextant.Git;
+using Sextant.Git.Wsl;
+
+namespace Sextant.Git.Repo;
 
 public static class RepositoryAdmin
 {

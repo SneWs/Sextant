@@ -1,4 +1,6 @@
 using Sextant.Git;
+using Sextant.Git.Diff;
+using Sextant.Git.Models;
 using Sextant.ViewModels;
 
 namespace Sextant.Services;

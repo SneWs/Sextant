@@ -38,9 +38,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Sextant.Git\Sextant.Git.csproj" />
-    <ProjectReference Include="..\..\src\Sextant.csproj" />
-    <Content Include="Fixtures\box.fbx" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Fixtures\animation.fbx" CopyToOutputDirectory="PreserveNewest" />
+    <ProjectReference Include="../../src/Sextant.Git/Sextant.Git.csproj" />
+    <ProjectReference Include="../../src/Sextant.csproj" />
+    <Content Include="Fixtures/box.fbx" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Fixtures/animation.fbx" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

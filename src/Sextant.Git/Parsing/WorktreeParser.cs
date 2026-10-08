@@ -1,3 +1,5 @@
+using Sextant.Git.Models;
+
 namespace Sextant.Git.Parsing;
 
 public static class WorktreeParser

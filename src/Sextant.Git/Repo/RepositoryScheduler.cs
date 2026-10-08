@@ -1,4 +1,4 @@
-namespace Sextant.Git;
+namespace Sextant.Git.Repo;
 
 public sealed class RepositoryScheduler : IDisposable
 {

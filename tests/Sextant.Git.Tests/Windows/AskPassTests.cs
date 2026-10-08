@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Sextant.Git.AskPass;
 
 namespace Sextant.Git.Tests;
 

@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Sextant.Git;
+using Sextant.Git.AskPass;
 using Sextant.ViewModels;
 
 namespace Sextant.Services;
