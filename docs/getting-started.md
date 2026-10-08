@@ -2,14 +2,16 @@
 
 Sextant does not ship its own Git. Clone, commit, push, hooks, and Git LFS all go through the `git` on your machine. Install Git before you open a repository. Install Git LFS as well when a repository stores large files that way.
 
-Published builds are on the [releases page](https://github.com/SneWs/Sextant/releases). Each tagged release has two downloads:
+Published builds are on the [releases page](https://github.com/SneWs/Sextant/releases). Each tagged release has four downloads:
 
 | Platform | File | What you run |
 | --- | --- | --- |
 | macOS Apple silicon | `Sextant-osx-arm64.tar` | `Sextant.app` |
 | Windows x64 | `Sextant-win-x64.zip` | `Sextant.exe` |
+| Ubuntu/Debian x64 | `Sextant-linux-x64.deb` | `Sextant` on `PATH` |
+| Fedora x64 | `Sextant-linux-x64.rpm` | `Sextant` on `PATH` |
 
-There is no Intel macOS build and no Windows ARM build. Linux has no download on that page. Build it from source, described at the end of this page.
+There is no Intel macOS build and no Windows ARM build, and the Linux packages are x64 only. You can also build Linux from source, described at the end of this page.
 
 Installing a release from that page is free, and so is a build you make from source. The terms are in the [license](../LICENSE).
 
@@ -58,13 +60,33 @@ Download `Sextant-win-x64.zip`, extract the whole zip, and run `Sextant.exe`. Ke
 
 To update, quit Sextant, download the new zip, and replace that folder. Settings stay in `%APPDATA%\Sextant`, which is `C:\Users\<you>\AppData\Roaming\Sextant`.
 
-On Windows 11, Sextant also looks for WSL2. When a distribution is installed, File → Open from WSL, and the empty window, offer that distribution. The folder comes from the distribution. That tab runs the distribution's `git`, so it uses that install's config, hooks, and credential helpers. A folder opened from `\\wsl.localhost\` or `\\wsl$\` is treated the same way. Windows Git is still used for repositories that live on Windows. A WSL or Windows git command can ask for the SSH key passphrase in a window. A checkbox on that window keeps it for later prompts in that repository, including Git LFS, until Sextant closes. It is not written to disk.
+A WSL or Windows git command can ask for the SSH key passphrase in a window. A checkbox on that window keeps it for later prompts in that repository, including Git LFS, until Sextant closes. It is not written to disk.
+
+## WSL (Windows only)
+
+On Windows 11, Sextant also looks for WSL2. When a distribution is installed, File → Open from WSL, and the empty window, offer that distribution. The folder comes from the distribution. That tab runs the distribution's `git`, so it uses that install's config, hooks, and credential helpers. A folder opened from `\\wsl.localhost\` or `\\wsl$\` is treated the same way. Windows Git is still used for repositories that live on Windows.
 
 ## Linux
 
 Install `git` and `git-lfs` from your distribution, then run `git lfs install` once.
 
-The release page does not publish a Linux archive. From a clone of this repository, with the [.NET 10 SDK](https://dotnet.microsoft.com/download) installed:
+Download the package for your distribution from the releases page and install it. The package puts the app in `/opt/Sextant`, links `Sextant` onto `PATH`, and installs the desktop entry and icon for the application menus.
+
+Ubuntu and Debian:
+
+```bash
+sudo apt install ./Sextant-linux-x64.deb
+```
+
+Fedora:
+
+```bash
+sudo dnf install ./Sextant-linux-x64.rpm
+```
+
+To update, install the new package the same way. Settings stay in `$XDG_CONFIG_HOME/sextant`, or `~/.config/sextant` when `XDG_CONFIG_HOME` is unset.
+
+You can also build from source. From a clone of this repository, with the [.NET 10 SDK](https://dotnet.microsoft.com/download) installed:
 
 ```bash
 dotnet publish src/Sextant.csproj -c Release
@@ -72,14 +94,13 @@ dotnet publish src/Sextant.csproj -c Release
 
 The publish output includes `sextant.desktop` and the Sextant icon next to the executable. The first launch copies that desktop file into `~/.local/share/applications`, or `$XDG_DATA_HOME/applications` when that variable is set, if a copy is not already there. The copied entry points at the executable you launched.
 
-To update a build you published yourself, quit Sextant and replace that folder. Settings stay in `$XDG_CONFIG_HOME/sextant`, or `~/.config/sextant` when `XDG_CONFIG_HOME` is unset.
+To update a build you published yourself, quit Sextant and replace that folder.
 
 ## First launch
 
-The empty window offers Open, Clone, and Init. On Windows 11 it also offers Open from WSL when a WSL2 distribution is installed.
+The empty window offers Open, Clone, and Init. On Windows 11, with a WSL2 distribution installed, it also offers Open from WSL; see [WSL (Windows only)](#wsl-windows-only).
 
 - **Open** chooses a folder that is already a Git repository.
-- **Open from WSL** chooses a WSL2 distribution, then a folder inside it. That tab uses the distribution's Git.
 - **Clone** copies a remote repository into a new folder and opens it. The remote URL and credentials are handled by your Git credential helper, the same way `git clone` works in a terminal.
 - **Init** creates a new repository in a folder you choose.
 
