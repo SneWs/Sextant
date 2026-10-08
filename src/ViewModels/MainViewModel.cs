@@ -102,6 +102,10 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     /// <summary>Branch, stash, and the other repository commands need an open tab that is not busy.</summary>
     public bool CanRunRepositoryCommands => ActiveTab is { CanRunCommands: true };
 
+    public bool CanStash => ActiveTab is { CanStash: true };
+
+    public bool CanPopLatestStash => ActiveTab is { CanPopLatestStash: true };
+
     public bool HasStatusText => !string.IsNullOrWhiteSpace(StatusText);
 
     public bool HasActiveTab => ActiveTab is not null;
@@ -285,8 +289,15 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
     private Task CreateBranch() => ActiveTab?.CreateBranch() ?? Task.CompletedTask;
 
-    [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
-    private Task Stash() => ActiveTab?.StashCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+    [RelayCommand(CanExecute = nameof(CanStash))]
+    private Task Stash() => ActiveTab is { } tab && tab.StashCommand.CanExecute(null)
+        ? tab.StashCommand.ExecuteAsync(null)
+        : Task.CompletedTask;
+
+    [RelayCommand(CanExecute = nameof(CanPopLatestStash))]
+    private Task PopLatestStash() => ActiveTab is { } tab && tab.PopLatestStashCommand.CanExecute(null)
+        ? tab.PopLatestStashCommand.ExecuteAsync(null)
+        : Task.CompletedTask;
 
     [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
     private Task AddRemote() => ActiveTab?.AddRemoteCommand.ExecuteAsync(null) ?? Task.CompletedTask;
@@ -413,7 +424,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     private void OnMenuTabChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is not (nameof(RepositoryViewModel.CanRunCommands) or nameof(RepositoryViewModel.IsBusy)))
+        if (e.PropertyName is not (nameof(RepositoryViewModel.CanRunCommands) or nameof(RepositoryViewModel.IsBusy)
+            or nameof(RepositoryViewModel.CanStash) or nameof(RepositoryViewModel.CanPopLatestStash)))
             return;
         OnPropertyChanged(nameof(CanRunRepositoryCommands));
         NotifyRepositoryCommands();
@@ -421,8 +433,11 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     private void NotifyRepositoryCommands()
     {
+        OnPropertyChanged(nameof(CanStash));
+        OnPropertyChanged(nameof(CanPopLatestStash));
         CreateBranchCommand.NotifyCanExecuteChanged();
         StashCommand.NotifyCanExecuteChanged();
+        PopLatestStashCommand.NotifyCanExecuteChanged();
         AddRemoteCommand.NotifyCanExecuteChanged();
         AddWorktreeCommand.NotifyCanExecuteChanged();
         ApplyPatchCommand.NotifyCanExecuteChanged();
@@ -953,7 +968,10 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _palette.Add(new PaletteItem { Title = "Create branch", Run = tab.CreateBranch });
             _palette.Add(new PaletteItem { Title = "Merge branch", Run = tab.MergeFromPalette });
             _palette.Add(new PaletteItem { Title = "Search history", Run = () => { tab.ToggleHistorySearchCommand.Execute(null); return Task.CompletedTask; } });
-            _palette.Add(new PaletteItem { Title = "Stash", Run = () => tab.StashCommand.ExecuteAsync(null) });
+            if (CanStash)
+                _palette.Add(new PaletteItem { Title = "Stash", Run = () => StashCommand.ExecuteAsync(null) });
+            if (CanPopLatestStash)
+                _palette.Add(new PaletteItem { Title = "Pop latest stash", Run = () => PopLatestStashCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Add remote", Run = () => tab.AddRemoteCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Add worktree", Run = () => tab.AddWorktreeCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Apply patch", Run = () => tab.ApplyPatchCommand.ExecuteAsync(null) });

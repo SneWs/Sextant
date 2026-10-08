@@ -348,6 +348,7 @@ public partial class RepositoryViewModel : ViewModelBase
     private async Task DisposeCoreAsync()
     {
         _lifetime.Cancel();
+        NotifyStashCommands();
         _operation?.Cancel();
         _details?.Cancel();
         _watcher?.Dispose();
@@ -646,6 +647,7 @@ public partial class RepositoryViewModel : ViewModelBase
         OnPropertyChanged(nameof(ShowBranchStatus));
         NotifyBulkStage();
         NotifyRepositoryFileCommands();
+        NotifyStashCommands();
     }
 
     partial void OnShowAheadBehindChanged(bool value) => OnPropertyChanged(nameof(ShowBranchStatus));
@@ -1131,6 +1133,11 @@ public partial class RepositoryViewModel : ViewModelBase
             SparseCheckout = state.SparseCheckout;
             IsConflicted = state.Sequencer != SequencerKind.None;
             var unmerged = state.Entries.Any(entry => entry.Kind == ChangeKind.Unmerged);
+            _hasUnmergedFiles = unmerged;
+            _hasStashableChanges = !state.Branch.Unborn
+                && state.Entries.Any(entry => entry.Kind != ChangeKind.Untracked && (entry.Staged || entry.Unstaged));
+            _latestStash = state.Stashes.FirstOrDefault();
+            NotifyStashCommands();
             _amendAllowed = !state.Branch.Unborn
                 && (state.Sequencer == SequencerKind.None || (state.Sequencer == SequencerKind.Rebase && !unmerged));
             ConflictText = state.Sequencer switch

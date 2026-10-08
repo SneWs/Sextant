@@ -247,8 +247,30 @@ public partial class RepositoryViewModel
         return RunAsync("Loading history…", ct => _session.SetHistoryAsync(null, ct));
     }
 
-    [RelayCommand]
+    private bool _hasStashableChanges;
+    private bool _hasUnmergedFiles;
+    private StashEntry? _latestStash;
+
+    public bool CanStash => _session is not null && !IsBusy && !_lifetime.IsCancellationRequested
+        && !_hasUnmergedFiles && _hasStashableChanges;
+
+    public bool CanPopLatestStash => _session is not null && !IsBusy && !_lifetime.IsCancellationRequested
+        && !_hasUnmergedFiles && _latestStash is not null;
+
+    private void NotifyStashCommands()
+    {
+        OnPropertyChanged(nameof(CanStash));
+        OnPropertyChanged(nameof(CanPopLatestStash));
+        StashCommand.NotifyCanExecuteChanged();
+        PopLatestStashCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanStash))]
     private Task Stash() => StashAsync();
+
+    [RelayCommand(CanExecute = nameof(CanPopLatestStash))]
+    private Task PopLatestStash() =>
+        CanPopLatestStash && _latestStash is { } stash ? PopStashAsync(stash) : Task.CompletedTask;
 
     [RelayCommand]
     private Task AddRemote() => AddRemoteAsync();
@@ -321,14 +343,14 @@ public partial class RepositoryViewModel
 
     private Task StashAsync()
     {
-        if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)
+        if (!CanStash || _host.Dialogs is not { } dialogs)
             return Task.CompletedTask;
         return HoldFocus(async () =>
         {
             var message = await dialogs.PromptAsync("Stash", "Stash message. Leave it blank to let git describe the stash.", allowEmpty: true);
-            if (message is null || _session is null)
+            if (message is null || !CanStash)
                 return;
-            await RunAsync("Stashing…", ct => _session.StashPushAsync(message, ct));
+            await RunAsync("Stashing…", ct => Session.StashPushAsync(message, ct));
         });
     }
 

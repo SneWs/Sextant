@@ -75,6 +75,8 @@ The working-copy list is grouped into Conflicts, then Staged, then Unstaged. Emp
 
 Stage all, Unstage all, and Discard all are in the command palette. Discard all asks before it restores tracked files and removes untracked files.
 
+Stash saves changes to tracked files with Ctrl+S (Command+S on macOS). It is unavailable when there are no tracked changes to save, before the first commit, or while files have unresolved conflicts. Untracked files are left alone. Ctrl+Shift+S (Command+Shift+S) pops the latest stash after confirmation. Pop is unavailable when there is no stash or files have unresolved conflicts. Both actions are in the Repository menu and appear in the command palette when available.
+
 The commit box is above the file list. Write the message and press Commit, or Ctrl+Enter (Command+Enter). The commit menu also offers Commit without hooks, and Amend. Amend replaces the tip message and keeps unstaged work unstaged. Nothing staged leaves Commit disabled, and the box says so.
 
 On a past commit, that area shows the SHA, author, date, and the size of the change instead of a message you can edit.
@@ -132,7 +134,8 @@ The command key is Command on macOS and Ctrl on Windows and Linux, except where 
 | Search history | Command/Ctrl+F |
 | Commit | Command/Ctrl+Enter |
 | Create branch | Command/Ctrl+B |
-| Stash | Command/Ctrl+Shift+S |
+| Stash | Command/Ctrl+S |
+| Pop latest stash | Command/Ctrl+Shift+S |
 | Close tab | Command/Ctrl+W |
 | Next tab | Ctrl+Tab |
 | Refresh | F5 |

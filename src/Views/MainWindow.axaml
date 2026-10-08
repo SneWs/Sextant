@@ -39,7 +39,8 @@
             <NativeMenuItem Header="_Repository" IsEnabled="{Binding HasActiveTab}">
                 <NativeMenu>
                     <NativeMenuItem Header="_Branch…" Command="{Binding CreateBranchCommand}" Gesture="{app:CommandGesture Key=B}"/>
-                    <NativeMenuItem Header="_Stash…" Command="{Binding StashCommand}" Gesture="{app:CommandGesture Key=S, Shift=True}"/>
+                    <NativeMenuItem Header="_Stash…" Command="{Binding StashCommand}" Gesture="{app:CommandGesture Key=S}"/>
+                    <NativeMenuItem Header="_Pop latest stash…" Command="{Binding PopLatestStashCommand}" Gesture="{app:CommandGesture Key=S, Shift=True}"/>
                     <NativeMenuItem Header="Add _remote…" Command="{Binding AddRemoteCommand}"/>
                     <NativeMenuItem Header="Add _worktree…" Command="{Binding AddWorktreeCommand}"/>
                     <NativeMenuItem Header="Apply _patch…" Command="{Binding ApplyPatchCommand}"/>

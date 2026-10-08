@@ -214,11 +214,19 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (AppGestures.Matches(e, Key.S, KeyModifiers.Shift) && vm.ActiveTab is { } stashTab)
+        if (AppGestures.Matches(e, Key.S))
         {
             e.Handled = true;
-            if (stashTab.CanRunCommands)
-                await stashTab.StashCommand.ExecuteAsync(null);
+            if (vm.StashCommand.CanExecute(null))
+                await vm.StashCommand.ExecuteAsync(null);
+            return;
+        }
+
+        if (AppGestures.Matches(e, Key.S, KeyModifiers.Shift))
+        {
+            e.Handled = true;
+            if (vm.PopLatestStashCommand.CanExecute(null))
+                await vm.PopLatestStashCommand.ExecuteAsync(null);
             return;
         }
 
