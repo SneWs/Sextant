@@ -17,6 +17,14 @@
         <Style Selector="SplitButton.commit /template/ Button#PART_PrimaryButton">
             <Setter Property="IsEnabled" Value="{Binding CanCommit}"/>
         </Style>
+        <Style Selector="SplitButton.compact /template/ Button#PART_PrimaryButton">
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="MinWidth" Value="0"/>
+        </Style>
+        <Style Selector="SplitButton.compact /template/ ToggleButton#PART_FlyoutToggle">
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Padding" Value="3,0"/>
+        </Style>
         <Style Selector="Button.viewtab">
             <Setter Property="Theme" Value="{StaticResource FlatButton}"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -76,7 +84,7 @@
                 <ColumnDefinition Width="Auto" SharedSizeGroup="BranchEnds"/>
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button x:Name="SidebarToggleButton" Classes="locationsearch" Padding="7,0" MinWidth="0" Height="26"
+                <Button x:Name="SidebarToggleButton" Classes="locationsearch" Padding="7,0" MinWidth="0" MinHeight="26" Height="26"
                         Command="{Binding ToggleLocationsCommand}"
                         Classes.pressed="{Binding ShowLocations}"
                         ToolTip.Tip="Toggle locations" VerticalAlignment="Center"
@@ -90,8 +98,8 @@
                 </Button>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6">
-                <SplitButton x:Name="StashSplitButton" Command="{Binding StashCommand}" VerticalAlignment="Center"
-                             Padding="7,0" MinWidth="0" Height="26" ToolTip.Tip="Stash changes"
+                <SplitButton x:Name="StashSplitButton" Classes="compact" Command="{Binding StashCommand}" VerticalAlignment="Center"
+                             Padding="7,0" MinWidth="0" MinHeight="26" Height="26" ToolTip.Tip="Stash changes"
                              AutomationProperties.Name="Stash">
                     <Canvas Width="14" Height="14">
                         <Polygon Points="7,1.5 12.5,4.4 7,7.3 1.5,4.4"
@@ -132,7 +140,7 @@
                                TextTrimming="CharacterEllipsis" MaxWidth="400"/>
                 </Grid>
                 </Border>
-                <Button x:Name="HistorySearchToggleButton" Classes="locationsearch" Padding="7,0" MinWidth="0" Height="26"
+                <Button x:Name="HistorySearchToggleButton" Classes="locationsearch" Padding="7,0" MinWidth="0" MinHeight="26" Height="26"
                         Command="{Binding ToggleHistorySearchCommand}"
                         Classes.pressed="{Binding ShowHistorySearch}"
                         ToolTip.Tip="Search history" VerticalAlignment="Center"
@@ -147,8 +155,8 @@
                 </Button>
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Panel.ZIndex="1">
-                <SplitButton x:Name="PullSplitButton" Command="{Binding PullCommand}" IsEnabled="{Binding CanRunCommands}"
-                             Padding="7,0" MinWidth="0" Height="26" ToolTip.Tip="Pull"
+                <SplitButton x:Name="PullSplitButton" Classes="compact" Command="{Binding PullCommand}" IsEnabled="{Binding CanRunCommands}"
+                             Padding="7,0" MinWidth="0" MinHeight="26" Height="26" ToolTip.Tip="Pull"
                              AutomationProperties.Name="Pull">
                     <Canvas Width="14" Height="14">
                         <Line StartPoint="7,1.5" EndPoint="7,10"
@@ -171,8 +179,8 @@
                         </MenuFlyout>
                     </SplitButton.Flyout>
                 </SplitButton>
-                <SplitButton x:Name="PushSplitButton" Command="{Binding PushCommand}" Margin="6,0,0,0" IsEnabled="{Binding CanRunCommands}"
-                             Padding="7,0" MinWidth="0" Height="26" ToolTip.Tip="Push"
+                <SplitButton x:Name="PushSplitButton" Classes="compact" Command="{Binding PushCommand}" Margin="6,0,0,0" IsEnabled="{Binding CanRunCommands}"
+                             Padding="7,0" MinWidth="0" MinHeight="26" Height="26" ToolTip.Tip="Push"
                              AutomationProperties.Name="Push">
                     <Canvas Width="14" Height="14">
                         <Line StartPoint="7,4" EndPoint="7,12.5"
@@ -452,6 +460,21 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
             </DockPanel>
+
+            <!-- Floating pill over the graph while the history is (re)loading. -->
+            <Border x:Name="HistoryLoadingOverlay" Grid.Row="1" ZIndex="2"
+                    IsVisible="{Binding IsLoadingHistory}" IsHitTestVisible="False"
+                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Padding="12,8" CornerRadius="8" Opacity="0.94"
+                    Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                    BorderThickness="1"
+                    AutomationProperties.Name="Loading history">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <controls:LoadingSpinner Width="18" Height="18" VerticalAlignment="Center"/>
+                    <TextBlock Text="Loading history…" VerticalAlignment="Center" FontSize="12" Opacity="0.8"/>
+                </StackPanel>
+            </Border>
 
                 <Grid Grid.Row="1" RowDefinitions="Auto,*" IsVisible="{Binding RepositoryFilesTabOn}">
                     <TextBlock Text="Repository files" FontWeight="SemiBold" Margin="8,0,4,4"

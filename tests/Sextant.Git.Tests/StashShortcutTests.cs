@@ -327,7 +327,7 @@ public class StashShortcutTests
     [Fact]
     public async Task Toolbar_exposes_stash_split_button_and_search_toggle()
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var session = HeadlessUnitTestSession.StartNew(typeof(App));
         using var repo = new TempRepo();
         repo.WriteFile("a.txt", "base\n");
         repo.CommitAll("first");
@@ -337,20 +337,25 @@ public class StashShortcutTests
         {
             var dialogs = new StashDialogs();
             var (vm, tab) = await Open(repo, dialogs);
-            var window = new MainWindow { DataContext = vm, Width = 1000, Height = 700 };
+            var view = new RepositoryView { DataContext = tab, Width = 1000, Height = 700 };
+            var window = new Window { Content = view, Width = 1000, Height = 700 };
             try
             {
                 window.Show();
                 await vm.InitializeAsync();
                 vm.Attach(dialogs);
-                window.UpdateLayout();
+                view.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
                 var until = DateTime.UtcNow.AddSeconds(5);
                 while (tab.IsBusy && DateTime.UtcNow < until)
+                {
                     await Task.Delay(30);
+                    Dispatcher.UIThread.RunJobs();
+                }
                 Assert.False(tab.IsBusy);
+                view.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
 
-                var view = window.GetVisualDescendants().OfType<RepositoryView>().Single();
                 var stash = view.GetVisualDescendants().OfType<SplitButton>().Single(button => button.Name == "StashSplitButton");
                 var search = view.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "HistorySearchToggleButton");
                 var pull = view.GetVisualDescendants().OfType<SplitButton>().Single(button => button.Name == "PullSplitButton");
@@ -360,8 +365,11 @@ public class StashShortcutTests
                 Assert.NotEmpty(pull.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Polyline>());
                 Assert.NotEmpty(push.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Polyline>());
                 var pullFlyout = Assert.IsType<MenuFlyout>(pull.Flyout);
+                pullFlyout.ShowAt(pull);
+                Dispatcher.UIThread.RunJobs();
                 var pullRebase = pullFlyout.Items.OfType<MenuItem>().Single(item => item.Header as string == "Pull with rebase");
                 Assert.Same(tab.PullRebaseCommand, pullRebase.Command);
+                pullFlyout.Hide();
                 var sidebar = view.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "SidebarToggleButton");
                 Assert.Same(tab.ToggleLocationsCommand, sidebar.Command);
                 Assert.Equal(stash.Bounds.Height, sidebar.Bounds.Height);
@@ -384,12 +392,15 @@ public class StashShortcutTests
                 Assert.NotEmpty(stash.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Polygon>());
                 Assert.True(stash.Bounds.Width <= 60, $"stash button too wide: {stash.Bounds.Width}");
                 var flyout = Assert.IsType<MenuFlyout>(stash.Flyout);
+                flyout.ShowAt(stash);
+                Dispatcher.UIThread.RunJobs();
                 Assert.Equal(
                     new[] { "Stash…", "Stash (include untracked)", "Stash (keep index)", "Stash (staged)" },
                     flyout.Items.OfType<MenuItem>().Select(item => item.Header as string));
                 Assert.Same(tab.StashUntrackedCommand, flyout.Items.OfType<MenuItem>().ElementAt(1).Command);
                 Assert.Same(tab.StashKeepIndexCommand, flyout.Items.OfType<MenuItem>().ElementAt(2).Command);
                 Assert.Same(tab.StashStagedCommand, flyout.Items.OfType<MenuItem>().ElementAt(3).Command);
+                flyout.Hide();
 
                 Assert.False(tab.ShowHistorySearch);
                 Assert.Same(tab.ToggleHistorySearchCommand, search.Command);
@@ -399,11 +410,22 @@ public class StashShortcutTests
                 Assert.True(tab.ShowHistorySearch);
                 search.Command.Execute(null);
                 Assert.False(tab.ShowHistorySearch);
+
+                var overlay = view.GetVisualDescendants().OfType<Border>().Single(border => border.Name == "HistoryLoadingOverlay");
+                Assert.False(overlay.IsVisible);
+                tab.IsLoadingHistory = true;
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(overlay.IsVisible);
+                Assert.NotEmpty(overlay.GetVisualDescendants().OfType<Sextant.Controls.LoadingSpinner>());
+                tab.IsLoadingHistory = false;
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(overlay.IsVisible);
             }
             finally
             {
                 await vm.Shutdown();
             }
+            return 0;
         }, CancellationToken.None);
     }
 

@@ -242,6 +242,10 @@ public partial class RepositoryViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool CanCancel { get; set; }
 
+    /// <summary>True while the history graph is (re)loading; drives the spinner overlay.</summary>
+    [ObservableProperty]
+    public partial bool IsLoadingHistory { get; set; }
+
     [ObservableProperty]
     public partial string BusyText { get; set; } = "";
 
@@ -1630,7 +1634,7 @@ public partial class RepositoryViewModel : ViewModelBase
                 RebaseCommand = new AsyncRelayCommand(() => RebaseOntoAsync(name)),
                 DeleteCommand = new AsyncRelayCommand(() => DeleteNamedAsync(name)),
                 SetUpstreamCommand = new AsyncRelayCommand(() => SetUpstreamNamedAsync(name)),
-                RevealCommand = new AsyncRelayCommand(() => RevealAsync(branch.Oid)),
+                RevealCommand = new AsyncRelayCommand(() => RevealAsync(branch.Oid, name)),
                 HideCommand = new AsyncRelayCommand(() => ToggleHiddenAsync(branch.Name)),
                 HideOthersCommand = new AsyncRelayCommand(() => HideOthersAsync(branch.Name)),
                 ShowAllBranchesCommand = new AsyncRelayCommand(ShowAllBranchesAsync),
@@ -1670,7 +1674,7 @@ public partial class RepositoryViewModel : ViewModelBase
                     LabelOpacity = hidden ? 0.45 : 1,
                     CheckoutCommand = new AsyncRelayCommand(() => RunAsync("Checking out…", ct => Session.SwitchTrackAsync(name, ct))),
                     DeleteCommand = new AsyncRelayCommand(() => DeleteRemoteBranchAsync(remoteName, branchName)),
-                    RevealCommand = new AsyncRelayCommand(() => RevealAsync(remote.Oid)),
+                    RevealCommand = new AsyncRelayCommand(() => RevealAsync(remote.Oid, name)),
                     HideCommand = new AsyncRelayCommand(() => ToggleHiddenAsync(remote.Name)),
                     HideOthersCommand = new AsyncRelayCommand(() => HideOthersAsync(remote.Name)),
                     ShowAllBranchesCommand = new AsyncRelayCommand(ShowAllBranchesAsync),
@@ -1692,7 +1696,7 @@ public partial class RepositoryViewModel : ViewModelBase
                 SearchText = name,
                 Oid = tag.Oid,
                 ShowTag = true,
-                RevealCommand = new AsyncRelayCommand(() => RevealAsync(tag.Oid)),
+                RevealCommand = new AsyncRelayCommand(() => RevealAsync(tag.Oid, name)),
                 CreateBranchFromTagCommand = new AsyncRelayCommand(() => CreateBranchFromTagAsync(name)),
                 CheckoutTagCommand = new AsyncRelayCommand(() => CheckoutTagAsync(name)),
                 PushTagCommand = new AsyncRelayCommand(() => PushTagAsync(name)),
@@ -2102,12 +2106,13 @@ public partial class RepositoryViewModel : ViewModelBase
         });
     }
 
-    private async Task RevealAsync(string oid)
+    private async Task RevealAsync(string oid, string? revision = null)
     {
         if (_session is null || _lifetime.IsCancellationRequested)
             return;
         using var pending = new PendingRepositoryWork(this);
         RepositoryFilesTabOn = false;
+        IsLoadingHistory = true;
         try
         {
             for (var attempt = 0; attempt < 12; attempt++)
@@ -2135,12 +2140,33 @@ public partial class RepositoryViewModel : ViewModelBase
 
             var row = Rows.FirstOrDefault(candidate => string.Equals(candidate.Sha, oid, StringComparison.OrdinalIgnoreCase));
             if (row is null)
+            {
+                // The commit sits outside the loaded graph, for example on a hidden branch.
+                // Load history up to it instead of failing, the way a revision search would.
+                await _session.SetHistoryAsync(new HistoryQuery(string.IsNullOrEmpty(revision) ? oid : revision, null, null, null, false, false), _lifetime.Token);
+                Apply(_session.Snapshot());
+                row = Rows.FirstOrDefault(candidate => string.Equals(candidate.Sha, oid, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (row is null)
                 Fail("That commit is not in the loaded history.");
             else
                 SelectedGraphRow = row;
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
+        }
+        catch (GitCommandFailedException exception)
+        {
+            Fail(exception.Message);
+        }
+        catch (RepositoryActionException exception)
+        {
+            Fail(exception.Message);
+        }
+        finally
+        {
+            IsLoadingHistory = false;
         }
     }
 
@@ -2171,6 +2197,7 @@ public partial class RepositoryViewModel : ViewModelBase
             return;
         using var pending = new PendingRepositoryWork(this);
         _loadingMore = true;
+        IsLoadingHistory = true;
         try
         {
             await _session.LoadMoreHistoryAsync(pastCap, _lifetime.Token);
@@ -2186,6 +2213,7 @@ public partial class RepositoryViewModel : ViewModelBase
         finally
         {
             _loadingMore = false;
+            IsLoadingHistory = false;
         }
     }
 

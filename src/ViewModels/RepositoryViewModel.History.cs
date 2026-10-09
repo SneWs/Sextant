@@ -216,11 +216,25 @@ public partial class RepositoryViewModel
         return wasRange ? LoadDetailsAsync() : Task.CompletedTask;
     }
 
+    /// <summary>Runs a history reload with the graph spinner up on top of the busy text.</summary>
+    private async Task<bool> RunHistoryLoadAsync(string label, Func<CancellationToken, Task> action)
+    {
+        IsLoadingHistory = true;
+        try
+        {
+            return await RunAsync(label, action);
+        }
+        finally
+        {
+            IsLoadingHistory = false;
+        }
+    }
+
     [RelayCommand]
     private Task SearchHistory()
     {
         var query = HistoryQueryParser.Parse(HistoryText);
-        return RunAsync("Searching…", ct => _session!.SetHistoryAsync(query.IsEmpty ? null : query, ct));
+        return RunHistoryLoadAsync("Searching…", ct => _session!.SetHistoryAsync(query.IsEmpty ? null : query, ct));
     }
 
     /// <summary>
@@ -237,7 +251,7 @@ public partial class RepositoryViewModel
         HasHistoryQuery = false;
         HasHistoryFilter = false;
         HistoryCaption = "";
-        return RunAsync("Loading history…", ct => _session.SetHistoryAsync(null, ct));
+        return RunHistoryLoadAsync("Loading history…", ct => _session.SetHistoryAsync(null, ct));
     }
 
     /// <summary>Leaves file history or a search. Hidden branches stay hidden.</summary>
@@ -246,7 +260,7 @@ public partial class RepositoryViewModel
     {
         if (_session is null || !HasHistoryQuery)
             return Task.CompletedTask;
-        return RunAsync("Loading history…", ct => _session.SetHistoryAsync(null, ct));
+        return RunHistoryLoadAsync("Loading history…", ct => _session.SetHistoryAsync(null, ct));
     }
 
     private bool _hasStashableChanges;
@@ -361,7 +375,7 @@ public partial class RepositoryViewModel
     private Task ShowFileHistoryAsync(string path)
     {
         RepositoryFilesTabOn = false;
-        return RunAsync("Loading file history…", ct => _session!.SetHistoryAsync(HistoryQuery.ForPath(path), ct));
+        return RunHistoryLoadAsync("Loading file history…", ct => _session!.SetHistoryAsync(HistoryQuery.ForPath(path), ct));
     }
 
     private Task StashAsync(string label, bool includeUntracked, bool keepIndex, bool staged)
