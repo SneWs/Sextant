@@ -35,6 +35,7 @@ public sealed class DiffTextHost : Grid
 
     private readonly List<TextEditor> _editors = [];
     private readonly List<TextMate.Installation> _grammars = [];
+    private Dispatcher? _fontDispatcher;
     private DiffEditorRow? _built;
     private bool _scrollPosted;
 
@@ -111,6 +112,7 @@ public sealed class DiffTextHost : Grid
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
+        _fontDispatcher = Dispatcher.UIThread;
         ActualThemeVariantChanged += OnTheme;
         DiffFont.Changed += OnFontChanged;
         if (_editors.Count == 0)
@@ -132,6 +134,9 @@ public sealed class DiffTextHost : Grid
 
     private void OnFontChanged()
     {
+        // Ignore changes raised while a different (torn-down) session's dispatcher is current.
+        if (!ReferenceEquals(Dispatcher.UIThread, _fontDispatcher))
+            return;
         var family = DiffFont.Current;
         foreach (var editor in _editors)
         {

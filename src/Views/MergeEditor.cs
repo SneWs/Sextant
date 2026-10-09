@@ -6,6 +6,7 @@ using Avalonia.Styling;
 using Avalonia.Data;
 using Avalonia.Media;
 using Avalonia.Media.Immutable;
+using Avalonia.Threading;
 using AvaloniaEdit;
 using AvaloniaEdit.Document;
 using AvaloniaEdit.Rendering;
@@ -41,6 +42,7 @@ public sealed class MergeEditor : Grid
     private readonly TextBlock _baseHeader;
     private readonly Border _baseRule;
     private readonly List<TextMate.Installation> _grammars = [];
+    private Dispatcher? _fontDispatcher;
     private readonly List<Mark> _oursMarks = [];
     private readonly List<Mark> _resultMarks = [];
     private readonly List<Mark> _theirsMarks = [];
@@ -136,6 +138,7 @@ public sealed class MergeEditor : Grid
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
+        _fontDispatcher = Dispatcher.UIThread;
         ActualThemeVariantChanged += OnTheme;
         DiffFont.Changed += OnFontChanged;
         ApplyChrome();
@@ -162,6 +165,9 @@ public sealed class MergeEditor : Grid
 
     private void OnFontChanged()
     {
+        // Ignore changes raised while a different (torn-down) session's dispatcher is current.
+        if (!ReferenceEquals(Dispatcher.UIThread, _fontDispatcher))
+            return;
         var family = DiffFont.Current;
         foreach (var editor in Editors)
         {

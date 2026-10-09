@@ -43,7 +43,7 @@ public class DiffFontPreferenceTests
     [Fact]
     public async Task Applying_a_font_updates_an_open_text_block()
     {
-        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var session = HeadlessUnitTestSession.StartNew(typeof(App));
         await session.Dispatch(() =>
         {
             var app = Application.Current!;
@@ -52,10 +52,14 @@ public class DiffFontPreferenceTests
             var text = new TextBlock { Text = "diff", Classes = { "diff" } };
             text.Bind(TextBlock.FontFamilyProperty, new DynamicResourceExtension(DiffFont.ResourceKey));
             text.Bind(TextBlock.FontSizeProperty, new DynamicResourceExtension(DiffFont.SizeKey));
-            var window = new Window { Content = text, Width = 240, Height = 80 };
+            // A live RepositoryView in the same window takes the guarded OnFontChanged path.
+            var view = new Sextant.Views.RepositoryView { Width = 400, Height = 300 };
+            var root = new StackPanel { Children = { text, view } };
+            var window = new Window { Content = root, Width = 480, Height = 380 };
             window.Show();
 
             DiffFont.Apply("Consolas", 18);
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
 
             Assert.Contains("Consolas", text.FontFamily?.Name, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("Consolas", DiffFont.Current.Name, StringComparison.OrdinalIgnoreCase);
@@ -64,4 +68,5 @@ public class DiffFontPreferenceTests
             window.Close();
         }, CancellationToken.None);
     }
+
 }

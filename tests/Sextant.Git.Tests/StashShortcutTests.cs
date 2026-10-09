@@ -423,6 +423,7 @@ public class StashShortcutTests
             }
             finally
             {
+                window.Close();
                 await vm.Shutdown();
             }
             return 0;

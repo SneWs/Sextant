@@ -31,6 +31,7 @@ public partial class RepositoryView : UserControl
     private string _appliedCommandLog = "";
     private bool _sideScrollHooked;
     private bool _sideScrollQueued;
+    private Dispatcher? _fontDispatcher;
     private bool _resetSideScroll;
     private double _charWidth;
 
@@ -59,6 +60,7 @@ public partial class RepositoryView : UserControl
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
+        _fontDispatcher = Dispatcher.UIThread;
         DiffFont.Changed += OnFontChanged;
     }
 
@@ -71,11 +73,17 @@ public partial class RepositoryView : UserControl
     private void OnFontChanged()
     {
         _charWidth = 0;
+        // A view left attached by a torn-down headless session must not post into the
+        // current session's dispatcher; its jobs would run on the wrong thread at teardown.
+        if (!ReferenceEquals(Dispatcher.UIThread, _fontDispatcher))
+            return;
         Dispatcher.UIThread.Post(RefreshFontLayout, DispatcherPriority.Background);
     }
 
     private void RefreshFontLayout()
     {
+        if (!Dispatcher.UIThread.CheckAccess())
+            return;
         foreach (var panel in DiffList.GetVisualDescendants().OfType<DiffVirtualizingPanel>())
             panel.ResetHeights();
         UpdateSideScroll();
@@ -419,6 +427,8 @@ public partial class RepositoryView : UserControl
     /// </summary>
     private void UpdateSideScroll()
     {
+        if (!Dispatcher.UIThread.CheckAccess())
+            return;
         if (DataContext is not RepositoryViewModel { SideBySide: true, ShowingDiff: true })
         {
             HideSideScroll();
