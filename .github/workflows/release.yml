@@ -2,7 +2,7 @@
 # The Windows, macOS, and Linux builds stay in dotnet-desktop.yml. This workflow
 # passes that tag as the version. The leading v only selects the workflow;
 # the build imprints the rest. It then attaches Sextant-osx-arm64.tar,
-# Sextant-win-x64.zip, Sextant-linux-x64.deb, and Sextant-linux-x64.rpm.
+# Sextant-win-x64.zip, and x64/arm64 Linux deb and rpm packages.
 # Branch pushes and pull requests do not run this workflow.
 
 name: Release
@@ -72,18 +72,17 @@ jobs:
             exit 1
             ;;
         esac
-        deb="$(find release-artifacts -type f -name 'Sextant-linux-x64.deb' -print -quit)"
-        if [[ -z "$deb" ]]; then
-          echo "The deb package was not in the downloaded artifacts." >&2
-          exit 1
-        fi
-        cp "$deb" dist/Sextant-linux-x64.deb
-        rpm_pkg="$(find release-artifacts -type f -name 'Sextant-linux-x64.rpm' -print -quit)"
-        if [[ -z "$rpm_pkg" ]]; then
-          echo "The rpm package was not in the downloaded artifacts." >&2
-          exit 1
-        fi
-        cp "$rpm_pkg" dist/Sextant-linux-x64.rpm
+        for arch in x64 arm64; do
+          for format in deb rpm; do
+            filename="Sextant-linux-$arch.$format"
+            package="$(find release-artifacts -type f -name "$filename" -print -quit)"
+            if [[ -z "$package" ]]; then
+              echo "$filename was not in the downloaded artifacts." >&2
+              exit 1
+            fi
+            cp "$package" "dist/$filename"
+          done
+        done
 
     - name: Publish the GitHub release
       env:
@@ -99,10 +98,12 @@ jobs:
         - **macOS arm64:** `Sextant-osx-arm64.tar`. Extract with `tar -xf Sextant-osx-arm64.tar`, then open `Sextant.app`.
         - **Windows x64:** `Sextant-win-x64.zip`. Extract it and run `Sextant.exe`.
         - **Ubuntu/Debian x64:** `Sextant-linux-x64.deb`. Install with `sudo apt install ./Sextant-linux-x64.deb`.
+        - **Ubuntu/Debian arm64:** `Sextant-linux-arm64.deb`. Install with `sudo apt install ./Sextant-linux-arm64.deb`.
         - **Fedora x64:** `Sextant-linux-x64.rpm`. Install with `sudo dnf install ./Sextant-linux-x64.rpm`.
+        - **Fedora aarch64:** `Sextant-linux-arm64.rpm`. Install with `sudo dnf install ./Sextant-linux-arm64.rpm`.
         EOF
         if gh release view "$tag" >/dev/null 2>&1; then
-          gh release upload "$tag" dist/Sextant-osx-arm64.tar dist/Sextant-win-x64.zip dist/Sextant-linux-x64.deb dist/Sextant-linux-x64.rpm --clobber
+          gh release upload "$tag" dist/Sextant-osx-arm64.tar dist/Sextant-win-x64.zip dist/Sextant-linux-{x64,arm64}.{deb,rpm} --clobber
         else
           gh release create "$tag" \
             --title "Sextant $tag" \
@@ -110,7 +111,9 @@ jobs:
             dist/Sextant-osx-arm64.tar \
             dist/Sextant-win-x64.zip \
             dist/Sextant-linux-x64.deb \
-            dist/Sextant-linux-x64.rpm
+            dist/Sextant-linux-x64.rpm \
+            dist/Sextant-linux-arm64.deb \
+            dist/Sextant-linux-arm64.rpm
           generated="$(gh api --method POST "repos/${GITHUB_REPOSITORY}/releases/generate-notes" -f tag_name="$tag" --jq .body 2>/dev/null || true)"
           if [[ -n "$generated" ]]; then
             {

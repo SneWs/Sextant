@@ -1,10 +1,10 @@
 #!/bin/bash
-# Packs a published linux-x64 self-contained build into an .rpm for Fedora.
+# Packs a published Linux self-contained build into an .rpm for Fedora.
 # Same layout as make-deb.sh: /opt/Sextant, a /usr/bin/Sextant symlink,
 # the desktop file, and the icon. rpmbuild comes from the rpm package on
 # Ubuntu runners and ships with Fedora.
 #
-# Usage: make-rpm.sh <publish-dir> <version> <output-file>
+# Usage: make-rpm.sh <publish-dir> <version> <output-file> [linux-x64|linux-arm64]
 # An rpm Version cannot hold a hyphen, so 0.1.3-beta splits into
 # Version 0.1.3 and Release beta.
 set -euo pipefail
@@ -12,12 +12,22 @@ set -euo pipefail
 publish_dir="${1:?Usage: make-rpm.sh <publish-dir> <version> <output-file>}"
 version="${2:?Usage: make-rpm.sh <publish-dir> <version> <output-file>}"
 output="${3:?Usage: make-rpm.sh <publish-dir> <version> <output-file>}"
+runtime="${4:-linux-x64}"
+
+case "$runtime" in
+  linux-x64) architecture=x86_64 ;;
+  linux-arm64) architecture=aarch64 ;;
+  *)
+    echo "Unsupported runtime: $runtime (expected linux-x64 or linux-arm64)." >&2
+    exit 1
+    ;;
+esac
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 publish_dir="$(realpath "$publish_dir")"
 
 if [[ ! -x "$publish_dir/Sextant" ]]; then
-  echo "No executable Sextant in $publish_dir. Publish linux-x64 first." >&2
+  echo "No executable Sextant in $publish_dir. Publish $runtime first." >&2
   exit 1
 fi
 
@@ -50,7 +60,7 @@ Release: $rel
 Summary: A Git client for large repositories
 License: Sextant License
 URL: https://github.com/SneWs/Sextant
-BuildArch: x86_64
+BuildArch: $architecture
 # The self-contained runtime links the system OpenSSL and zlib.
 Requires: openssl-libs, zlib
 
@@ -77,7 +87,7 @@ install -m 0644 -D "$icon" %{buildroot}/usr/share/icons/hicolor/256x256/apps/sex
 - Packaged from the CI publish.
 EOF
 
-rpmbuild --define "_topdir $top" -bb "$top/SPECS/sextant.spec" --target x86_64
+rpmbuild --define "_topdir $top" -bb "$top/SPECS/sextant.spec" --target "$architecture"
 
 built="$(find "$top/RPMS" -name 'sextant-*.rpm' -type f | head -1)"
 if [[ -z "$built" ]]; then

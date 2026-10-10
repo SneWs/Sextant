@@ -2,16 +2,18 @@
 
 Sextant does not ship its own Git. Clone, commit, push, hooks, and Git LFS all go through the `git` on your machine. Install Git before you open a repository. Install Git LFS as well when a repository stores large files that way.
 
-Published builds are on the [releases page](https://github.com/SneWs/Sextant/releases). Each tagged release has four downloads:
+Published builds are on the [releases page](https://github.com/SneWs/Sextant/releases). Each tagged release has six downloads:
 
 | Platform | File | What you run |
 | --- | --- | --- |
 | macOS Apple silicon | `Sextant-osx-arm64.tar` | `Sextant.app` |
 | Windows x64 | `Sextant-win-x64.zip` | `Sextant.exe` |
 | Ubuntu/Debian x64 | `Sextant-linux-x64.deb` | `Sextant` on `PATH` |
+| Ubuntu/Debian arm64 | `Sextant-linux-arm64.deb` | `Sextant` on `PATH` |
 | Fedora x64 | `Sextant-linux-x64.rpm` | `Sextant` on `PATH` |
+| Fedora aarch64 | `Sextant-linux-arm64.rpm` | `Sextant` on `PATH` |
 
-There is no Intel macOS build and no Windows ARM build, and the Linux packages are x64 only. You can also build Linux from source, described at the end of this page.
+There is no Intel macOS build and no Windows ARM build. You can also build Linux from source, described at the end of this page.
 
 Installing a release from that page is free, and so is a build you make from source. The terms are in the [license](../LICENSE).
 
@@ -78,11 +80,13 @@ Ubuntu and Debian:
 sudo apt install ./Sextant-linux-x64.deb
 ```
 
-Fedora:
+On arm64 Ubuntu/Debian, use `Sextant-linux-arm64.deb` instead. Fedora:
 
 ```bash
 sudo dnf install ./Sextant-linux-x64.rpm
 ```
+
+On aarch64 Fedora, use `Sextant-linux-arm64.rpm` instead.
 
 To update, install the new package the same way. Settings stay in `$XDG_CONFIG_HOME/sextant`, or `~/.config/sextant` when `XDG_CONFIG_HOME` is unset.
 
