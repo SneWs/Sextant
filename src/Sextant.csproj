@@ -26,20 +26,20 @@
 
   <ItemGroup>
     <PackageReference Include="AssimpNetter" Version="6.0.5" />
-    <PackageReference Include="Avalonia" Version="12.1.3" />
+    <PackageReference Include="Avalonia" Version="12.1.4" />
     <PackageReference Include="Avalonia.AvaloniaEdit" Version="12.0.0" />
     <PackageReference Include="AvaloniaEdit.TextMate" Version="12.0.0" />
-    <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
     <!-- X11-on-XWayland does not see the compositor scale. Opt in; X11 stays the fallback. -->
-    <PackageReference Include="Avalonia.Wayland" Version="12.1.3" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Wayland" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.4" />
     <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3">
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
     <!-- Runtime XAML loader for user theme files. Compiled XAML does not need it. -->
-    <PackageReference Include="Avalonia.Markup.Xaml.Loader" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Markup.Xaml.Loader" Version="12.1.4" />
     <PackageReference Include="BitMiracle.LibTiff.NET" Version="2.4.660" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <!-- Svg.Skia 5 pulls SkiaSharp 4. Pin the managed package and the Linux native together; Avalonia.Skia still brings the 3.119 Linux native. -->
