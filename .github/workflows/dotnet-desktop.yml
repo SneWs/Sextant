@@ -58,12 +58,10 @@
 # workflow_dispatch still starts a build by hand, and a tag release is not
 # limited to those folders.
 #
-# The two Linux jobs publish the same self-contained linux-x64 app and pack
-# it twice: make-deb.sh builds a .deb for Ubuntu and Debian with dpkg-deb,
-# and make-rpm.sh builds an .rpm for Fedora with rpmbuild, which the rpm
-# package provides on the Ubuntu runner. Both install the app to
-# /opt/Sextant with a /usr/bin/Sextant symlink, the desktop file, and the
-# icon. The artifacts are Sextant-linux-x64.deb and Sextant-linux-x64.rpm.
+# The two Linux jobs publish self-contained linux-x64 and linux-arm64 apps on
+# native runners and pack each: make-deb.sh builds a .deb for Ubuntu and Debian,
+# and make-rpm.sh builds an .rpm for Fedora with rpmbuild. Both install the app
+# to /opt/Sextant with a /usr/bin/Sextant symlink, desktop file, and icon.
 
 name: Build all Platforms
 
@@ -254,14 +252,23 @@ jobs:
         if-no-files-found: error
 
   build-linux-deb:
-    name: Linux deb x64
-    runs-on: ubuntu-latest
+    name: Linux deb ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-latest
+            package_arch: amd64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            package_arch: arm64
 
     env:
       Solution_Name: Sextant.slnx
       Project_Path: src/Sextant.csproj
-      Publish_Directory: artifacts/linux-x64
-      Runtime: linux-x64
+      Publish_Directory: artifacts/linux-${{ matrix.arch }}
+      Runtime: linux-${{ matrix.arch }}
 
     steps:
     - name: Checkout
@@ -287,13 +294,14 @@ jobs:
       run: dotnet publish "$Project_Path" --configuration Release --runtime "$Runtime" --self-contained true --output "$Publish_Directory" -p:Version="$SEXTANT_VERSION" -p:InformationalVersion="$SEXTANT_VERSION" -p:IncludeSourceRevisionInInformationalVersion=false
 
     - name: Build the deb package
-      run: bash src/tools/make-deb.sh "$Publish_Directory" "$SEXTANT_VERSION" artifacts/Sextant-linux-x64.deb
+      run: bash src/tools/make-deb.sh "$Publish_Directory" "$SEXTANT_VERSION" "artifacts/Sextant-$Runtime.deb" "$Runtime"
 
     - name: Check the deb package
       run: |
         set -euo pipefail
-        deb=artifacts/Sextant-linux-x64.deb
+        deb="artifacts/Sextant-$Runtime.deb"
         dpkg-deb --info "$deb" | grep -F "Version: $SEXTANT_VERSION"
+        test "$(dpkg-deb --field "$deb" Architecture)" = "${{ matrix.package_arch }}"
         contents="$(dpkg-deb --contents "$deb" | sed 's/ -> .*//' | awk '{ print $NF }')"
         echo "$contents" | grep -F -x './opt/Sextant/Sextant'
         echo "$contents" | grep -F -x './usr/bin/Sextant'
@@ -304,19 +312,28 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         # archive: false ignores name and uses the filename as the artifact name.
-        path: artifacts/Sextant-linux-x64.deb
+        path: artifacts/Sextant-linux-${{ matrix.arch }}.deb
         archive: false
         if-no-files-found: error
 
   build-linux-rpm:
-    name: Linux rpm x64
-    runs-on: ubuntu-latest
+    name: Linux rpm ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-latest
+            package_arch: x86_64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            package_arch: aarch64
 
     env:
       Solution_Name: Sextant.slnx
       Project_Path: src/Sextant.csproj
-      Publish_Directory: artifacts/linux-x64
-      Runtime: linux-x64
+      Publish_Directory: artifacts/linux-${{ matrix.arch }}
+      Runtime: linux-${{ matrix.arch }}
 
     steps:
     - name: Checkout
@@ -345,20 +362,20 @@ jobs:
       run: sudo apt-get update && sudo apt-get install -y rpm
 
     - name: Build the rpm package
-      run: bash src/tools/make-rpm.sh "$Publish_Directory" "$SEXTANT_VERSION" artifacts/Sextant-linux-x64.rpm
+      run: bash src/tools/make-rpm.sh "$Publish_Directory" "$SEXTANT_VERSION" "artifacts/Sextant-$Runtime.rpm" "$Runtime"
 
     - name: Check the rpm package
       run: |
         set -euo pipefail
-        rpm=artifacts/Sextant-linux-x64.rpm
+        rpm="artifacts/Sextant-$Runtime.rpm"
         query="$(rpm -qp --queryformat '%{NAME} %{VERSION} %{RELEASE} %{ARCH}' "$rpm")"
         ver="${SEXTANT_VERSION%%-*}"
         rel="1"
         if [[ "$SEXTANT_VERSION" == *-* ]]; then
           rel="${SEXTANT_VERSION#*-}"
         fi
-        if [[ "$query" != "sextant $ver $rel x86_64" ]]; then
-          echo "Unexpected rpm metadata: $query (expected sextant $ver $rel x86_64)" >&2
+        if [[ "$query" != "sextant $ver $rel ${{ matrix.package_arch }}" ]]; then
+          echo "Unexpected rpm metadata: $query (expected sextant $ver $rel ${{ matrix.package_arch }})" >&2
           exit 1
         fi
         rpm -qpl "$rpm" | grep -F -x '/opt/Sextant/Sextant'
@@ -369,6 +386,6 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         # archive: false ignores name and uses the filename as the artifact name.
-        path: artifacts/Sextant-linux-x64.rpm
+        path: artifacts/Sextant-linux-${{ matrix.arch }}.rpm
         archive: false
         if-no-files-found: error

@@ -1,9 +1,9 @@
 #!/bin/bash
-# Packs a published linux-x64 self-contained build into a .deb for Ubuntu
+# Packs a published Linux self-contained build into a .deb for Ubuntu
 # and Debian. The app lives in /opt/Sextant, /usr/bin/Sextant is a symlink,
 # and the desktop file and icon go where the menu systems look for them.
 #
-# Usage: make-deb.sh <publish-dir> <version> <output-file>
+# Usage: make-deb.sh <publish-dir> <version> <output-file> [linux-x64|linux-arm64]
 # The version is the imprint from resolve-version.sh, such as 0.1.3-beta.
 # dpkg accepts that shape: upstream 0.1.3, revision beta.
 set -euo pipefail
@@ -11,11 +11,21 @@ set -euo pipefail
 publish_dir="${1:?Usage: make-deb.sh <publish-dir> <version> <output-file>}"
 version="${2:?Usage: make-deb.sh <publish-dir> <version> <output-file>}"
 output="${3:?Usage: make-deb.sh <publish-dir> <version> <output-file>}"
+runtime="${4:-linux-x64}"
+
+case "$runtime" in
+  linux-x64) architecture=amd64 ;;
+  linux-arm64) architecture=arm64 ;;
+  *)
+    echo "Unsupported runtime: $runtime (expected linux-x64 or linux-arm64)." >&2
+    exit 1
+    ;;
+esac
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 if [[ ! -x "$publish_dir/Sextant" ]]; then
-  echo "No executable Sextant in $publish_dir. Publish linux-x64 first." >&2
+  echo "No executable Sextant in $publish_dir. Publish $runtime first." >&2
   exit 1
 fi
 
@@ -49,7 +59,7 @@ Package: sextant
 Version: $version
 Section: vcs
 Priority: optional
-Architecture: amd64
+Architecture: $architecture
 Maintainer: Marcus Grenängen <marcus@grenangen.se>
 Homepage: https://github.com/SneWs/Sextant
 Depends: libssl3 | libssl1.1, zlib1g
