@@ -52,6 +52,15 @@ public class TagHistoryTests
             window.Show();
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
+            for (var attempt = 0; attempt < 100 && (older.FileCountText.Length == 0 || newer.FileCountText.Length == 0); attempt++)
+            {
+                Dispatcher.UIThread.RunJobs();
+                await Task.Delay(20);
+            }
+            Assert.Equal("1", older.FileCountText);
+            Assert.Equal("1", newer.FileCountText);
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
 
             var graph = view.FindControl<ListBox>("GraphList");
             Assert.NotNull(graph);
@@ -69,7 +78,16 @@ public class TagHistoryTests
             Assert.False(IsClear(chip.Background));
             var subject = commit.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text == "second");
             Assert.True(Left(chip, commit) > Right(subject, commit), $"chip {Left(chip, commit)} subject {Right(subject, commit)}");
-            Assert.True(Right(chip, commit) > commit.Bounds.Width - 20, $"chip right {Right(chip, commit)} row {commit.Bounds.Width}");
+            var count = commit.GetVisualDescendants().OfType<Border>().Single(border => border.Name == "RowFileCountChip");
+            Assert.True(Right(chip, commit) < Left(count, commit), $"tag right {Right(chip, commit)} count left {Left(count, commit)}");
+            Assert.True(Right(count, commit) > commit.Bounds.Width - 20, $"count right {Right(count, commit)} row {commit.Bounds.Width}");
+            var refs = commit.GetVisualDescendants().OfType<Border>().Where(border => border.Classes.Contains("reflabel")).ToList();
+            Assert.NotEmpty(refs);
+            Assert.True(Right(refs[^1], commit) < Left(chip, commit), "Branch labels should precede the tag and file count.");
+            var olderCommit = graph.ContainerFromItem(older) as ListBoxItem;
+            Assert.NotNull(olderCommit);
+            var olderCount = olderCommit.GetVisualDescendants().OfType<Border>().Single(border => border.Name == "RowFileCountChip");
+            Assert.InRange(Math.Abs(Right(count, commit) - Right(olderCount, olderCommit)), 0, 1);
             Assert.DoesNotContain(
                 commit.GetVisualDescendants().OfType<TextBlock>(),
                 text => text.Text?.Contains("v2", StringComparison.Ordinal) == true && text != chipText);

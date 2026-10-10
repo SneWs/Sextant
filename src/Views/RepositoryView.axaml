@@ -411,13 +411,6 @@
                                         <TextBlock Text="{Binding Detail}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" FontSize="12" Opacity="0.65" Margin="0,1,0,0"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="4" Margin="8,0,4,0" VerticalAlignment="Center">
-                                        <Border x:Name="RowFileCountChip" IsVisible="{Binding FileCountText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                                Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
-                                                Padding="6,0" CornerRadius="3" MinWidth="22" VerticalAlignment="Center"
-                                                ToolTip.Tip="{Binding FileCountTooltip}">
-                                            <TextBlock Text="{Binding FileCountText}" FontSize="11" FontWeight="SemiBold"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </Border>
                                         <ItemsControl ItemsSource="{Binding Refs}" IsVisible="{Binding HasRefs}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
@@ -453,6 +446,13 @@
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
+                                        <Border x:Name="RowFileCountChip" IsVisible="{Binding FileCountText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                                                Padding="6,0" CornerRadius="3" MinWidth="22" VerticalAlignment="Center"
+                                                ToolTip.Tip="{Binding FileCountTooltip}">
+                                            <TextBlock Text="{Binding FileCountText}" FontSize="11" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
                                     </StackPanel>
                                 </controls:GraphRowPanel>
                             </Border>
