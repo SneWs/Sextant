@@ -302,6 +302,13 @@ jobs:
         deb="artifacts/Sextant-$Runtime.deb"
         dpkg-deb --info "$deb" | grep -F "Version: $SEXTANT_VERSION"
         test "$(dpkg-deb --field "$deb" Architecture)" = "${{ matrix.package_arch }}"
+        dependencies="$(dpkg-deb --field "$deb" Depends)"
+        for dependency in libicu libfontconfig1 libstdc++6 libgcc-s1; do
+          if [[ "$dependencies" != *"$dependency"* ]]; then
+            echo "Missing deb dependency: $dependency" >&2
+            exit 1
+          fi
+        done
         contents="$(dpkg-deb --contents "$deb" | sed 's/ -> .*//' | awk '{ print $NF }')"
         echo "$contents" | grep -F -x './opt/Sextant/Sextant'
         echo "$contents" | grep -F -x './usr/bin/Sextant'
@@ -381,6 +388,17 @@ jobs:
         rpm -qpl "$rpm" | grep -F -x '/opt/Sextant/Sextant'
         rpm -qpl "$rpm" | grep -F -x '/usr/bin/Sextant'
         rpm -qpl "$rpm" | grep -F -x '/usr/share/applications/sextant.desktop'
+        requires="$(rpm -qp --requires "$rpm")"
+        for dependency in libicu; do
+          if ! grep -F -x "$dependency" <<< "$requires"; then
+            echo "Missing rpm dependency: $dependency" >&2
+            exit 1
+          fi
+        done
+        if [[ "$requires" == *'liblttng-ust.so.0'* ]]; then
+          echo "Optional .NET tracing library added an unavailable Fedora dependency." >&2
+          exit 1
+        fi
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v7

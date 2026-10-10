@@ -53,7 +53,9 @@ icon="$publish_dir/sextant.png"
 [[ -f "$icon" ]] || icon="$repo_root/src/Assets/sextant.png"
 install -m 0644 "$icon" "$pkg/usr/share/icons/hicolor/256x256/apps/sextant.png"
 
-# The self-contained runtime links the system OpenSSL and zlib.
+# .NET loads ICU for globalization, and Skia links Fontconfig.
+# Both published architectures require glibc 2.38; ICU's runtime package name
+# differs between Ubuntu 24.04/26.04 and Debian 13.
 cat > "$pkg/DEBIAN/control" << EOF
 Package: sextant
 Version: $version
@@ -62,7 +64,7 @@ Priority: optional
 Architecture: $architecture
 Maintainer: Marcus Grenängen <marcus@grenangen.se>
 Homepage: https://github.com/SneWs/Sextant
-Depends: libssl3 | libssl1.1, zlib1g
+Depends: libc6 (>= 2.38), libssl3 | libssl1.1, zlib1g, libstdc++6, libgcc-s1, libfontconfig1, libicu78 | libicu76 | libicu74
 Description: A Git client for large repositories
  Sextant is a desktop Git client for large repositories,
  built with Avalonia.

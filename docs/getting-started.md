@@ -73,6 +73,7 @@ On Windows 11, Sextant also looks for WSL2. When a distribution is installed, Fi
 Install `git` and `git-lfs` from your distribution, then run `git lfs install` once.
 
 Download the package for your distribution from the releases page and install it. The package puts the app in `/opt/Sextant`, links `Sextant` onto `PATH`, and installs the desktop entry and icon for the application menus.
+The Linux builds require glibc 2.38 or newer. Package installation and runtime dependency loading were checked on Ubuntu 24.04 and 26.04, Debian 13, and Fedora 43. Ubuntu 22.04 and Debian 12 have an older glibc.
 
 Ubuntu and Debian:
 

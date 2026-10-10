@@ -96,6 +96,10 @@ On 2026-10-08 each commit row in the history shows a pill with the number of fil
 
 On 2026-10-10 the Linux release workflow publishes both linux-x64 and linux-arm64 on native Ubuntu runners. Debian/Ubuntu packages use amd64 or arm64 metadata; Fedora packages use x86_64 or aarch64. Both architectures' deb and rpm artifacts are included in tagged releases. The packaging scripts retain linux-x64 as their default runtime for existing callers. Debian package metadata for both architectures and native aarch64 rpm metadata were checked in a local Ubuntu arm64 container.
 
+On 2026-10-10 the Fedora arm64 RPM no longer requires `liblttng-ust.so.0`. That dependency was auto-generated from the self-contained .NET runtime's optional `libcoreclrtraceptprovider.so`, not from Sextant or CoreCLR's startup libraries. The RPM filters only that soname from auto-requires; the provider stays in the package. Repacking the 0.1.9-beta arm64 release and installing it in a Fedora 43 arm64 container succeeded. The RPM CI step checks that this dependency does not return.
+
+On 2026-10-10 the Linux packages declare the runtime dependencies that ELF auto-requires cannot see: .NET loads ICU at startup. The deb also declares Fontconfig, libstdc++, and libgcc, which dpkg-deb does not infer from native libraries. Its ICU alternatives cover Ubuntu 24.04 and 26.04 and Debian 13, with a libc6 >= 2.38 floor matching both published architectures. The rpm auto-requires Fontconfig and the C++ runtime, and explicitly requires libicu. Neither package explicitly requires X11: a desktop environment supplies its own display backend, and Sextant supports Wayland as well as X11. Repacked 0.1.9-beta arm64 debs installed on Ubuntu 24.04/26.04 and Debian 13; rpm installed on Fedora 43. Both x64 packages installed on Ubuntu 24.04 and Fedora 43. In each headless container with X11 installed for the smoke test the application progressed past dependency loading to the expected no-display error.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

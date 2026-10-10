@@ -61,8 +61,13 @@ Summary: A Git client for large repositories
 License: Sextant License
 URL: https://github.com/SneWs/Sextant
 BuildArch: $architecture
-# The self-contained runtime links the system OpenSSL and zlib.
-Requires: openssl-libs, zlib
+# .NET loads ICU for globalization. Do not require a particular display backend.
+# The ELF auto-requires cover Fontconfig and the C++ runtime.
+Requires: openssl-libs, zlib, libicu
+# .NET's optional tracepoint provider links to liblttng-ust.so.0, which is
+# unavailable on current Fedora. Keep the provider but do not require its
+# tracing-only dependency to install or run Sextant.
+%global __requires_exclude ^liblttng-ust[.]so[.]0[(][)][(]64bit[)]$
 
 %description
 Sextant is a desktop Git client for large repositories, built with Avalonia.
