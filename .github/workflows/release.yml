@@ -3,6 +3,8 @@
 # passes that tag as the version. The leading v only selects the workflow;
 # the build imprints the rest. It then attaches Sextant-osx-arm64.tar,
 # Sextant-win-x64.zip, and x64/arm64 Linux deb and rpm packages.
+# The Microsoft Store MSIX stays a workflow artifact. Partner Center is the
+# upload, not this GitHub release.
 # Branch pushes and pull requests do not run this workflow.
 
 name: Release

@@ -2,9 +2,11 @@
 # Build, test, sign and publish a desktop application built on .NET.
 # https://github.com/actions/starter-workflows/blob/main/ci/dotnet-desktop.yml
 #
-# Sextant is an unpackaged Avalonia app, so this file keeps that workflow's
-# shape and replaces the Windows Application Packaging (MSIX) project with
-# `dotnet publish` for win-x64. There is no .wapproj. The macOS job publishes
+# Sextant is an Avalonia app. This file keeps the starter workflow's shape
+# and publishes a self-contained win-x64 folder instead of a Visual Studio
+# packaging project. There is no .wapproj. src/tools/make-msix.ps1 packs that
+# folder into an MSIX after publish. The GitHub release stays the loose zip.
+# The MSIX is a separate artifact for Partner Center. The macOS job publishes
 # a self-contained osx-arm64 app. On a Mac that publish is a Sextant.app
 # bundle. stamp-mac-app.sh ad-hoc signs that bundle. The SDK's loose apphost
 # signature does not seal bundle resources, and Gatekeeper reports a
@@ -30,6 +32,29 @@
 #
 # When those secrets are empty, the build still tests and publishes, and
 # skips Authenticode signing.
+#
+# The Microsoft Store package is signed separately. make-msix.ps1 already
+# has the reserved identity: 20817M.Grenangen.SextantGit,
+# CN=409B546D-EA32-4065-A208-A777236471B3, publisher display name
+# M.Grenangen. The package family name is
+# 20817M.Grenangen.SextantGit_nr8zhaqknvty0. The package SID is
+# S-1-15-2-4043513989-1948314254-3861236244-1758161784-3578805874-145697710-4171492892
+# and the Store ID is 9N1T9BGFCTZS. Neither is a manifest field. Leave the
+# pfx unset to build a sideload MSIX signed as CN=Sextant-Dev. Set the pfx
+# to pack the Store upload.
+# The three Store_* identity secrets below are optional overrides.
+#
+# 1. Store_Package_Name — overrides the identity Name.
+# 2. Store_Publisher — overrides the publisher, including the CN= prefix.
+# 3. Store_Publisher_Display_Name — overrides the publisher display name.
+# 4. Store_Pfx_Base64 — a pfx whose certificate subject is
+#    CN=409B546D-EA32-4065-A208-A777236471B3. A self-signed certificate is
+#    enough. The Store re-signs the upload. This is not Base64_Encoded_Pfx.
+# 5. Store_Pfx_Key — the pfx password.
+# 6. Store_Package_Version — a repository variable, not a secret:
+#    major.minor.build.0 with a major of at least 1. Required while the
+#    imprint is 0.x or has a prerelease label such as -beta. Raise it on
+#    every submission. About keeps showing the imprint.
 #
 # https://github.com/microsoft/github-actions-for-desktop-apps#signing
 #
@@ -174,11 +199,38 @@ jobs:
           }
         }
 
+    - name: Check the Store package version rules
+      shell: pwsh
+      run: |
+        Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+        ./src/tools/make-msix.ps1 -SelfTest
+
+    - name: Pack the Microsoft Store package
+      shell: pwsh
+      env:
+        SEXTANT_STORE_PACKAGE_NAME: ${{ secrets.Store_Package_Name }}
+        SEXTANT_STORE_PUBLISHER: ${{ secrets.Store_Publisher }}
+        SEXTANT_STORE_PUBLISHER_DISPLAY_NAME: ${{ secrets.Store_Publisher_Display_Name }}
+        SEXTANT_STORE_PFX_BASE64: ${{ secrets.Store_Pfx_Base64 }}
+        SEXTANT_STORE_PFX_PASSWORD: ${{ secrets.Store_Pfx_Key }}
+        SEXTANT_STORE_PACKAGE_VERSION: ${{ vars.Store_Package_Version }}
+      run: |
+        Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+        New-Item -ItemType Directory -Force -Path artifacts/store | Out-Null
+        ./src/tools/make-msix.ps1 artifacts/win-x64 $env:SEXTANT_VERSION artifacts/store/Sextant-win-x64.msix
+
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
         name: Sextant-win-x64
         path: artifacts/win-x64
+        if-no-files-found: error
+
+    - name: Upload the Microsoft Store package
+      uses: actions/upload-artifact@v4
+      with:
+        name: Sextant-win-x64-msix
+        path: artifacts/store/
         if-no-files-found: error
 
   build-macos:
