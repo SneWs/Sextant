@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using Sextant.Git.AskPass;
 
@@ -11,8 +10,6 @@ namespace Sextant.Git.Wsl;
 /// </summary>
 public static class WslAskPass
 {
-    private static readonly ConcurrentDictionary<string, string> Scripts = new(StringComparer.Ordinal);
-
     public static string Script(string linuxExecutable, string pipeName)
     {
         return "#!/bin/sh\n"
@@ -25,16 +22,11 @@ public static class WslAskPass
     {
         if (!OperatingSystem.IsWindows() || !wsl.CanRun || string.IsNullOrWhiteSpace(windowsExecutable))
             return null;
-        var key = wsl.Distribution + "\0" + pipeName + "\0" + windowsExecutable;
-        if (Scripts.TryGetValue(key, out var cached))
-            return cached;
-
         var linuxExecutable = WslPath.ToLinux(wsl.Distribution, windowsExecutable);
         var script = "/tmp/sextant-askpass-" + pipeName;
         var body = Script(linuxExecutable, pipeName);
         if (!await WriteAsync(wsl, script, body, cancellationToken).ConfigureAwait(false))
             return null;
-        Scripts[key] = script;
         return script;
     }
 
@@ -58,7 +50,10 @@ public static class WslAskPass
         info.ArgumentList.Add("-e");
         info.ArgumentList.Add("/bin/sh");
         info.ArgumentList.Add("-c");
-        info.ArgumentList.Add("cat > " + script + " && chmod 700 " + script);
+        var quoted = ShQuote(script);
+        // /tmp can be cleared while Sextant is still running. Keep valid helpers intact.
+        info.ArgumentList.Add("if test -f " + quoted + " && test -x " + quoted
+            + "; then cat > /dev/null; else cat > " + quoted + " && chmod 700 " + quoted + "; fi");
         using var process = new Process { StartInfo = info };
         try
         {
