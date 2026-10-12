@@ -110,6 +110,8 @@ On 2026-10-12 the Windows job no longer fails when `Store_Package_Version` is em
 
 On 2026-10-12 the Microsoft Store listing gained a privacy policy at `docs/privacy.md`. Sextant has no account, telemetry, or server of its own. The policy says settings and the workspace stay in the local config folder, Git network commands go through the installed `git` and its credential helper, and a remembered SSH passphrase stays in memory until the app closes. The Store URL is `https://github.com/SneWs/Sextant/blob/master/docs/privacy.md`.
 
+On 2026-10-12 `Clicking_a_tag_outside_the_loaded_history_loads_history_up_to_it` failed on the Linux runner because the history load finished inside `Execute` before the test read `IsLoadingHistory`. The same check on a hidden branch had the same shape. Both tests now record the spinner as it rises. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

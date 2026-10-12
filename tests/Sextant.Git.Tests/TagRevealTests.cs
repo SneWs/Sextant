@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Avalonia.Threading;
 using Avalonia.Headless;
 using CommunityToolkit.Mvvm.Input;
@@ -51,13 +52,7 @@ public class TagRevealTests
                 Assert.DoesNotContain(tab.Rows, row => string.Equals(row.Sha, tagOid, StringComparison.OrdinalIgnoreCase));
 
                 var tag = tab.Locations.Single(item => item.Key == "t:v1");
-                var reveal = (AsyncRelayCommand)tag.RevealCommand!;
-                reveal.Execute(null);
-                Assert.True(tab.IsLoadingHistory, "spinner should be up while the history loads");
-                if (reveal.ExecutionTask is { } revealTask)
-                    await revealTask;
-                Dispatcher.UIThread.RunJobs();
-                Assert.False(tab.IsLoadingHistory, "spinner should be down once the history is loaded");
+                await RunWhileHistoryLoads(tab, (AsyncRelayCommand)tag.RevealCommand!);
                 await Settle(tab);
 
                 Assert.False(tab.HasBanner, tab.Banner);
@@ -110,13 +105,7 @@ public class TagRevealTests
                 await Settle(tab);
                 Assert.DoesNotContain(tab.Rows, row => string.Equals(row.Sha, tipOid, StringComparison.OrdinalIgnoreCase));
 
-                var reveal = (AsyncRelayCommand)side.RevealCommand!;
-                reveal.Execute(null);
-                Assert.True(tab.IsLoadingHistory, "spinner should be up while the history loads");
-                if (reveal.ExecutionTask is { } revealTask)
-                    await revealTask;
-                Dispatcher.UIThread.RunJobs();
-                Assert.False(tab.IsLoadingHistory, "spinner should be down once the history is loaded");
+                await RunWhileHistoryLoads(tab, (AsyncRelayCommand)side.RevealCommand!);
                 await Settle(tab);
 
                 Assert.False(tab.HasBanner, tab.Banner);
@@ -232,6 +221,35 @@ public class TagRevealTests
             }
             return 0;
         }, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// A two-commit history can finish inside <c>Execute</c> on a fast runner.
+    /// The spinner still has to come up for that load, so watch the property as well as the flag afterwards.
+    /// </summary>
+    private static async Task RunWhileHistoryLoads(RepositoryViewModel tab, AsyncRelayCommand command)
+    {
+        var sawSpinner = false;
+        void OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(RepositoryViewModel.IsLoadingHistory) && tab.IsLoadingHistory)
+                sawSpinner = true;
+        }
+
+        tab.PropertyChanged += OnPropertyChanged;
+        try
+        {
+            command.Execute(null);
+            Assert.True(sawSpinner || tab.IsLoadingHistory, "spinner should be up while the history loads");
+            if (command.ExecutionTask is { } task)
+                await task;
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(tab.IsLoadingHistory, "spinner should be down once the history is loaded");
+        }
+        finally
+        {
+            tab.PropertyChanged -= OnPropertyChanged;
+        }
     }
 
     private static async Task Run(AsyncRelayCommand command)
