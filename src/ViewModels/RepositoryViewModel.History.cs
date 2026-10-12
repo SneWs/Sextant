@@ -98,6 +98,7 @@ public partial class RepositoryViewModel
     {
         OnPropertyChanged(nameof(ShowingDiff));
         OnPropertyChanged(nameof(DiffTabOn));
+        OnPropertyChanged(nameof(ShowBulkActions));
         NoteSectionFolds();
     }
 

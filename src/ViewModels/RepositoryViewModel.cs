@@ -374,6 +374,9 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public bool CanDiscardAll => !IsBusy && ShowingWorkingCopy && (_hasUnstagedWork || _hasStagedWork);
 
+    /// <summary>Stage all, unstage all, and discard all sit on the diff while the working copy is open.</summary>
+    public bool ShowBulkActions => ShowingWorkingCopy && !ShowingBlame;
+
     private bool _hasUnstagedWork;
 
     private bool _hasStagedWork;
@@ -731,6 +734,7 @@ public partial class RepositoryViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanAmend));
         OnPropertyChanged(nameof(CanCommitOrAmend));
         NotifyBulkStage();
+        OnPropertyChanged(nameof(ShowBulkActions));
         NoteSectionFolds();
     }
 

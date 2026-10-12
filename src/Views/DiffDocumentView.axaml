@@ -10,6 +10,12 @@
              x:Class="Sextant.Views.DiffDocumentView"
              x:DataType="vm:RepositoryViewModel">
     <DockPanel>
+                    <Grid x:Name="BulkActions" DockPanel.Dock="Top" Margin="8,6,8,0" ColumnDefinitions="Auto,Auto,*"
+                          IsVisible="{Binding ShowBulkActions}">
+                        <Button Content="Stage all" Command="{Binding StageAllCommand}" IsEnabled="{Binding CanStageAll}"/>
+                        <Button Grid.Column="1" Margin="8,0,0,0" Content="Unstage all" Command="{Binding UnstageAllCommand}" IsEnabled="{Binding CanUnstageAll}"/>
+                        <Button Grid.Column="2" HorizontalAlignment="Right" Content="Discard all" Command="{Binding DiscardAllCommand}" IsEnabled="{Binding CanDiscardAll}"/>
+                    </Grid>
                     <CommandBar DockPanel.Dock="Top" Margin="0,4,0,0" IsVisible="{Binding ShowSectionFolds}"
                                 DefaultLabelPosition="Right" OverflowButtonVisibility="Collapsed">
                         <CommandBarButton Label="Expand all" Command="{Binding ExpandAllSectionsCommand}" HotKey="{app:CommandGesture Key=E, Shift=True}">
