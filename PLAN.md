@@ -106,6 +106,8 @@ On 2026-10-12 Partner Center reserved the Store identity. The package name is `2
 
 On 2026-10-12 Partner Center also shows the package SID `S-1-15-2-4043513989-1948314254-3861236244-1758161784-3578805874-145697710-4171492892` and the Store ID `9N1T9BGFCTZS`. Both are recorded in `make-msix.ps1`. Neither is written into the MSIX manifest. The listing address is `https://apps.microsoft.com/detail/9N1T9BGFCTZS` after the submission is published. The package was not installed.
 
+On 2026-10-12 the Windows job no longer fails when `Store_Package_Version` is empty. The certificate secrets alone used to put `make-msix.ps1` into Store mode, and `0.1.9-beta` became `0.1.9.0`, which that mode rejects. The pack step now skips until the variable is set, and the MSIX artifact is uploaded only when a package was produced. The workflow still does not submit anything to Partner Center.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

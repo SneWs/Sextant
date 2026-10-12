@@ -52,9 +52,10 @@
 #    enough. The Store re-signs the upload. This is not Base64_Encoded_Pfx.
 # 5. Store_Pfx_Key — the pfx password.
 # 6. Store_Package_Version — a repository variable, not a secret:
-#    major.minor.build.0 with a major of at least 1. Required while the
-#    imprint is 0.x or has a prerelease label such as -beta. Raise it on
-#    every submission. About keeps showing the imprint.
+#    major.minor.build.0 with a major of at least 1. The pack step skips
+#    itself when this is empty, so a normal build still publishes the zip.
+#    Nothing in this workflow submits a package to Partner Center. Raise the
+#    variable on every submission. About keeps showing the imprint.
 #
 # https://github.com/microsoft/github-actions-for-desktop-apps#signing
 #
@@ -216,6 +217,10 @@ jobs:
         SEXTANT_STORE_PACKAGE_VERSION: ${{ vars.Store_Package_Version }}
       run: |
         Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+        if ([string]::IsNullOrWhiteSpace($env:SEXTANT_STORE_PACKAGE_VERSION)) {
+          Write-Host "Store_Package_Version is not set. Skipping the Store package. Pack it locally when you are ready to upload it in Partner Center."
+          exit 0
+        }
         New-Item -ItemType Directory -Force -Path artifacts/store | Out-Null
         ./src/tools/make-msix.ps1 artifacts/win-x64 $env:SEXTANT_VERSION artifacts/store/Sextant-win-x64.msix
 
@@ -227,6 +232,7 @@ jobs:
         if-no-files-found: error
 
     - name: Upload the Microsoft Store package
+      if: hashFiles('artifacts/store/*.msix') != ''
       uses: actions/upload-artifact@v4
       with:
         name: Sextant-win-x64-msix
