@@ -30,14 +30,6 @@ public class TabBarTests
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
 
-                var left = window.FindControl<Border>("PaneRuleLeft");
-                var right = window.FindControl<Border>("PaneRuleRight");
-                Assert.NotNull(left);
-                Assert.NotNull(right);
-                Assert.False(left.IsVisible);
-                Assert.False(right.IsVisible);
-                Assert.Equal(0, left.Width);
-                Assert.Equal(0, right.Width);
                 Assert.DoesNotContain(window.GetVisualDescendants().OfType<Border>(), border => border.Classes.Contains("tab") && border.IsEffectivelyVisible);
 
                 var tab = new RepositoryViewModel(vm, Path.Combine(directory, "repo"));
@@ -46,18 +38,13 @@ public class TabBarTests
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
 
-                Assert.True(left.IsVisible || right.IsVisible);
-                Assert.True(left.Width + right.Width > 1);
                 Assert.Contains(window.GetVisualDescendants().OfType<Border>(), border => border.Classes.Contains("tab") && border.IsEffectivelyVisible);
 
                 await vm.Close(tab);
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
 
-                Assert.False(left.IsVisible);
-                Assert.False(right.IsVisible);
-                Assert.Equal(0, left.Width);
-                Assert.Equal(0, right.Width);
+                Assert.DoesNotContain(window.GetVisualDescendants().OfType<Border>(), border => border.Classes.Contains("tab") && border.IsEffectivelyVisible);
 
                 await vm.Shutdown();
                 window.DataContext = null;

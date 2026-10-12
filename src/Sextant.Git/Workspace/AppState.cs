@@ -28,6 +28,9 @@ public sealed class WorkspaceState
     public int? WindowY { get; set; }
 
     public bool WindowMaximized { get; set; }
+
+    /// <summary>Global tool arrangement. Missing or unusable values are seeded from the legacy pane sizes.</summary>
+    public DockLayout? DockLayout { get; set; }
 }
 
 public sealed class RepoLayout

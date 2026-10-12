@@ -1,7 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
-using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Sextant.Git.Models;
@@ -47,16 +46,11 @@ public class RepositoryFileTreeTests
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
 
-            var historyButton = view.FindControl<Button>("HistoryTabButton")!;
-            var filesButton = view.FindControl<Button>("RepositoryFilesTabButton")!;
-            Assert.Contains("selected", historyButton.Classes);
             await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
             Assert.True(vm.RepositoryFilesTabOn);
-            Assert.Contains("selected", filesButton.Classes);
-            Assert.DoesNotContain("selected", historyButton.Classes);
-            Assert.False(view.FindControl<ListBox>("GraphList")!.IsEffectivelyVisible);
+            Assert.True(view.FindControl<ListBox>("GraphList")!.IsEffectivelyVisible);
             Assert.Equal(history, vm.Rows);
             Assert.Same(selected, vm.SelectedGraphRow);
             var commandLog = vm.CommandLog;
@@ -105,16 +99,17 @@ public class RepositoryFileTreeTests
             Assert.Contains(vm.Rows, row => row.Subject == "first");
             await vm.ShowAllCommitsCommand.ExecuteAsync(null);
             await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
-            historyButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            vm.ShowHistoryTabCommand.Execute(null);
             Assert.True(vm.HistoryTabOn);
             Assert.Equal(history.Select(row => row.Subject), vm.Rows.Select(row => row.Subject));
             vm.ShowHistorySearch = true;
             await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
-            Assert.False(vm.ShowHistoryChrome);
-            vm.ToggleHistorySearchCommand.Execute(null);
-            Assert.True(vm.HistoryTabOn);
-            Assert.True(vm.ShowHistorySearch);
             Assert.True(vm.ShowHistoryChrome);
+            Assert.True(view.FindControl<ListBox>("GraphList")!.IsEffectivelyVisible);
+            vm.ToggleHistorySearchCommand.Execute(null);
+            Assert.True(vm.RepositoryFilesTabOn);
+            Assert.False(vm.ShowHistorySearch);
+            Assert.False(vm.ShowHistoryChrome);
 
             window.Close();
             await vm.DisposeAsync();

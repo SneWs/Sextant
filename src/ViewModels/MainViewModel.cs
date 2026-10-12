@@ -9,6 +9,7 @@ using System.ComponentModel;
 using Sextant.Git.Diff;
 using Sextant.Git.Repo;
 using Sextant.Git.Workspace;
+using Sextant.Docking;
 using Sextant.Git.Wsl;
 
 namespace Sextant.ViewModels;
@@ -37,8 +38,15 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         WindowX = workspace.WindowX;
         WindowY = workspace.WindowY;
         WindowMaximized = workspace.WindowMaximized;
-        Tabs.CollectionChanged += (_, _) => RefreshShortcutHints();
+        Dock = new RepositoryDock(this, workspace);
+        Tabs.CollectionChanged += (_, change) =>
+        {
+            RefreshShortcutHints();
+            Dock.OnTabsChanged(change);
+        };
     }
+
+    public RepositoryDock Dock { get; }
 
     public GitProcessRunner Runner { get; }
 
@@ -139,11 +147,14 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     public Task InitializeAsync() => _initialize ??= InitializeCoreAsync();
 
-    public Task OnWindowActivated()
+    public Task OnWindowActivated() => _started ? RefreshShownAsync() : Task.CompletedTask;
+
+    /// <summary>Refreshes the active repository and any other repository whose document is on screen.</summary>
+    public async Task RefreshShownAsync()
     {
-        return _started && ActiveTab is { IsReady: true } tab
-            ? tab.RefreshFromFocusAsync()
-            : Task.CompletedTask;
+        if (ActiveTab is { IsReady: true } tab)
+            await tab.RefreshFromFocusAsync();
+        await Dock.RefreshOtherVisibleAsync();
     }
 
     public Task Shutdown() => _shutdown ??= ShutdownCoreAsync();
@@ -227,7 +238,6 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
                 tab.LocationsWidth = saved.LocationsWidth;
                 tab.GraphWidth = saved.GraphWidth;
                 tab.FilesHeight = saved.FilesHeight;
-                tab.ShowLocations = saved.ShowLocations;
             }
         }
 
@@ -255,6 +265,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         _workspace.WindowX = WindowX;
         _workspace.WindowY = WindowY;
         _workspace.WindowMaximized = WindowMaximized;
+        Dock.WriteLayout();
         _store.SaveWorkspace(_workspace);
     }
 
@@ -269,16 +280,30 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     public Task ActivateDigit(int digit)
     {
         var index = TabShortcut.IndexFromDigit(digit);
-        if (index is not int slot || slot >= Tabs.Count || Tabs[slot] == ActiveTab)
+        var order = ShortcutOrder();
+        if (index is not int slot || slot >= order.Count || order[slot] == ActiveTab)
             return Task.CompletedTask;
-        return Activate(Tabs[slot]);
+        return Activate(order[slot]);
     }
 
-    private void RefreshShortcutHints()
+    internal void RefreshShortcutHints()
     {
-        for (var i = 0; i < Tabs.Count; i++)
-            Tabs[i].ShortcutHint = TabShortcut.Hint(i);
+        var order = ShortcutOrder();
+        var hinted = new HashSet<RepositoryViewModel>();
+        for (var i = 0; i < order.Count; i++)
+        {
+            order[i].ShortcutHint = TabShortcut.Hint(i);
+            hinted.Add(order[i]);
+        }
+
+        foreach (var tab in Tabs)
+        {
+            if (!hinted.Contains(tab))
+                tab.ShortcutHint = "";
+        }
     }
+
+    private IReadOnlyList<RepositoryViewModel> ShortcutOrder() => Tabs;
 
     [RelayCommand(CanExecute = nameof(CanUseGit))]
     public Task OpenFolder() => OpenFolderAsync();
@@ -366,6 +391,21 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
     private void ToggleBranchView() => ActiveTab?.ToggleLocationsCommand.Execute(null);
 
+    [RelayCommand(CanExecute = nameof(HasActiveTab))]
+    private void ToggleHistory() => Dock.Toggle(DockIds.History);
+
+    [RelayCommand(CanExecute = nameof(HasActiveTab))]
+    private void ToggleChanges() => Dock.Toggle(DockIds.Changes);
+
+    [RelayCommand(CanExecute = nameof(HasActiveTab))]
+    private void ToggleDiff() => Dock.Toggle(DockIds.Diff);
+
+    [RelayCommand(CanExecute = nameof(HasActiveTab))]
+    private void ToggleFiles() => Dock.Toggle(DockIds.Files);
+
+    [RelayCommand(CanExecute = nameof(HasActiveTab))]
+    private void ResetLayout() => Dock.Reset();
+
     [RelayCommand]
     public Task LocateGit() => LocateGitAsync();
 
@@ -393,10 +433,22 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     [RelayCommand(AllowConcurrentExecutions = true)]
     public Task NextTab()
     {
-        if (Tabs.Count < 2 || ActiveTab is null)
+        var order = ShortcutOrder();
+        if (order.Count < 2 || ActiveTab is null)
             return Task.CompletedTask;
-        var index = Tabs.IndexOf(ActiveTab);
-        return Activate(Tabs[(index + 1) % Tabs.Count]);
+        var index = -1;
+        for (var i = 0; i < order.Count; i++)
+        {
+            if (ReferenceEquals(order[i], ActiveTab))
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (index < 0)
+            index = 0;
+        return Activate(order[(index + 1) % order.Count]);
     }
 
     [RelayCommand]
@@ -463,6 +515,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         OnPropertyChanged(nameof(ShowEmpty));
         OnPropertyChanged(nameof(CanRunRepositoryCommands));
         NotifyRepositoryCommands();
+        Dock.Select(value);
     }
 
     private void OnMenuTabChanged(object? sender, PropertyChangedEventArgs e)
@@ -502,6 +555,11 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         ToggleCommandsCommand.NotifyCanExecuteChanged();
         ToggleHistorySearchCommand.NotifyCanExecuteChanged();
         ToggleBranchViewCommand.NotifyCanExecuteChanged();
+        ToggleHistoryCommand.NotifyCanExecuteChanged();
+        ToggleChangesCommand.NotifyCanExecuteChanged();
+        ToggleDiffCommand.NotifyCanExecuteChanged();
+        ToggleFilesCommand.NotifyCanExecuteChanged();
+        ResetLayoutCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnPaletteQueryChanged(string value) => FilterPalette();

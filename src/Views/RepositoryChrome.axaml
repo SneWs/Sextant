@@ -1,0 +1,209 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Sextant.ViewModels"
+             xmlns:views="using:Sextant.Views"
+             xmlns:app="using:Sextant"
+             xmlns:controls="using:Sextant.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="Sextant.Views.RepositoryChrome"
+             x:DataType="vm:RepositoryViewModel"
+             KeyDown="OnChromeKeyDown">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+        <Border Grid.Row="0" IsVisible="{Binding HasBanner}" Padding="10,6" MaxHeight="168"
+                ClipToBounds="True" Background="#33C42B1C">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+                    <Button Classes="flat" Content="Copy" Command="{Binding CopyBannerCommand}"/>
+                    <Button Classes="flat" Content="Dismiss" Command="{Binding DismissBannerCommand}"/>
+                </StackPanel>
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                    <TextBlock Text="{Binding Banner}" TextWrapping="Wrap"/>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <Border Grid.Row="1" IsVisible="{Binding IsConflicted}" Padding="10,6" Background="#33E0A100">
+            <TextBlock Text="{Binding ConflictText}" TextWrapping="Wrap"/>
+        </Border>
+
+        <Border Grid.Row="2" IsVisible="{Binding SparseCheckout}" Padding="10,6" Background="#332B6CB0">
+            <TextBlock Text="Sparse checkout is on. Excluded paths stay out of the working tree." TextWrapping="Wrap"/>
+        </Border>
+
+        <Grid Grid.Row="3" Margin="8,6" Grid.IsSharedSizeScope="True">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="BranchEnds"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto" SharedSizeGroup="BranchEnds"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="SidebarToggleButton" Classes="locationsearch" Padding="7,0" MinWidth="0" MinHeight="26" Height="26"
+                        Command="{Binding ToggleLocationsCommand}"
+                        Classes.pressed="{Binding ShowLocations}"
+                        ToolTip.Tip="Toggle locations" VerticalAlignment="Center"
+                        AutomationProperties.Name="Toggle locations">
+                    <Canvas Width="14" Height="14">
+                        <Rectangle Canvas.Left="1" Canvas.Top="1" Width="12" Height="12" RadiusX="2" RadiusY="2"
+                                   Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.2"/>
+                        <Line StartPoint="5.2,1" EndPoint="5.2,13"
+                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.2"/>
+                    </Canvas>
+                </Button>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="6">
+                <SplitButton x:Name="StashSplitButton" Classes="compact" Command="{Binding StashCommand}" VerticalAlignment="Center"
+                             Padding="7,0" MinWidth="0" MinHeight="26" Height="26" ToolTip.Tip="Stash changes"
+                             AutomationProperties.Name="Stash">
+                    <Canvas Width="14" Height="14">
+                        <Polygon Points="7,1.5 12.5,4.4 7,7.3 1.5,4.4"
+                                 Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.2"/>
+                        <Polyline Points="1.5,8.1 7,11 12.5,8.1"
+                                  Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.2"
+                                  StrokeLineCap="Round" StrokeJoin="Round"/>
+                        <Polyline Points="1.5,10.9 7,13.8 12.5,10.9"
+                                  Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.2"
+                                  StrokeLineCap="Round" StrokeJoin="Round"/>
+                    </Canvas>
+                    <SplitButton.Flyout>
+                        <MenuFlyout>
+                            <MenuItem Header="Stash…" Command="{Binding StashCommand}"/>
+                            <MenuItem Header="Stash (include untracked)" Command="{Binding StashUntrackedCommand}"/>
+                            <MenuItem Header="Stash (keep index)" Command="{Binding StashKeepIndexCommand}"/>
+                            <MenuItem Header="Stash (staged)" Command="{Binding StashStagedCommand}"/>
+                        </MenuFlyout>
+                    </SplitButton.Flyout>
+                </SplitButton>
+                <Border VerticalAlignment="Center"
+                    MinWidth="210"
+                    MaxWidth="840"
+                    Padding="16,5"
+                    CornerRadius="14"
+                    BorderThickness="1"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                    Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+                    <Grid ColumnDefinitions="Auto,Auto,Auto,*" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding BranchText}" FontWeight="SemiBold" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="275"/>
+                        
+                        <TextBlock Grid.Column="1" Text="·" Opacity="0.45" VerticalAlignment="Center" Margin="8,0,0,0"
+                                   IsVisible="{Binding ShowBranchStatus}"/>
+                        
+                        <TextBlock Grid.Column="2" Text="{Binding AheadBehindText}" 
+                                   IsVisible="{Binding ShowAheadBehind}"
+                                   VerticalAlignment="Center" Opacity="0.72" FontSize="12" Margin="8,0,0,0"/>
+                        
+                        <TextBlock Grid.Column="3" Text="{Binding BusyText}" 
+                                   IsVisible="{Binding IsBusy}"
+                                   VerticalAlignment="Center" Opacity="0.72" 
+                                   FontSize="12" 
+                                   Margin="8,0,0,0"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="400" />
+                    </Grid>
+                </Border>
+                <Button x:Name="HistorySearchToggleButton" Classes="locationsearch" Padding="7,0" 
+                        MinWidth="0" MinHeight="26" Height="26"
+                        Command="{Binding ToggleHistorySearchCommand}"
+                        Classes.pressed="{Binding ShowHistorySearch}"
+                        ToolTip.Tip="Search history" VerticalAlignment="Center"
+                        AutomationProperties.Name="Search history">
+                    <Canvas Width="14" Height="14">
+                        <Ellipse Width="8" Height="8" Canvas.Left="1" Canvas.Top="1"
+                                 Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"/>
+                        <Line StartPoint="7.6,7.6" EndPoint="12.2,12.2"
+                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                              StrokeLineCap="Round"/>
+                    </Canvas>
+                </Button>
+                
+                <Button Content="Cancel" Command="{Binding CancelCommand}" 
+                        Margin="6,0,0,0" 
+                        IsVisible="{Binding CanCancel}"/>
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Panel.ZIndex="1">
+                <SplitButton x:Name="PullSplitButton" Classes="compact" Command="{Binding PullCommand}" IsEnabled="{Binding CanRunCommands}"
+                             Padding="7,0" MinWidth="0" MinHeight="26" Height="26" ToolTip.Tip="Pull"
+                             AutomationProperties.Name="Pull">
+                    <Canvas Width="14" Height="14">
+                        <Line StartPoint="7,1.5" EndPoint="7,10"
+                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                              StrokeLineCap="Round"/>
+                        <Polyline Points="3,6.8 7,11 11,6.8"
+                                  Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                                  StrokeLineCap="Round" StrokeJoin="Round"/>
+                        <Line StartPoint="2,12.8" EndPoint="12,12.8"
+                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                              StrokeLineCap="Round"/>
+                    </Canvas>
+                    <SplitButton.Flyout>
+                        <MenuFlyout>
+                            <MenuItem Header="Pull" Command="{Binding PullCommand}"/>
+                            <MenuItem Header="Pull with rebase" Command="{Binding PullRebaseCommand}"/>
+                            <MenuItem Header="Fetch" Command="{Binding FetchCommand}"/>
+                            <MenuItem Header="Fetch all" Command="{Binding FetchAllCommand}"/>
+                            <MenuItem Header="Fetch all and clean up" Command="{Binding FetchAllAndCleanUpCommand}"/>
+                        </MenuFlyout>
+                    </SplitButton.Flyout>
+                </SplitButton>
+                <SplitButton x:Name="PushSplitButton" Classes="compact" Command="{Binding PushCommand}" Margin="6,0,0,0" IsEnabled="{Binding CanRunCommands}"
+                             Padding="7,0" MinWidth="0" MinHeight="26" Height="26" ToolTip.Tip="Push"
+                             AutomationProperties.Name="Push">
+                    <Canvas Width="14" Height="14">
+                        <Line StartPoint="7,4" EndPoint="7,12.5"
+                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                              StrokeLineCap="Round"/>
+                        <Polyline Points="3,7.2 7,3 11,7.2"
+                                  Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                                  StrokeLineCap="Round" StrokeJoin="Round"/>
+                        <Line StartPoint="2,1.2" EndPoint="12,1.2"
+                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                              StrokeLineCap="Round"/>
+                    </Canvas>
+                    <SplitButton.Flyout>
+                        <MenuFlyout>
+                            <MenuItem Header="Push" Command="{Binding PushCommand}"/>
+                            <MenuItem Header="Push ignoring local checks" Command="{Binding PushIgnoringLocalChecksCommand}"/>
+                            <MenuItem Header="Push with force-with-lease" Command="{Binding PushForceWithLeaseCommand}"/>
+                        </MenuFlyout>
+                    </SplitButton.Flyout>
+                </SplitButton>
+                <Button Content="Continue" Command="{Binding ContinueSequencerCommand}" Margin="6,0,0,0" IsVisible="{Binding IsConflicted}"/>
+                <Button Content="Abort" Command="{Binding AbortMergeCommand}" Margin="6,0,0,0" IsVisible="{Binding IsConflicted}"/>
+            </StackPanel>
+        </Grid>
+
+        <StackPanel Grid.Row="4" Margin="8,0,8,4" Spacing="4" IsVisible="{Binding ShowHistoryChrome}">
+            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding ShowHistorySearch}">
+                <TextBox x:Name="HistorySearchBox" PlaceholderText="Search subject, author, sha, branch:name, *.fbx, or MyFile.cs" Text="{Binding HistoryText}" KeyDown="OnHistoryKeyDown"/>
+                <Button x:Name="HistorySearchButton" Grid.Column="1" Classes="flat" Width="22" Height="22" Padding="0" MinWidth="0"
+                        Margin="4,0,0,0" Command="{Binding SearchHistoryCommand}"
+                        ToolTip.Tip="Search" Background="Transparent" VerticalAlignment="Center">
+                    <Canvas Width="14" Height="14">
+                        <Ellipse Width="8" Height="8" Canvas.Left="1" Canvas.Top="1"
+                                 Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"/>
+                        <Line StartPoint="7.6,7.6" EndPoint="12.2,12.2"
+                              Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
+                              StrokeLineCap="Round"/>
+                    </Canvas>
+                </Button>
+            </Grid>
+            <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding HasHistoryFilter}">
+                <Button x:Name="HistoryCloseButton" Command="{Binding ShowAllCommitsCommand}"
+                        IsVisible="{Binding HasHistoryQuery}" IsEnabled="{Binding CanRunCommands}"
+                        Classes="accent" Width="28" Height="28" Padding="0" MinWidth="0" CornerRadius="8"
+                        Margin="0,0,10,0" VerticalAlignment="Center"
+                        AutomationProperties.Name="Close history"
+                        ToolTip.Tip="Show the commit graph">
+                    <Canvas Width="12" Height="12">
+                        <Line StartPoint="1,1" EndPoint="11,11"
+                              Stroke="{DynamicResource CatppuccinOnAccentBrush}" StrokeThickness="2" StrokeLineCap="Round"/>
+                        <Line StartPoint="11,1" EndPoint="1,11"
+                              Stroke="{DynamicResource CatppuccinOnAccentBrush}" StrokeThickness="2" StrokeLineCap="Round"/>
+                    </Canvas>
+                </Button>
+                <TextBlock Grid.Column="1" Text="{Binding HistoryCaption}" Opacity="0.75" TextWrapping="Wrap" VerticalAlignment="Center"/>
+            </Grid>
+        </StackPanel>
+    </Grid>
+</UserControl>

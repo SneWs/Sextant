@@ -5,6 +5,7 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Sextant;
+using Sextant.Docking;
 using Sextant.Services;
 using Sextant.ViewModels;
 using System.ComponentModel;
@@ -15,16 +16,24 @@ public partial class MainWindow : Window
 {
     public MainWindow()
     {
+        if (Application.Current is { } app)
+            DockChrome.Ensure(app);
         InitializeComponent();
         AddHandler(KeyDownEvent, OnTunnelKey, RoutingStrategies.Tunnel);
-        AddHandler(PointerMovedEvent, OnWindowPointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
-        AddHandler(PointerReleasedEvent, OnWindowPointerReleased, RoutingStrategies.Tunnel, handledEventsToo: true);
-        TabsList.LayoutUpdated += (_, _) => PlacePaneRule();
-        TabScroll.ScrollChanged += (_, _) => PlacePaneRule();
+        AddHandler(KeyDownEvent, OnBubbleKey, RoutingStrategies.Bubble);
         SizeChanged += (_, _) => RememberWindow();
         PositionChanged += (_, _) => RememberWindow();
         PropertyChanged += OnWindowPropertyChanged;
         Activated += OnWindowActivated;
+    }
+
+    private void OnRepositoryTabPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.Source is Visual source && source.FindAncestorOfType<Button>() is not null)
+            return;
+        if (sender is not Control { DataContext: RepositoryViewModel tab } || DataContext is not MainViewModel vm)
+            return;
+        _ = vm.Activate(tab);
     }
 
     private async void OnWindowActivated(object? sender, EventArgs e)
@@ -42,7 +51,21 @@ public partial class MainWindow : Window
         vm.ExitRequested += OnExitRequested;
         vm.PropertyChanged += OnViewModelPropertyChanged;
         vm.Attach(new AvaloniaDialogService(this));
+        vm.Dock.Screens = WorkAreas;
+        vm.Dock.RehomeOffScreenFloats();
         await vm.InitializeAsync();
+    }
+
+    private IReadOnlyList<(int X, int Y, int Width, int Height)> WorkAreas()
+    {
+        var screens = Screens?.All;
+        if (screens is null || screens.Count == 0)
+            return [];
+        return screens.Select(screen =>
+        {
+            var area = screen.WorkingArea;
+            return (area.X, area.Y, area.Width, area.Height);
+        }).ToList();
     }
 
     private void OnExitRequested(object? sender, EventArgs e) => Close();
@@ -60,7 +83,6 @@ public partial class MainWindow : Window
             return;
         _closing = true;
         CommitWindow();
-        ReadWidths();
         IsEnabled = false;
         await vm.Shutdown();
         _shutdownComplete = true;
@@ -69,7 +91,6 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        _dragTab = null;
         if (DataContext is MainViewModel vm)
         {
             vm.ExitRequested -= OnExitRequested;
@@ -78,227 +99,22 @@ public partial class MainWindow : Window
         base.OnClosed(e);
     }
 
-    private void ReadWidths()
-    {
-        foreach (var view in this.GetVisualDescendants().OfType<RepositoryView>())
-            view.ReadWidths();
-    }
-
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MainViewModel.PaletteOpen) && sender is MainViewModel { PaletteOpen: true })
             PaletteBox.Focus();
-        if (e.PropertyName is nameof(MainViewModel.ActiveTab) or nameof(MainViewModel.HasActiveTab))
-            PlacePaneRule();
     }
 
-    private bool _placingPaneRule;
-
-    /// <summary>
-    /// The repository pane's top rule runs the full width and stops under the selected tab,
-    /// so that tab's side borders meet the rule and its bottom stays open.
-    /// With no tab open, the rule is not drawn.
-    /// </summary>
-    private void PlacePaneRule()
+    private void OnTunnelKey(object? sender, KeyEventArgs e)
     {
-        if (_placingPaneRule || PaneHost is null)
-            return;
-        var hostWidth = PaneHost.Bounds.Width;
-        if (hostWidth <= 0)
-            return;
-        _placingPaneRule = true;
-        try
-        {
-            if (DataContext is not MainViewModel { ActiveTab: not null })
-            {
-                SetRule(PaneRuleLeft, 0, 0);
-                SetRule(PaneRuleRight, 0, 0);
-                return;
-            }
-
-            double left;
-            double rightStart;
-            if (!TryActiveTabSpan(out var x, out var tabWidth))
-            {
-                left = hostWidth;
-                rightStart = hostWidth;
-            }
-            else
-            {
-                var innerLeft = x + 1;
-                var innerRight = x + tabWidth - 1;
-                left = Math.Clamp(innerLeft, 0, hostWidth);
-                rightStart = Math.Clamp(innerRight, 0, hostWidth);
-                if (rightStart < left)
-                    rightStart = left;
-            }
-
-            SetRule(PaneRuleLeft, 0, left);
-            SetRule(PaneRuleRight, rightStart, Math.Max(0, hostWidth - rightStart));
-        }
-        finally
-        {
-            _placingPaneRule = false;
-        }
+        if (DataContext is MainViewModel vm)
+            WindowInput.OnTunnel(vm, e);
     }
 
-    private bool TryActiveTabSpan(out double x, out double width)
+    private void OnBubbleKey(object? sender, KeyEventArgs e)
     {
-        x = 0;
-        width = 0;
-        if (DataContext is not MainViewModel vm || vm.ActiveTab is null)
-            return false;
-        var index = vm.Tabs.IndexOf(vm.ActiveTab);
-        if (index < 0 || TabsList.ContainerFromIndex(index) is not Visual container)
-            return false;
-        var chrome = container.GetVisualDescendants().OfType<Border>().FirstOrDefault(border => border.Classes.Contains("tab"));
-        if (chrome is null || chrome.Bounds.Width <= 0)
-            return false;
-        var origin = chrome.TranslatePoint(default, PaneHost);
-        if (origin is null)
-            return false;
-        x = origin.Value.X;
-        width = chrome.Bounds.Width;
-        return true;
-    }
-
-    private static void SetRule(Border rule, double x, double width)
-    {
-        var show = width > 0.5;
-        if (rule.IsVisible != show)
-            rule.IsVisible = show;
-        if (!show)
-        {
-            if (double.IsNaN(rule.Width) || rule.Width > 0.5)
-                rule.Width = 0;
-            return;
-        }
-
-        if (Math.Abs(rule.Margin.Left - x) > 0.5)
-            rule.Margin = new Thickness(x, 0, 0, 0);
-        if (double.IsNaN(rule.Width) || Math.Abs(rule.Width - width) > 0.5)
-            rule.Width = width;
-    }
-
-    private async void OnTunnelKey(object? sender, KeyEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm)
-            return;
-        if (AppGestures.Matches(e, Key.P))
-        {
-            vm.TogglePalette();
-            e.Handled = true;
-            return;
-        }
-
-        if (AppGestures.Matches(e, Key.O))
-        {
-            e.Handled = true;
-            if (vm.CanUseGit)
-                await vm.OpenFolderCommand.ExecuteAsync(null);
-            return;
-        }
-
-        if (AppGestures.Matches(e, Key.P, KeyModifiers.Shift))
-        {
-            e.Handled = true;
-            if (vm.CanRunRepositoryCommands)
-                vm.PushCommand.Execute(null);
-            return;
-        }
-
-        if (AppGestures.Matches(e, Key.U, KeyModifiers.Shift))
-        {
-            e.Handled = true;
-            if (vm.CanRunRepositoryCommands)
-                vm.PullCommand.Execute(null);
-            return;
-        }
-
-        if (AppGestures.Matches(e, Key.F) && vm.ActiveTab is { } searchTab)
-        {
-            searchTab.ToggleHistorySearchCommand.Execute(null);
-            e.Handled = true;
-            return;
-        }
-
-        if (AppGestures.Matches(e, Key.B) && vm.ActiveTab is { } branchTab)
-        {
-            e.Handled = true;
-            if (branchTab.CanRunCommands)
-                await branchTab.CreateBranchCommand.ExecuteAsync(null);
-            return;
-        }
-
-        if (AppGestures.Matches(e, Key.S))
-        {
-            e.Handled = true;
-            if (vm.StashCommand.CanExecute(null))
-                await vm.StashCommand.ExecuteAsync(null);
-            return;
-        }
-
-        if (AppGestures.Matches(e, Key.S, KeyModifiers.Shift))
-        {
-            e.Handled = true;
-            if (vm.PopLatestStashCommand.CanExecute(null))
-                await vm.PopLatestStashCommand.ExecuteAsync(null);
-            return;
-        }
-
-        if (AppGestures.Matches(e, Key.A, KeyModifiers.Shift))
-        {
-            e.Handled = true;
-            if (vm.StageAllCommand.CanExecute(null))
-                await vm.StageAllCommand.ExecuteAsync(null);
-            return;
-        }
-
-        if (AppGestures.Matches(e, Key.R, KeyModifiers.Shift))
-        {
-            e.Handled = true;
-            if (vm.UnstageAllCommand.CanExecute(null))
-                await vm.UnstageAllCommand.ExecuteAsync(null);
-            return;
-        }
-
-        if (e.Key == Key.Escape && vm.PaletteOpen)
-        {
-            vm.ClosePalette();
-            e.Handled = true;
-            return;
-        }
-
-        if (AppGestures.Matches(e, Key.W))
-        {
-            e.Handled = true;
-            if (vm.PaletteOpen)
-                vm.ClosePalette();
-            else
-                await vm.CloseActiveCommand.ExecuteAsync(null);
-            return;
-        }
-
-        // Command+Tab is the macOS application switcher, so next tab is Control+Tab everywhere.
-        if (e.Key == Key.Tab && e.KeyModifiers == KeyModifiers.Control)
-        {
-            e.Handled = true;
-            await vm.NextTabCommand.ExecuteAsync(null);
-            return;
-        }
-
-        if (!vm.PaletteOpen && e.KeyModifiers == AppGestures.Command && Digit(e.Key) is int digit)
-        {
-            e.Handled = true;
-            await vm.ActivateDigit(digit);
-            return;
-        }
-
-        if (e.Key == Key.F5)
-        {
-            e.Handled = true;
-            await vm.RefreshActiveCommand.ExecuteAsync(null);
-        }
+        if (DataContext is MainViewModel vm)
+            WindowInput.OnHistoryEscape(vm, e);
     }
 
     private async void OnPaletteKeyDown(object? sender, KeyEventArgs e)
@@ -345,9 +161,6 @@ public partial class MainWindow : Window
     private bool _layoutApplied;
     private bool _applyingLayout;
     private int _remember;
-    private RepositoryViewModel? _dragTab;
-    private Point _dragStart;
-    private bool _dragMoved;
 
     private void OnWindowPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
@@ -476,152 +289,4 @@ public partial class MainWindow : Window
         var area = screen.WorkingArea;
         return Width * scale >= area.Width - 8 && Height * scale >= area.Height - 8;
     }
-
-    private void OnTabPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (sender is not Panel { DataContext: RepositoryViewModel tab })
-            return;
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || IsCloseButton(e.Source))
-            return;
-        _dragTab = tab;
-        _dragStart = e.GetPosition(this);
-        _dragMoved = false;
-    }
-
-    private async void OnWindowPointerMoved(object? sender, PointerEventArgs e)
-    {
-        if (_dragTab is null || DataContext is not MainViewModel vm)
-            return;
-        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-        {
-            await FinishTabGesture(activateIfClick: true);
-            return;
-        }
-
-        var point = e.GetPosition(this);
-        if (!_dragMoved)
-        {
-            if (Math.Abs(point.X - _dragStart.X) < 6 && Math.Abs(point.Y - _dragStart.Y) < 6)
-                return;
-            _dragMoved = true;
-            e.Pointer.Capture(this);
-            Cursor = new Cursor(StandardCursorType.SizeWestEast);
-        }
-
-        var index = TabIndexAt(e.GetPosition(TabsList));
-        if (index >= 0)
-            vm.MoveTab(_dragTab, index);
-        NudgeTabScroll(e.GetPosition(TabScroll));
-        e.Handled = true;
-    }
-
-    private async void OnWindowPointerReleased(object? sender, PointerReleasedEventArgs e)
-    {
-        if (_dragTab is null)
-            return;
-        if (_dragMoved)
-            e.Handled = true;
-        var activation = FinishTabGesture(activateIfClick: true);
-        if (e.Pointer.Captured == this)
-            e.Pointer.Capture(null);
-        await activation;
-    }
-
-    private Task FinishTabGesture(bool activateIfClick)
-    {
-        if (_dragTab is null)
-            return Task.CompletedTask;
-        var tab = _dragTab;
-        var moved = _dragMoved;
-        EndDrag();
-        if (activateIfClick && !moved && DataContext is MainViewModel vm)
-            return vm.Activate(tab);
-        return Task.CompletedTask;
-    }
-
-    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
-    {
-        base.OnPointerCaptureLost(e);
-        EndDrag();
-    }
-
-    private void EndDrag()
-    {
-        if (_dragTab is null)
-            return;
-        var moved = _dragMoved;
-        _dragTab = null;
-        _dragMoved = false;
-        Cursor = new Cursor(StandardCursorType.Arrow);
-        if (moved && DataContext is MainViewModel vm)
-            vm.Save();
-    }
-
-    private void NudgeTabScroll(Point point)
-    {
-        var offset = TabScroll.Offset;
-        if (point.X < 24)
-            TabScroll.Offset = new Vector(Math.Max(0, offset.X - 16), offset.Y);
-        else if (point.X > TabScroll.Bounds.Width - 24)
-            TabScroll.Offset = new Vector(offset.X + 16, offset.Y);
-    }
-
-    private int TabIndexAt(Point point)
-    {
-        if (DataContext is not MainViewModel vm || vm.Tabs.Count == 0)
-            return -1;
-        var first = TabBounds(0);
-        var last = TabBounds(vm.Tabs.Count - 1);
-        if (first is null || last is null)
-            return -1;
-        if (point.X < first.Value.X)
-            return 0;
-        if (point.X >= last.Value.X + last.Value.Width)
-            return vm.Tabs.Count - 1;
-        for (var i = 0; i < vm.Tabs.Count; i++)
-        {
-            if (TabBounds(i) is not Rect bounds)
-                continue;
-            if (point.X >= bounds.X && point.X < bounds.X + bounds.Width)
-                return i;
-        }
-
-        return -1;
-    }
-
-    private Rect? TabBounds(int index)
-    {
-        if (TabsList.ContainerFromIndex(index) is not Visual visual)
-            return null;
-        var origin = visual.TranslatePoint(default, TabsList);
-        return origin is null ? null : new Rect(origin.Value, visual.Bounds.Size);
-    }
-
-    private static bool IsCloseButton(object? source)
-    {
-        var visual = source as Visual;
-        while (visual is not null)
-        {
-            if (visual is Button { Content: "×" })
-                return true;
-            visual = visual.GetVisualParent();
-        }
-
-        return false;
-    }
-
-    private static int? Digit(Key key) => key switch
-    {
-        Key.D0 or Key.NumPad0 => 0,
-        Key.D1 or Key.NumPad1 => 1,
-        Key.D2 or Key.NumPad2 => 2,
-        Key.D3 or Key.NumPad3 => 3,
-        Key.D4 or Key.NumPad4 => 4,
-        Key.D5 or Key.NumPad5 => 5,
-        Key.D6 or Key.NumPad6 => 6,
-        Key.D7 or Key.NumPad7 => 7,
-        Key.D8 or Key.NumPad8 => 8,
-        Key.D9 or Key.NumPad9 => 9,
-        _ => null,
-    };
 }
