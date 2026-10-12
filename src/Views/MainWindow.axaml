@@ -15,10 +15,85 @@
         MinWidth="880" MinHeight="520"
         Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
 
+    <Window.Resources>
+        <ControlTheme x:Key="RepositoryTabClose" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Width" Value="{DynamicResource DockCloseButtonSize}"/>
+            <Setter Property="Height" Value="{DynamicResource DockCloseButtonSize}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource DockDocumentTabItemCornerRadius}"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter x:Name="PART_ContentPresenter"
+                                      Background="{TemplateBinding Background}"
+                                      Padding="{TemplateBinding Padding}"
+                                      CornerRadius="{TemplateBinding CornerRadius}"
+                                      Content="{TemplateBinding Content}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover">
+                <Setter Property="Background" Value="{DynamicResource DockChromeButtonDangerHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pressed">
+                <Setter Property="Background" Value="{DynamicResource DockChromeButtonPressedBackgroundBrush}"/>
+            </Style>
+        </ControlTheme>
+    </Window.Resources>
+
     <Window.Styles>
-        <Style Selector="Border.tab.selected">
-            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}"/>
+        <Style Selector="TabStrip#RepositoryTabs">
+            <Setter Property="Background" Value="{DynamicResource DockTabBackgroundBrush}"/>
+            <Setter Property="MinHeight" Value="{DynamicResource DockHeaderHeight}"/>
+        </Style>
+        <Style Selector="TabStrip#RepositoryTabs TabStripItem" x:DataType="vm:RepositoryViewModel">
+            <Setter Property="ToolTip.Tip" Value="{Binding ShortcutHint}"/>
+            <Setter Property="Background" Value="{DynamicResource DockSurfacePanelBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource DockTabForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource DockBorderSubtleBrush}"/>
+            <Setter Property="BorderThickness" Value="1,1,1,0"/>
+            <Setter Property="Padding" Value="{DynamicResource DockDocumentTabItemPadding}"/>
+            <Setter Property="MinHeight" Value="{DynamicResource DockHeaderHeight}"/>
+            <Setter Property="MinWidth" Value="{DynamicResource DockDocumentTabItemMinWidth}"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource DockDocumentTabItemCornerRadius}"/>
+            <Setter Property="FontSize" Value="{DynamicResource DockFontSizeNormal}"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="TabStrip#RepositoryTabs TabStripItem:pointerover">
+            <Setter Property="Background" Value="{DynamicResource DockTabHoverBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource DockDocumentTabPointerOverForegroundBrush}"/>
+        </Style>
+        <Style Selector="TabStrip#RepositoryTabs TabStripItem:selected">
+            <Setter Property="Background" Value="{DynamicResource DockSurfaceHeaderActiveBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource DockTabActiveForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource DockBorderSubtleBrush}"/>
+        </Style>
+        <Style Selector="TabStrip#RepositoryTabs TabStripItem:selected:pointerover">
+            <Setter Property="Background" Value="{DynamicResource DockSurfaceHeaderActiveBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource DockTabActiveForegroundBrush}"/>
         </Style>
     </Window.Styles>
 
@@ -108,35 +183,45 @@
         </Border>
 
         <Grid Grid.Row="2" RowDefinitions="Auto,Auto,*">
-                <ScrollViewer x:Name="TabScroll" Padding="8,6,8,0"
-                              HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
-                              Background="Transparent">
-                    <ItemsControl x:Name="TabsList" ItemsSource="{Binding Tabs}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:RepositoryViewModel">
-                                <Panel Margin="0,0,6,0" ToolTip.Tip="{Binding ShortcutHint}" PointerPressed="OnRepositoryTabPressed">
-                                    <Border Classes="tab" Classes.selected="{Binding IsActive}"
-                                            BorderThickness="1,1,1,0"
-                                            CornerRadius="6,6,0,0"
-                                            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
-                                            Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"/>
-                                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="16,10">
-                                        <Ellipse Width="6" Height="6" Fill="#D04040" IsVisible="{Binding IsConflicted}" VerticalAlignment="Center"/>
-                                        <Ellipse Width="6" Height="6" Fill="#E0A100" IsVisible="{Binding ShowDirtyDot}" VerticalAlignment="Center"/>
-                                        <Ellipse Width="6" Height="6" Fill="#3CB44B" IsVisible="{Binding ShowCleanDot}" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding Title}" VerticalAlignment="Center" Background="Transparent"/>
-                                        <Button Classes="flat" Content="×" Command="{Binding CloseTabCommand}" Padding="4,0" MinWidth="0"/>
-                                    </StackPanel>
-                                </Panel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+                <Border IsVisible="{Binding HasActiveTab}"
+                        Background="{DynamicResource DockSurfacePanelBrush}"
+                        BorderThickness="0,0,0,1"
+                        BorderBrush="{DynamicResource DockSeparatorBrush}">
+                    <ScrollViewer x:Name="TabScroll"
+                                  HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                                  Background="Transparent">
+                        <TabStrip x:Name="RepositoryTabs" ItemsSource="{Binding Tabs}" SelectionChanged="OnRepositoryTabSelected">
+                            <TabStrip.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </TabStrip.ItemsPanel>
+                            <TabStrip.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RepositoryViewModel">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="{DynamicResource DockToolChromeHeaderMargin}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Ellipse Width="6" Height="6" Margin="0,0,4,0" Fill="#D04040" IsVisible="{Binding IsConflicted}"/>
+                                            <Ellipse Width="6" Height="6" Margin="0,0,4,0" Fill="#E0A100" IsVisible="{Binding ShowDirtyDot}"/>
+                                            <Ellipse Width="6" Height="6" Margin="0,0,4,0" Fill="#3CB44B" IsVisible="{Binding ShowCleanDot}"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Margin="{DynamicResource DockToolChromeTitleMargin}"/>
+                                        <Button Grid.Column="2" Theme="{StaticResource RepositoryTabClose}"
+                                                Command="{Binding CloseTabCommand}"
+                                                Margin="{DynamicResource DockChromeButtonMargin}">
+                                            <Viewbox Width="8" Height="8">
+                                                <Path Fill="{Binding $parent[TabStripItem].Foreground}"
+                                                      Data="{DynamicResource DockToolIconCloseGeometry}"
+                                                      Stretch="Uniform"/>
+                                            </Viewbox>
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </TabStrip.ItemTemplate>
+                        </TabStrip>
+                    </ScrollViewer>
+                </Border>
                 <Panel Grid.Row="1" IsVisible="{Binding HasActiveTab}">
                     <ContentControl Content="{Binding ActiveTab}">
                         <ContentControl.ContentTemplate>

@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -24,16 +25,47 @@ public partial class MainWindow : Window
         SizeChanged += (_, _) => RememberWindow();
         PositionChanged += (_, _) => RememberWindow();
         PropertyChanged += OnWindowPropertyChanged;
+        DataContextChanged += (_, _) => AttachViewModel();
         Activated += OnWindowActivated;
     }
 
-    private void OnRepositoryTabPressed(object? sender, PointerPressedEventArgs e)
+    private MainViewModel? _watched;
+    private bool _syncingTabs;
+
+    private void AttachViewModel()
     {
-        if (e.Source is Visual source && source.FindAncestorOfType<Button>() is not null)
+        if (_watched is not null)
+            _watched.PropertyChanged -= OnViewModelPropertyChanged;
+        _watched = DataContext as MainViewModel;
+        if (_watched is not null)
+            _watched.PropertyChanged += OnViewModelPropertyChanged;
+        SyncRepositoryTabs();
+    }
+
+    private void OnRepositoryTabSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_syncingTabs || sender is not TabStrip strip || strip.SelectedItem is not RepositoryViewModel tab || DataContext is not MainViewModel vm)
             return;
-        if (sender is not Control { DataContext: RepositoryViewModel tab } || DataContext is not MainViewModel vm)
+        if (ReferenceEquals(vm.ActiveTab, tab) || (!strip.IsPointerOver && !strip.IsKeyboardFocusWithin))
             return;
         _ = vm.Activate(tab);
+    }
+
+    private void SyncRepositoryTabs()
+    {
+        if (RepositoryTabs is null || DataContext is not MainViewModel vm)
+            return;
+        if (ReferenceEquals(RepositoryTabs.SelectedItem, vm.ActiveTab))
+            return;
+        _syncingTabs = true;
+        try
+        {
+            RepositoryTabs.SelectedItem = vm.ActiveTab;
+        }
+        finally
+        {
+            _syncingTabs = false;
+        }
     }
 
     private async void OnWindowActivated(object? sender, EventArgs e)
@@ -49,7 +81,6 @@ public partial class MainWindow : Window
         if (DataContext is not MainViewModel vm)
             return;
         vm.ExitRequested += OnExitRequested;
-        vm.PropertyChanged += OnViewModelPropertyChanged;
         vm.Attach(new AvaloniaDialogService(this));
         vm.Dock.Screens = WorkAreas;
         vm.Dock.RehomeOffScreenFloats();
@@ -101,6 +132,8 @@ public partial class MainWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(MainViewModel.ActiveTab))
+            SyncRepositoryTabs();
         if (e.PropertyName == nameof(MainViewModel.PaletteOpen) && sender is MainViewModel { PaletteOpen: true })
             PaletteBox.Focus();
     }
