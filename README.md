@@ -61,4 +61,4 @@ On Linux a published build includes `sextant.desktop` and the sextant mark besid
 
 ## License
 
-Sextant is free to use when you build it from source, and when you install a release from GitHub. Marcus Grenängen also sells official pre-built binaries for Windows and macOS. The terms are in [LICENSE](LICENSE).
+Sextant is free to use when you build it from source, and when you install a release from GitHub. Marcus Grenängen also sells official pre-built binaries for Windows and macOS. The terms are in [LICENSE](LICENSE). The [privacy policy](docs/privacy.md) covers what the app stores on your computer.

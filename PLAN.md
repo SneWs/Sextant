@@ -108,6 +108,8 @@ On 2026-10-12 Partner Center also shows the package SID `S-1-15-2-4043513989-194
 
 On 2026-10-12 the Windows job no longer fails when `Store_Package_Version` is empty. The certificate secrets alone used to put `make-msix.ps1` into Store mode, and `0.1.9-beta` became `0.1.9.0`, which that mode rejects. The pack step now skips until the variable is set, and the MSIX artifact is uploaded only when a package was produced. The workflow still does not submit anything to Partner Center.
 
+On 2026-10-12 the Microsoft Store listing gained a privacy policy at `docs/privacy.md`. Sextant has no account, telemetry, or server of its own. The policy says settings and the workspace stay in the local config folder, Git network commands go through the installed `git` and its credential helper, and a remembered SSH passphrase stays in memory until the app closes. The Store URL is `https://github.com/SneWs/Sextant/blob/master/docs/privacy.md`.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
