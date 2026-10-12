@@ -523,6 +523,12 @@ public static class GitCommands
     public static IReadOnlyList<string> ApplyCachedReverse(string toplevel, string patchFile) =>
         ["-C", toplevel, "apply", "--cached", "--reverse", patchFile];
 
+    /// <summary>
+    /// Reverses a patch in the working tree. The index is left alone.
+    /// </summary>
+    public static IReadOnlyList<string> ApplyReverse(string toplevel, string patchFile) =>
+        ["-C", toplevel, "apply", "--reverse", "--", patchFile];
+
     public static IReadOnlyList<string> Commit(string toplevel, string messageFile, bool noVerify = false)
     {
         var arguments = new List<string> { "-C", toplevel, "commit" };

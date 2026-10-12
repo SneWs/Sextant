@@ -7,6 +7,7 @@ using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
 using Sextant;
 using Sextant.Git;
+using Sextant.Git.Models;
 using Sextant.Services;
 using Sextant.ViewModels;
 using Sextant.Views;
@@ -158,6 +159,116 @@ public class DiffHeaderLayoutTests
         }, CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Discard_hunk_sits_beside_stage_hunk_and_restores_that_change()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(App));
+        using var repo = new TempRepo();
+        var lines = Enumerable.Range(0, 40).Select(index => $"line {index}").ToArray();
+        repo.WriteFile("a.txt", string.Join('\n', lines) + "\n");
+        repo.WriteFile("b.txt", "one\n");
+        repo.CommitAll("base");
+        repo.WriteFile("b.txt", "staged\n");
+        repo.Run("add", "b.txt");
+        lines[2] = "changed-a";
+        lines[18] = "changed-b";
+        lines[34] = "changed-c";
+        repo.WriteFile("a.txt", string.Join('\n', lines) + "\n");
+
+        var dialogs = new DiscardDialogs();
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new HeaderHost(repo.Git, dialogs), repo.Directory);
+            Window? window = null;
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                await vm.ExpandAllSectionsCommand.ExecuteAsync(null);
+                var unstaged = vm.DiffRows.OfType<DiffHunkRow>().Where(row => row.ActionLabel == "Stage hunk").ToList();
+                var staged = vm.DiffRows.OfType<DiffHunkRow>().Where(row => row.ActionLabel == "Unstage hunk").ToList();
+                Assert.Equal(3, unstaged.Count);
+                Assert.All(unstaged, row => Assert.True(row.ShowDiscard));
+                var stagedHunk = Assert.Single(staged);
+                Assert.False(stagedHunk.ShowDiscard);
+
+                var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 900 };
+                window = new Window { Content = view, Width = 1100, Height = 900 };
+                window.Show();
+                var list = view.FindControl<CopyListBox>("DiffList");
+                Assert.NotNull(list);
+                list.ScrollIntoView(unstaged[1]);
+                Settle(view);
+                var discard = ButtonOn(view, unstaged[1], "Discard hunk");
+                var stage = ButtonOn(view, unstaged[1], "Stage hunk");
+                Assert.True(discard.IsEffectivelyVisible);
+                Assert.True(stage.IsEffectivelyVisible);
+                Assert.Same(unstaged[1].DiscardCommand, discard.Command);
+                Assert.Same(unstaged[1].ActionCommand, stage.Command);
+                var discardAt = discard.TranslatePoint(default, list);
+                var stageAt = stage.TranslatePoint(default, list);
+                Assert.NotNull(discardAt);
+                Assert.NotNull(stageAt);
+                Assert.True(discardAt.Value.X + discard.Bounds.Width <= stageAt.Value.X + 1,
+                    $"discard {discardAt.Value.X} stage {stageAt.Value.X}");
+                Assert.True(Math.Abs(discardAt.Value.Y - stageAt.Value.Y) < 2, "discard and stage hunk are on one row");
+
+                list.ScrollIntoView(stagedHunk);
+                Settle(view);
+                Assert.True(ButtonOn(view, stagedHunk, "Unstage hunk").IsEffectivelyVisible);
+                Assert.DoesNotContain(view.GetVisualDescendants().OfType<Button>(),
+                    button => ReferenceEquals(button.DataContext, stagedHunk)
+                        && button.IsEffectivelyVisible
+                        && button.Content as string == "Discard hunk");
+
+                list.ScrollIntoView(unstaged[1]);
+                Settle(view);
+                discard = ButtonOn(view, unstaged[1], "Discard hunk");
+                await Click(window, discard);
+                Assert.Equal(1, dialogs.Confirmations);
+                Assert.Equal("Discard hunk", dialogs.Title);
+                Assert.Equal("Discard hunk", dialogs.Confirm);
+                Assert.Contains("a.txt", dialogs.Message, StringComparison.Ordinal);
+                Assert.Contains("changed-b", Read(repo), StringComparison.Ordinal);
+
+                dialogs.Accept = true;
+                discard = ButtonOn(view, unstaged[1], "Discard hunk");
+                await Click(window, discard);
+                Assert.Equal(2, dialogs.Confirmations);
+                Assert.False(vm.HasBanner, vm.Banner);
+                var text = Read(repo);
+                Assert.Contains("changed-a", text, StringComparison.Ordinal);
+                Assert.DoesNotContain("changed-b", text, StringComparison.Ordinal);
+                Assert.Contains("changed-c", text, StringComparison.Ordinal);
+                Assert.Equal("b.txt", repo.RunCapture("diff", "--cached", "--name-only").Trim());
+            }
+            finally
+            {
+                window?.Close();
+                await vm.DisposeAsync();
+            }
+
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    private static Button ButtonOn(Visual root, object row, string content) =>
+        root.GetVisualDescendants().OfType<Button>().Single(button =>
+            ReferenceEquals(button.DataContext, row) && button.Content as string == content);
+
+    private static async Task Click(Window window, Button button)
+    {
+        var point = button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window);
+        Assert.NotNull(point);
+        window.MouseDown(point.Value, MouseButton.Left);
+        window.MouseUp(point.Value, MouseButton.Left);
+        var command = Assert.IsAssignableFrom<IAsyncRelayCommand>(button.Command);
+        Assert.NotNull(command.ExecutionTask);
+        await command.ExecutionTask;
+    }
+
+    private static string Read(TempRepo repo) =>
+        File.ReadAllText(Path.Combine(repo.Directory, "a.txt")).Replace("\r\n", "\n", StringComparison.Ordinal);
+
     private static DiffFileRow Header(string name) => new()
     {
         Label = name,
@@ -211,9 +322,57 @@ public class DiffHeaderLayoutTests
         return point.Value.X;
     }
 
-    private sealed class HeaderHost(string? git = null) : IWorkspaceHost
+    private sealed class DiscardDialogs : IDialogService
     {
-        public IDialogService? Dialogs => null;
+        public bool Accept { get; set; }
+
+        public string Title { get; private set; } = "";
+
+        public string Message { get; private set; } = "";
+
+        public string Confirm { get; private set; } = "";
+
+        public int Confirmations { get; private set; }
+
+        public Task<bool> ConfirmAsync(string title, string message, string confirm = "OK")
+        {
+            Title = title;
+            Message = message;
+            Confirm = confirm;
+            Confirmations++;
+            return Task.FromResult(Accept);
+        }
+
+        public Task<string?> PickFolderAsync(string title, string? startDirectory = null) => throw new NotSupportedException();
+
+        public Task<string?> PickGitExecutableAsync() => throw new NotSupportedException();
+
+        public Task<string?> PromptAsync(string title, string message, string initial = "", bool allowEmpty = false) => throw new NotSupportedException();
+
+        public Task<string?> PromptSecretAsync(string title, string message) => throw new NotSupportedException();
+
+        public Task<string?> SaveFileAsync(string title, string suggestedName) => throw new NotSupportedException();
+
+        public Task<string?> PickFileAsync(string title, string typeName, IReadOnlyList<string> patterns) => throw new NotSupportedException();
+
+        public Task<CloneRequest?> PromptCloneAsync() => throw new NotSupportedException();
+
+        public Task<string?> PickAsync(string title, string message, IReadOnlyList<string> options) => throw new NotSupportedException();
+
+        public Task<PerformanceChoice?> ConfirmPerformanceAsync(PerformanceSuggestion suggestion) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<RebaseStep>?> EditRebaseAsync(IReadOnlyList<RebaseStep> steps) => throw new NotSupportedException();
+
+        public Task<SettingsDraft?> EditSettingsAsync(SettingsDraft current) => throw new NotSupportedException();
+
+        public Task ShowAboutAsync() => throw new NotSupportedException();
+
+        public Task CopyAsync(string text) => throw new NotSupportedException();
+    }
+
+    private sealed class HeaderHost(string? git = null, IDialogService? dialogs = null) : IWorkspaceHost
+    {
+        public IDialogService? Dialogs => dialogs;
 
         public GitProcessRunner Runner { get; } = new();
 

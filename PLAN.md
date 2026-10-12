@@ -304,7 +304,7 @@ For a tracked text file that is a plain modification:
 4. On a reject, show stderr. There is no interactive `git add -p` fallback, because that needs a terminal.
 5. Refresh status and that file's diff.
 
-Hide hunk buttons for untracked files, deletions, renames, mode-only changes, and binary files. Those use the whole-file stage and unstage commands. A hunk row is a full-width rounded bar with the same background and light stroke as a file header. Stage hunk and Unstage hunk sit on the right of that bar and use the accent color.
+Hide hunk buttons for untracked files, deletions, renames, mode-only changes, and binary files. Those use the whole-file stage and unstage commands. A hunk row is a full-width rounded bar with the same background and light stroke as a file header. Stage hunk and Unstage hunk sit on the right of that bar and use the accent color. Discard hunk sits to the left of Stage hunk on an unstaged change. It asks for confirmation, then reverses that hunk in the working tree and leaves the index alone.
 
 ### Commit graph lanes
 

@@ -781,6 +781,12 @@ public sealed partial class RepositorySession : IAsyncDisposable
     public Task ApplyHunkAsync(string rawPatch, int hunkIndex, bool reverse, CancellationToken cancellationToken) =>
         ApplyPatchTextAsync(HunkPatch.Slice(rawPatch, hunkIndex), reverse, cancellationToken);
 
+    /// <summary>
+    /// Reverses one hunk in the working tree. The index is left alone.
+    /// </summary>
+    public Task DiscardHunkAsync(string rawPatch, int hunkIndex, CancellationToken cancellationToken) =>
+        ApplyPatchTextAsync(HunkPatch.Slice(rawPatch, hunkIndex), reverse: true, cancellationToken, cached: false);
+
     public Task ApplyLineAsync(string rawPatch, int hunkIndex, int lineIndex, bool reverse, CancellationToken cancellationToken)
     {
         var patch = Staging.LinePatch.Slice(rawPatch, hunkIndex, lineIndex);
@@ -789,7 +795,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
         return ApplyPatchTextAsync(patch, reverse, cancellationToken);
     }
 
-    private Task ApplyPatchTextAsync(string patch, bool reverse, CancellationToken cancellationToken) =>
+    private Task ApplyPatchTextAsync(string patch, bool reverse, CancellationToken cancellationToken, bool cached = true) =>
         RunAsync(async ct =>
         {
             await _scheduler.WriteAsync(async token =>
@@ -798,9 +804,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
                 try
                 {
                     await File.WriteAllTextAsync(file, patch, new UTF8Encoding(false), token).ConfigureAwait(false);
-                    var arguments = reverse
-                        ? GitCommands.ApplyCachedReverse(_toplevel, file)
-                        : GitCommands.ApplyCached(_toplevel, file);
+                    var arguments = PatchArguments(file, reverse, cached);
                     Checked(await ExecuteAsync(arguments, null, token).ConfigureAwait(false));
                     return 0;
                 }
@@ -811,6 +815,13 @@ public sealed partial class RepositorySession : IAsyncDisposable
             }, ct).ConfigureAwait(false);
             await LoadRefsAndMaybeHistoryAsync(ct, statusAlreadyApplied: false).ConfigureAwait(false);
         }, cancellationToken);
+
+    private IReadOnlyList<string> PatchArguments(string file, bool reverse, bool cached)
+    {
+        if (!cached)
+            return reverse ? GitCommands.ApplyReverse(_toplevel, file) : GitCommands.ApplyPatch(_toplevel, file);
+        return reverse ? GitCommands.ApplyCachedReverse(_toplevel, file) : GitCommands.ApplyCached(_toplevel, file);
+    }
 
     public Task CommitAsync(string message, CancellationToken cancellationToken, bool noVerify = false) =>
         RunAsync(async ct =>

@@ -63,6 +63,9 @@ public class GitCommandTests
         Assert.DoesNotContain("--cached", GitCommands.ApplyPatch("repo", "change.patch"));
         Assert.DoesNotContain("--index", GitCommands.ApplyPatch("repo", "change.patch"));
         Assert.DoesNotContain("am", GitCommands.ApplyPatch("repo", "change.patch"));
+        Assert.Equal(["-C", "repo", "apply", "--reverse", "--", "change.patch"], GitCommands.ApplyReverse("repo", "change.patch"));
+        Assert.DoesNotContain("--cached", GitCommands.ApplyReverse("repo", "change.patch"));
+        Assert.DoesNotContain("--index", GitCommands.ApplyReverse("repo", "change.patch"));
         Assert.DoesNotContain("--no-optional-locks", GitCommands.CreateBranchAt("repo", "topic", "abc"));
         Assert.Equal(["-C", "repo", "switch", "--detach", "v1"], GitCommands.SwitchDetach("repo", "v1"));
         Assert.Equal(["-C", "repo", "switch", "-c", "feature/name", "--track", "origin/feature/name"], GitCommands.SwitchCreateTrack("repo", "feature/name", "origin/feature/name"));

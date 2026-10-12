@@ -314,6 +314,10 @@ public sealed class DiffHunkRow : DiffRow
     public bool ShowAction { get; init; }
 
     public ICommand ActionCommand { get; init; } = UiCommands.Disabled;
+
+    public bool ShowDiscard { get; init; }
+
+    public ICommand DiscardCommand { get; init; } = UiCommands.Disabled;
 }
 
 public enum EditorLineKind

@@ -767,8 +767,12 @@
                                             Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
                                             BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
                                         <DockPanel>
-                                            <Button Classes="accent" DockPanel.Dock="Right" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                                    Content="{Binding ActionLabel}" Command="{Binding ActionCommand}" IsVisible="{Binding ShowAction}" Margin="12,0,0,0"/>
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+                                                <Button Classes="accent" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                        Content="Discard hunk" Command="{Binding DiscardCommand}" IsVisible="{Binding ShowDiscard}"/>
+                                                <Button Classes="accent" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                        Content="{Binding ActionLabel}" Command="{Binding ActionCommand}" IsVisible="{Binding ShowAction}"/>
+                                            </StackPanel>
                                             <views:CopyableText Classes="diff" CopyKey="span" Text="{Binding Header}" Opacity="0.85"
                                                                 VerticalAlignment="Center" HorizontalAlignment="Stretch" TextTrimming="CharacterEllipsis"/>
                                         </DockPanel>

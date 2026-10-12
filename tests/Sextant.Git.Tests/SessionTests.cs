@@ -209,6 +209,75 @@ public class SessionTests
         Assert.DoesNotContain("changed-b", cleared, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Discarding_the_middle_hunk_restores_that_change_and_leaves_the_index(bool autocrlf)
+    {
+        using var repo = new TempRepo();
+        repo.Run("config", "core.autocrlf", autocrlf ? "true" : "false");
+        var lines = Enumerable.Range(0, 40).Select(index => $"line {index}").ToArray();
+        repo.WriteFile("a.txt", string.Join('\n', lines) + "\n");
+        repo.CommitAll("base");
+        lines[2] = "changed-a";
+        lines[18] = "changed-b";
+        lines[34] = "changed-c";
+        repo.WriteFile("a.txt", string.Join('\n', lines) + "\n");
+
+        await using var session = await Open(repo);
+        var diff = await session.WorkingDiffAsync("a.txt", staged: false, untracked: false, allowLarge: true, CancellationToken.None);
+        Assert.NotNull(diff);
+        Assert.Equal(3, diff.Hunks.Count);
+        await session.DiscardHunkAsync(diff.RawPatch, 1, CancellationToken.None);
+
+        var text = ReadNormalized(repo, "a.txt");
+        Assert.Contains("changed-a\n", text, StringComparison.Ordinal);
+        Assert.Contains("\nline 18\n", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("changed-b", text, StringComparison.Ordinal);
+        Assert.Contains("changed-c\n", text, StringComparison.Ordinal);
+        Assert.Equal("", repo.RunCapture("diff", "--cached", "--name-only").Trim());
+        Assert.Contains(session.Snapshot().Entries, entry => entry.Path == "a.txt" && entry.Unstaged && !entry.Staged);
+    }
+
+    [Fact]
+    public async Task Discarding_an_unstaged_hunk_leaves_the_staged_change()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\ntwo\nthree\n");
+        repo.CommitAll("base");
+        repo.WriteFile("a.txt", "staged\ntwo\nthree\n");
+        repo.Run("add", "a.txt");
+        repo.WriteFile("a.txt", "staged\ntwo\nworktree\n");
+
+        await using var session = await Open(repo);
+        var diff = await session.WorkingDiffAsync("a.txt", staged: false, untracked: false, allowLarge: true, CancellationToken.None);
+        Assert.NotNull(diff);
+        Assert.Single(diff.Hunks);
+        await session.DiscardHunkAsync(diff.RawPatch, 0, CancellationToken.None);
+
+        Assert.Equal("staged\ntwo\nthree\n", ReadNormalized(repo, "a.txt"));
+        Assert.Equal("staged\ntwo\nthree\n", repo.RunCapture("show", ":a.txt").Replace("\r\n", "\n", StringComparison.Ordinal));
+        Assert.Contains(session.Snapshot().Entries, entry => entry.Path == "a.txt" && entry.Staged && !entry.Unstaged);
+    }
+
+    [Fact]
+    public async Task Discarding_the_hunk_of_an_untracked_file_removes_it()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("base");
+        repo.WriteFile("new.txt", "hello\n");
+
+        await using var session = await Open(repo);
+        var diff = await session.WorkingDiffAsync("new.txt", staged: false, untracked: true, allowLarge: true, CancellationToken.None);
+        Assert.NotNull(diff);
+        Assert.NotEmpty(diff.Hunks);
+        await session.DiscardHunkAsync(diff.RawPatch, 0, CancellationToken.None);
+
+        Assert.False(File.Exists(Path.Combine(repo.Directory, "new.txt")));
+        Assert.DoesNotContain("new.txt", repo.RunCapture("status", "--short"), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Conflicted_merge_can_be_aborted()
     {

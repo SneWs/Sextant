@@ -2665,6 +2665,7 @@ public partial class RepositoryViewModel : ViewModelBase
         {
             var hunk = document.Hunks[index];
             var hunkIndex = index;
+            var discard = parts && !staged;
             AddRow(new DiffHunkRow
             {
                 Header = hunk.Header,
@@ -2672,6 +2673,10 @@ public partial class RepositoryViewModel : ViewModelBase
                 ActionLabel = hunkLabel,
                 ActionCommand = parts
                     ? new AsyncRelayCommand(() => ApplyShownHunkAsync(patch, hunkIndex, staged))
+                    : UiCommands.Disabled,
+                ShowDiscard = discard,
+                DiscardCommand = discard
+                    ? new AsyncRelayCommand(() => DiscardShownHunkAsync(patch, hunkIndex, path))
                     : UiCommands.Disabled,
             });
             if (SideBySide)
@@ -2859,6 +2864,23 @@ public partial class RepositoryViewModel : ViewModelBase
         if (_session is null || string.IsNullOrEmpty(patch))
             return;
         await RunAsync(reverse ? "Unstaging hunk…" : "Staging hunk…", ct => _session.ApplyHunkAsync(patch, index, reverse, ct));
+    }
+
+    private Task DiscardShownHunkAsync(string patch, int index, string? path)
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || string.IsNullOrEmpty(patch))
+            return Task.CompletedTask;
+        var which = string.IsNullOrEmpty(path) ? "this hunk" : $"this hunk of {path}";
+        return HoldFocus(async () =>
+        {
+            var ok = await dialogs.ConfirmAsync(
+                "Discard hunk",
+                $"Discard {which}? This cannot be undone.",
+                "Discard hunk");
+            if (!ok || _session is null)
+                return;
+            await RunAsync("Discarding hunk…", ct => _session.DiscardHunkAsync(patch, index, ct));
+        });
     }
 
     private async Task ApplyShownLineAsync(string patch, int hunkIndex, int lineIndex, bool reverse)
