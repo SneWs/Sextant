@@ -23,6 +23,9 @@
 #   Name:                  20817M.Grenangen.SextantGit
 #   Publisher:             CN=409B546D-EA32-4065-A208-A777236471B3
 #   PublisherDisplayName:  M.Grenangen
+#   Reserved display name: Sextant Git
+# Properties/DisplayName must be the reserved name. The name on the Start
+# menu stays Sextant.
 #   Package family name:   20817M.Grenangen.SextantGit_nr8zhaqknvty0
 #   Package SID:           S-1-15-2-4043513989-1948314254-3861236244-1758161784-3578805874-145697710-4171492892
 #   Store ID:              9N1T9BGFCTZS
@@ -103,6 +106,10 @@ $script:DevPublisherDisplayName = "Marcus Gren$([char]0x00E4)ngen"
 $script:StorePackageName = "20817M.Grenangen.SextantGit"
 $script:StorePublisher = "CN=409B546D-EA32-4065-A208-A777236471B3"
 $script:StorePublisherDisplayName = "M.Grenangen"
+# Partner Center reserved Sextant Git. Sextant itself was not available.
+# The package display name must be the reserved one. The installed app keeps Sextant.
+$script:StoreDisplayName = "Sextant Git"
+$script:AppDisplayName = "Sextant"
 $script:StorePackageSid = "S-1-15-2-4043513989-1948314254-3861236244-1758161784-3578805874-145697710-4171492892"
 $script:StoreId = "9N1T9BGFCTZS"
 
@@ -230,6 +237,12 @@ function Invoke-SelfTest {
     }
     if ($script:StoreId -notmatch '^9[A-Z0-9]{11}$') {
         throw "The Store ID is not a 12-character product id."
+    }
+    if ($script:StoreDisplayName -ne "Sextant Git") {
+        throw "The reserved Store display name must be Sextant Git."
+    }
+    if ($script:AppDisplayName -ne "Sextant") {
+        throw "The installed app name must stay Sextant."
     }
     if (-not (Test-StorePackageName "12345.Sextant")) { throw "A Partner Center name should be legal." }
     if (Test-StorePackageName "A") { throw "A one-character name should be rejected." }
@@ -447,7 +460,8 @@ function Assert-PackageContents {
     param(
         [Parameter(Mandatory)][string] $PackagePath,
         [Parameter(Mandatory)][string] $ExpectedVersion,
-        [Parameter(Mandatory)][string] $ExpectedPublisher
+        [Parameter(Mandatory)][string] $ExpectedPublisher,
+        [Parameter(Mandatory)][string] $ExpectedDisplayName
     )
     Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -487,7 +501,9 @@ function Assert-PackageContents {
             "Name=`"unvirtualizedResources`"",
             "<desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>",
             "<desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>",
-            "Alias=`"Sextant.exe`"")) {
+            "Alias=`"Sextant.exe`"",
+            "<DisplayName>$ExpectedDisplayName</DisplayName>",
+            "DisplayName=`"$($script:AppDisplayName)`"")) {
         if ($manifest -notlike "*$needle*") {
             throw "The package manifest does not contain $needle."
         }
@@ -629,6 +645,11 @@ try {
     }
     New-StoreLogos -SourcePng $icon -AssetsDir (Join-Path $layout "Assets")
 
+    $packageDisplayName = if ($storeMode) { $script:StoreDisplayName } else { $script:AppDisplayName }
+    if ($storeMode -and -not [string]::IsNullOrWhiteSpace($env:SEXTANT_STORE_DISPLAY_NAME)) {
+        $packageDisplayName = $env:SEXTANT_STORE_DISPLAY_NAME.Trim()
+    }
+
     $manifest = @"
 <?xml version="1.0" encoding="utf-8"?>
 <Package
@@ -644,7 +665,7 @@ try {
     Version="$($mapped.Version)"
     ProcessorArchitecture="x64" />
   <Properties>
-    <DisplayName>Sextant</DisplayName>
+    <DisplayName>$(ConvertTo-XmlText $packageDisplayName)</DisplayName>
     <PublisherDisplayName>$(ConvertTo-XmlText $PublisherDisplayName)</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
     <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
@@ -659,7 +680,7 @@ try {
   <Applications>
     <Application Id="Sextant" Executable="Sextant.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="Sextant"
+        DisplayName="$(ConvertTo-XmlText $script:AppDisplayName)"
         Description="A Git client for very large repositories."
         BackgroundColor="#3B2266"
         Square150x150Logo="Assets\Square150x150Logo.png"
@@ -724,7 +745,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $tempRoot "dev.cer") -Destination $generatedCer -Force
     }
 
-    Assert-PackageContents -PackagePath $OutputFile -ExpectedVersion $mapped.Version -ExpectedPublisher $Publisher
+    Assert-PackageContents -PackagePath $OutputFile -ExpectedVersion $mapped.Version -ExpectedPublisher $Publisher -ExpectedDisplayName $packageDisplayName
     $size = (Get-Item -LiteralPath $OutputFile).Length
     if ($size -lt 20MB) {
         throw "The package is $size bytes. A self-contained Sextant build is larger than that, so the layout is incomplete."
