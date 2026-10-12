@@ -128,19 +128,27 @@
                     BorderThickness="1"
                     BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
                     Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
-                <Grid ColumnDefinitions="Auto,Auto,Auto,*" HorizontalAlignment="Center">
-                    <TextBlock Text="{Binding BranchText}" FontWeight="SemiBold" VerticalAlignment="Center"
-                               TextTrimming="CharacterEllipsis" MaxWidth="275"/>
-                    <TextBlock Grid.Column="1" Text="·" Opacity="0.45" VerticalAlignment="Center" Margin="8,0,0,0"
-                               IsVisible="{Binding ShowBranchStatus}"/>
-                    <TextBlock Grid.Column="2" Text="{Binding AheadBehindText}" IsVisible="{Binding ShowAheadBehind}"
-                               VerticalAlignment="Center" Opacity="0.72" FontSize="12" Margin="8,0,0,0"/>
-                    <TextBlock Grid.Column="3" Text="{Binding BusyText}" IsVisible="{Binding IsBusy}"
-                               VerticalAlignment="Center" Opacity="0.72" FontSize="12" Margin="8,0,0,0"
-                               TextTrimming="CharacterEllipsis" MaxWidth="400"/>
-                </Grid>
+                    <Grid ColumnDefinitions="Auto,Auto,Auto,*" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding BranchText}" FontWeight="SemiBold" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="275"/>
+                        
+                        <TextBlock Grid.Column="1" Text="·" Opacity="0.45" VerticalAlignment="Center" Margin="8,0,0,0"
+                                   IsVisible="{Binding ShowBranchStatus}"/>
+                        
+                        <TextBlock Grid.Column="2" Text="{Binding AheadBehindText}" 
+                                   IsVisible="{Binding ShowAheadBehind}"
+                                   VerticalAlignment="Center" Opacity="0.72" FontSize="12" Margin="8,0,0,0"/>
+                        
+                        <TextBlock Grid.Column="3" Text="{Binding BusyText}" 
+                                   IsVisible="{Binding IsBusy}"
+                                   VerticalAlignment="Center" Opacity="0.72" 
+                                   FontSize="12" 
+                                   Margin="8,0,0,0"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="400" />
+                    </Grid>
                 </Border>
-                <Button x:Name="HistorySearchToggleButton" Classes="locationsearch" Padding="7,0" MinWidth="0" MinHeight="26" Height="26"
+                <Button x:Name="HistorySearchToggleButton" Classes="locationsearch" Padding="7,0" 
+                        MinWidth="0" MinHeight="26" Height="26"
                         Command="{Binding ToggleHistorySearchCommand}"
                         Classes.pressed="{Binding ShowHistorySearch}"
                         ToolTip.Tip="Search history" VerticalAlignment="Center"
@@ -153,6 +161,10 @@
                               StrokeLineCap="Round"/>
                     </Canvas>
                 </Button>
+                
+                <Button Content="Cancel" Command="{Binding CancelCommand}" 
+                        Margin="6,0,0,0" 
+                        IsVisible="{Binding CanCancel}"/>
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Panel.ZIndex="1">
                 <SplitButton x:Name="PullSplitButton" Classes="compact" Command="{Binding PullCommand}" IsEnabled="{Binding CanRunCommands}"
@@ -203,7 +215,6 @@
                 </SplitButton>
                 <Button Content="Continue" Command="{Binding ContinueSequencerCommand}" Margin="6,0,0,0" IsVisible="{Binding IsConflicted}"/>
                 <Button Content="Abort" Command="{Binding AbortMergeCommand}" Margin="6,0,0,0" IsVisible="{Binding IsConflicted}"/>
-                <Button Content="Cancel" Command="{Binding CancelCommand}" Margin="6,0,0,0" IsVisible="{Binding CanCancel}"/>
             </StackPanel>
         </Grid>
 
