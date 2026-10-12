@@ -14,8 +14,9 @@ public class DockLayoutTests
     {
         using var vm = Open(new WorkspaceState());
         Assert.Equal(
-            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Diff],
+            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Diff, DockIds.Blame],
             vm.View.Dock.PaneOrder());
+        Assert.True(vm.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
     }
 
     [Fact]
@@ -26,12 +27,14 @@ public class DockLayoutTests
         vm.View.Dock.SetOpen(DockIds.Commands, true);
         Assert.Contains(DockIds.Files, vm.View.Dock.PaneOrder());
         Assert.True(vm.View.Dock.IsOpen(DockIds.Commands));
+        Assert.True(vm.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
 
         vm.View.Dock.Reset();
 
         Assert.Equal(
-            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Diff],
+            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Diff, DockIds.Blame],
             vm.View.Dock.PaneOrder());
+        Assert.True(vm.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
         Assert.False(vm.View.Dock.IsOpen(DockIds.Files));
         Assert.False(vm.View.Dock.IsOpen(DockIds.Commands));
     }
@@ -65,7 +68,7 @@ public class DockLayoutTests
             var store = new WorkspaceStore(directory);
             var vm = new MainViewModel(store, state, new AppSettings(), new GitProcessRunner());
             Assert.Equal(
-                [DockIds.History, DockIds.Changes, DockIds.Diff],
+                [DockIds.History, DockIds.Changes, DockIds.Diff, DockIds.Blame],
                 vm.Dock.PaneOrder());
             Assert.False(vm.Dock.IsOpen(DockIds.Locations));
 
@@ -89,8 +92,58 @@ public class DockLayoutTests
         using var vm = Open(new WorkspaceState());
         vm.View.Dock.SetOpen(DockIds.Diff, false);
         Assert.Equal(
-            [DockIds.Locations, DockIds.History, DockIds.Changes],
+            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Blame],
             vm.View.Dock.PaneOrder());
+        Assert.False(vm.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
+    }
+
+    [Fact]
+    public void Closing_blame_and_opening_it_again_puts_it_back_with_the_diff()
+    {
+        using var vm = Open(new WorkspaceState());
+        vm.View.Dock.SetOpen(DockIds.Blame, false);
+        Assert.False(vm.View.Dock.IsOpen(DockIds.Blame));
+        Assert.True(vm.View.Dock.IsOpen(DockIds.Diff));
+
+        vm.View.Dock.SetOpen(DockIds.Blame, true);
+
+        Assert.Equal(
+            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Diff, DockIds.Blame],
+            vm.View.Dock.PaneOrder());
+        Assert.True(vm.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
+    }
+
+    [Fact]
+    public void Older_diff_slot_gains_a_blame_tab_once()
+    {
+        var state = new WorkspaceState
+        {
+            DockLayout = new DockLayout
+            {
+                Root = new DockSplit
+                {
+                    Orientation = "horizontal",
+                    Slots =
+                    [
+                        new DockSlot { Id = DockIds.History, Proportion = 0.4 },
+                        new DockSlot { Id = DockIds.Diff, Proportion = 0.6 },
+                    ],
+                },
+            },
+        };
+        var layout = DockLayouts.Resolve(state);
+        Assert.Same(state.DockLayout, layout);
+        Assert.Equal(DockLayouts.CurrentSchema, layout.Schema);
+        Assert.Equal([DockIds.Diff, DockIds.Blame], layout.Root!.Slots[1].Tabs);
+        Assert.Equal(DockIds.Diff, layout.Root.Slots[1].Active);
+
+        layout.Root.Slots[1].Tabs = null;
+        layout.Root.Slots[1].Id = DockIds.Diff;
+        layout.Root.Slots[1].Active = "";
+        var again = DockLayouts.Resolve(state);
+        Assert.Same(layout, again);
+        Assert.Equal(DockIds.Diff, again.Root!.Slots[1].Id);
+        Assert.Null(again.Root.Slots[1].Tabs);
     }
 
     [Fact]
@@ -126,7 +179,7 @@ public class DockLayoutTests
         };
         var layout = DockLayouts.Resolve(state);
         Assert.Same(state.DockLayout, layout);
-        Assert.Equal(DockIds.Diff, layout.Root!.Slots[1].Id);
+        Assert.Equal([DockIds.Diff, DockIds.Blame], layout.Root!.Slots[1].Tabs);
     }
 
     [Fact]
@@ -145,7 +198,7 @@ public class DockLayoutTests
         };
         using var vm = Open(state);
         Assert.Equal(
-            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Diff],
+            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Diff, DockIds.Blame],
             vm.View.Dock.PaneOrder());
     }
 

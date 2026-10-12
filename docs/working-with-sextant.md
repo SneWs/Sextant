@@ -83,7 +83,7 @@ On a past commit, that area shows the SHA, author, date, and the size of the cha
 
 ## Diffs, blame, and previews
 
-The Diff and Blame tabs sit above the patch. Blame annotates the selected file. The working-copy diff always includes both staged and unstaged files. Selecting a file in the staging list opens and scrolls to its header without hiding the other files. A partially staged file has separate Staged and Unstaged sections. For past commits and commit ranges, Diff can show the selected file or every file.
+Diff and Blame are separate docked tools. They start as two tabs in the pane under Changes. Blame annotates the selected file. The working-copy diff always includes both staged and unstaged files. Selecting a file in the staging list opens and scrolls to its header without hiding the other files. A partially staged file has separate Staged and Unstaged sections. For past commits and commit ranges, Diff can show the selected file or every file.
 
 Each working-copy file header has Stage file or Unstage file for that section.
 

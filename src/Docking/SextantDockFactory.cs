@@ -44,6 +44,7 @@ public sealed class SextantDockFactory : Factory
         if (_dock.Rebuilding || _dock.Silence)
             return;
         _dock.NoteVisibility();
+        _dock.NoteReview(dockable);
     }
 
     public override bool OnWindowClosing(IDockWindow? window)

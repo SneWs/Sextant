@@ -30,6 +30,7 @@ public partial class RepositoryDock : ObservableObject
             [DockIds.Files] = new RepositoryTool(this, DockIds.Files, "Repository files"),
             [DockIds.Commands] = new RepositoryTool(this, DockIds.Commands, "Command log"),
             [DockIds.Diff] = new RepositoryTool(this, DockIds.Diff, "Diff"),
+            [DockIds.Blame] = new RepositoryTool(this, DockIds.Blame, "Blame"),
         };
         var resolved = DockLayouts.Resolve(workspace);
         if (!ReferenceEquals(resolved, workspace.DockLayout))
@@ -221,6 +222,24 @@ public partial class RepositoryDock : ObservableObject
         {
             _applying = false;
         }
+
+        if (tool.ToolId == DockIds.Blame && IsOpen(DockIds.Diff))
+            Present(DockIds.Diff);
+        else if (tool.ToolId == DockIds.Diff && IsOpen(DockIds.Blame))
+            Present(DockIds.Blame);
+    }
+
+    public void NoteReview(IDockable? dockable)
+    {
+        if (dockable is RepositoryTool tool && tool.ToolId is DockIds.Diff or DockIds.Blame)
+            Present(tool.ToolId);
+    }
+
+    public bool SharesHost(string left, string right)
+    {
+        if (!_tools.TryGetValue(left, out var first) || !_tools.TryGetValue(right, out var second))
+            return false;
+        return first.Owner is not null && ReferenceEquals(first.Owner, second.Owner);
     }
 
     public void Rehome(RepositoryTool tool)
@@ -267,6 +286,7 @@ public partial class RepositoryDock : ObservableObject
         value.PropertyChanged += OnFocusedProperty;
         if (loadFiles)
             _ = value.RefreshRepositoryFilesCommand.ExecuteAsync(null);
+        Present(ActiveReview());
     }
 
     private void OnFocusedProperty(object? sender, PropertyChangedEventArgs e)
@@ -295,24 +315,12 @@ public partial class RepositoryDock : ObservableObject
         try
         {
             ReleaseFloats();
-            var panes = new Dictionary<string, IDockable>(StringComparer.Ordinal);
+            var panes = new Dictionary<string, RepositoryTool>(StringComparer.Ordinal);
             foreach (var tool in _tools.Values)
             {
-                if (!LayoutUses(layout, tool.ToolId))
-                {
-                    Detach(tool);
-                    continue;
-                }
-
                 Detach(tool);
-                var host = new ToolDock
-                {
-                    Id = "tool-" + tool.ToolId,
-                    Alignment = Alignment.Unset,
-                    VisibleDockables = Factory.CreateList<IDockable>(tool),
-                    ActiveDockable = tool,
-                };
-                panes[tool.ToolId] = host;
+                if (LayoutUses(layout, tool.ToolId))
+                    panes[tool.ToolId] = tool;
             }
 
             var tree = Build(layout.Root!, panes);
@@ -332,6 +340,7 @@ public partial class RepositoryDock : ObservableObject
 
         NoteVisibility();
         SyncFocusedTools();
+        Present(ActiveReview());
     }
 
     private void Detach(RepositoryTool tool)
@@ -468,6 +477,7 @@ public partial class RepositoryDock : ObservableObject
             }
         }
 
+        layout.Schema = DockLayouts.CurrentSchema;
         if (layout.Root is null || !DockLayouts.IsUsable(layout))
             return DockLayouts.Default();
         return layout;
@@ -505,9 +515,18 @@ public partial class RepositoryDock : ObservableObject
                 var tools = toolDock.VisibleDockables?.OfType<RepositoryTool>().ToList() ?? [];
                 if (tools.Count == 0)
                     continue;
-                var share = Share(child.Proportion) / tools.Count;
-                foreach (var tool in tools)
-                    split.Slots.Add(new DockSlot { Id = tool.ToolId, Proportion = share });
+                if (tools.Count == 1)
+                {
+                    split.Slots.Add(new DockSlot { Id = tools[0].ToolId, Proportion = Share(child.Proportion) });
+                    continue;
+                }
+
+                split.Slots.Add(new DockSlot
+                {
+                    Proportion = Share(child.Proportion),
+                    Tabs = tools.Select(tool => tool.ToolId).ToList(),
+                    Active = (toolDock.ActiveDockable as RepositoryTool)?.ToolId ?? tools[0].ToolId,
+                });
                 continue;
             }
 
@@ -518,7 +537,7 @@ public partial class RepositoryDock : ObservableObject
         return split;
     }
 
-    private IDockable Build(DockSplit split, IReadOnlyDictionary<string, IDockable> panes)
+    private IDockable Build(DockSplit split, IReadOnlyDictionary<string, RepositoryTool> panes)
     {
         var dock = new ProportionalDock
         {
@@ -528,7 +547,7 @@ public partial class RepositoryDock : ObservableObject
         var children = new List<IDockable>();
         foreach (var slot in split.Slots)
         {
-            IDockable? child = slot.Split is not null ? Build(slot.Split, panes) : panes.GetValueOrDefault(slot.Id);
+            IDockable? child = slot.Split is not null ? Build(slot.Split, panes) : Host(slot, panes);
             if (child is null)
                 continue;
             if (children.Count > 0)
@@ -561,9 +580,11 @@ public partial class RepositoryDock : ObservableObject
             return;
         }
 
-        if (id == DockIds.Diff && TryAttachDiff(layout.Root))
+        if (id is DockIds.Diff or DockIds.Blame && TryJoinReview(layout.Root, id))
             return;
-        if (id == DockIds.Changes && TryWrapDiff(layout.Root, id))
+        if (id is DockIds.Diff or DockIds.Blame && TryAttachReview(layout.Root, id))
+            return;
+        if (id == DockIds.Changes && TryWrapReview(layout.Root, id))
             return;
         foreach (var slot in layout.Root.Slots)
             slot.Proportion *= 0.82;
@@ -578,7 +599,33 @@ public partial class RepositoryDock : ObservableObject
         layout.Root.Slots.Insert(Math.Clamp(index, 0, layout.Root.Slots.Count), new DockSlot { Id = id, Proportion = 0.18 });
     }
 
-    private static bool TryAttachDiff(DockSplit split)
+    private static bool TryJoinReview(DockSplit split, string id)
+    {
+        var partner = id == DockIds.Diff ? DockIds.Blame : DockIds.Diff;
+        for (var i = 0; i < split.Slots.Count; i++)
+        {
+            var slot = split.Slots[i];
+            if (slot.Split is not null)
+            {
+                if (TryJoinReview(slot.Split, id))
+                    return true;
+                continue;
+            }
+
+            var ids = Members(slot);
+            if (!ids.Contains(partner) || ids.Any(item => item is not (DockIds.Diff or DockIds.Blame)))
+                continue;
+            slot.Id = "";
+            slot.Split = null;
+            slot.Tabs = [DockIds.Diff, DockIds.Blame];
+            slot.Active = id;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryAttachReview(DockSplit split, string id)
     {
         for (var i = 0; i < split.Slots.Count; i++)
         {
@@ -588,7 +635,7 @@ public partial class RepositoryDock : ObservableObject
                 if (split.Orientation == "vertical")
                 {
                     slot.Proportion = Math.Max(0.2, slot.Proportion * 0.36 / 0.64);
-                    split.Slots.Insert(i + 1, new DockSlot { Id = DockIds.Diff, Proportion = 0.64 });
+                    split.Slots.Insert(i + 1, new DockSlot { Id = id, Proportion = 0.64 });
                     return true;
                 }
 
@@ -599,40 +646,49 @@ public partial class RepositoryDock : ObservableObject
                     Slots =
                     [
                         new DockSlot { Id = DockIds.Changes, Proportion = 0.36 },
-                        new DockSlot { Id = DockIds.Diff, Proportion = 0.64 },
+                        new DockSlot { Id = id, Proportion = 0.64 },
                     ],
                 };
                 return true;
             }
 
-            if (slot.Split is not null && TryAttachDiff(slot.Split))
+            if (slot.Split is not null && TryAttachReview(slot.Split, id))
                 return true;
         }
 
         return false;
     }
 
-    private static bool TryWrapDiff(DockSplit split, string id)
+    private static bool TryWrapReview(DockSplit split, string id)
     {
         for (var i = 0; i < split.Slots.Count; i++)
         {
             var slot = split.Slots[i];
-            if (slot.Id == DockIds.Diff)
+            if (IsReview(slot))
             {
+                var review = new DockSlot
+                {
+                    Id = slot.Id,
+                    Proportion = 0.64,
+                    Tabs = slot.Tabs,
+                    Active = slot.Active,
+                };
                 slot.Id = "";
+                slot.Tabs = null;
+                slot.Active = "";
                 slot.Split = new DockSplit
                 {
                     Orientation = "vertical",
                     Slots =
                     [
                         new DockSlot { Id = id, Proportion = 0.36 },
-                        new DockSlot { Id = DockIds.Diff, Proportion = 0.64 },
+                        review,
                     ],
                 };
                 return true;
             }
 
-            if (slot.Split is not null && TryWrapDiff(slot.Split, id))
+            if (slot.Split is not null && TryWrapReview(slot.Split, id))
                 return true;
         }
 
@@ -643,14 +699,37 @@ public partial class RepositoryDock : ObservableObject
     {
         if (split is null)
             return;
-        split.Slots.RemoveAll(slot => slot.Id == id);
-        foreach (var slot in split.Slots.ToList())
+        for (var i = split.Slots.Count - 1; i >= 0; i--)
         {
-            if (slot.Split is null)
+            var slot = split.Slots[i];
+            if (slot.Split is not null)
+            {
+                RemoveSlot(slot.Split, id);
+                if (slot.Split.Slots.Count == 0)
+                    split.Slots.RemoveAt(i);
                 continue;
-            RemoveSlot(slot.Split, id);
-            if (slot.Split.Slots.Count == 0)
-                split.Slots.Remove(slot);
+            }
+
+            if (slot.Tabs is { Count: > 0 } tabs)
+            {
+                if (!tabs.Remove(id))
+                    continue;
+                if (slot.Active == id)
+                    slot.Active = tabs.FirstOrDefault() ?? "";
+                if (tabs.Count == 0)
+                    split.Slots.RemoveAt(i);
+                else if (tabs.Count == 1)
+                {
+                    slot.Id = tabs[0];
+                    slot.Tabs = null;
+                    slot.Active = "";
+                }
+
+                continue;
+            }
+
+            if (slot.Id == id)
+                split.Slots.RemoveAt(i);
         }
     }
 
@@ -671,7 +750,7 @@ public partial class RepositoryDock : ObservableObject
     {
         foreach (var slot in split.Slots)
         {
-            if (slot.Id == id)
+            if (slot.Id == id || slot.Tabs?.Contains(id) == true)
                 return true;
             if (slot.Split is not null && Contains(slot.Split, id))
                 return true;
@@ -724,6 +803,70 @@ public partial class RepositoryDock : ObservableObject
             foreach (var child in dock.VisibleDockables)
                 CollectPanes(child, order);
         }
+    }
+
+    private ToolDock? Host(DockSlot slot, IReadOnlyDictionary<string, RepositoryTool> panes)
+    {
+        var members = new List<RepositoryTool>();
+        foreach (var id in Members(slot))
+        {
+            if (panes.TryGetValue(id, out var tool))
+                members.Add(tool);
+        }
+
+        if (members.Count == 0)
+            return null;
+        var active = members.FirstOrDefault(tool => tool.ToolId == slot.Active) ?? members[0];
+        return new ToolDock
+        {
+            Id = "tool-" + string.Join('-', members.Select(tool => tool.ToolId)),
+            Alignment = Alignment.Unset,
+            VisibleDockables = Factory.CreateList<IDockable>(members.Cast<IDockable>().ToArray()),
+            ActiveDockable = active,
+        };
+    }
+
+    private void Present(string? id)
+    {
+        if (Rebuilding || id is not (DockIds.Diff or DockIds.Blame) || Focused is not { } tab)
+            return;
+        if (id == DockIds.Blame && !tab.ShowingBlame)
+            _ = tab.ShowBlameCommand.ExecuteAsync(null);
+        else if (id == DockIds.Diff && tab.ShowingBlame)
+            _ = tab.ShowDiffCommand.ExecuteAsync(null);
+    }
+
+    private string? ActiveReview()
+    {
+        var diff = OpenReview(DockIds.Diff);
+        var blame = OpenReview(DockIds.Blame);
+        var diffActive = diff?.Owner is IDock diffDock && ReferenceEquals(diffDock.ActiveDockable, diff);
+        var blameActive = blame?.Owner is IDock blameDock && ReferenceEquals(blameDock.ActiveDockable, blame);
+        if (blameActive && !diffActive)
+            return DockIds.Blame;
+        if (diffActive && !blameActive)
+            return DockIds.Diff;
+        if (blame is not null && diff is null)
+            return DockIds.Blame;
+        if (diff is not null)
+            return DockIds.Diff;
+        return null;
+    }
+
+    private RepositoryTool? OpenReview(string id) =>
+        _tools.TryGetValue(id, out var tool) && IsOpen(id) ? tool : null;
+
+    private static IReadOnlyList<string> Members(DockSlot slot)
+    {
+        if (slot.Tabs is { Count: > 0 } tabs)
+            return tabs;
+        return slot.Id.Length > 0 ? [slot.Id] : [];
+    }
+
+    private static bool IsReview(DockSlot slot)
+    {
+        var ids = Members(slot);
+        return ids.Contains(DockIds.Diff) || ids.Contains(DockIds.Blame);
     }
 
     private static double Share(double proportion) =>

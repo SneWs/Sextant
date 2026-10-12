@@ -401,6 +401,9 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     private void ToggleDiff() => Dock.Toggle(DockIds.Diff);
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
+    private void ToggleBlame() => Dock.Toggle(DockIds.Blame);
+
+    [RelayCommand(CanExecute = nameof(HasActiveTab))]
     private void ToggleFiles() => Dock.Toggle(DockIds.Files);
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
@@ -558,6 +561,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         ToggleHistoryCommand.NotifyCanExecuteChanged();
         ToggleChangesCommand.NotifyCanExecuteChanged();
         ToggleDiffCommand.NotifyCanExecuteChanged();
+        ToggleBlameCommand.NotifyCanExecuteChanged();
         ToggleFilesCommand.NotifyCanExecuteChanged();
         ResetLayoutCommand.NotifyCanExecuteChanged();
     }
@@ -1096,7 +1100,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _palette.Add(new PaletteItem { Title = "Toggle ignore whitespace", Run = ToggleSavedWhitespace });
             if (!tab.ShowingWorkingCopy || tab.ShowingBlame)
                 _palette.Add(new PaletteItem { Title = "Toggle all files", Run = () => tab.ToggleAllFilesCommand.ExecuteAsync(null) });
-            _palette.Add(new PaletteItem { Title = "Toggle blame", Run = () => tab.ToggleBlameCommand.ExecuteAsync(null) });
+            _palette.Add(new PaletteItem { Title = "Toggle blame", Run = () => { ToggleBlame(); return Task.CompletedTask; } });
             if (tab.IsConflicted)
             {
                 _palette.Add(new PaletteItem { Title = "Continue", Run = tab.ContinueSequencer });

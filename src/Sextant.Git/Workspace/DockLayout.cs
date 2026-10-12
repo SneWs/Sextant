@@ -14,18 +14,23 @@ public static class DockIds
 
     public const string Diff = "diff";
 
+    public const string Blame = "blame";
+
     /// <summary>Older layouts used this id for the repository document dock. It is read as <see cref="Diff"/>.</summary>
     public const string Documents = "documents";
 
-    public static readonly string[] Tools = [Locations, History, Changes, Files, Commands, Diff];
+    public static readonly string[] Tools = [Locations, History, Changes, Files, Commands, Diff, Blame];
 
     public static bool IsKnown(string id) =>
-        id is Locations or History or Changes or Files or Commands or Diff;
+        id is Locations or History or Changes or Files or Commands or Diff or Blame;
 }
 
 /// <summary>Sextant's own layout record. It is not Dock's object graph.</summary>
 public sealed class DockLayout
 {
+    /// <summary>1 groups an older lone Diff slot with Blame once. Later saves keep a closed Blame closed.</summary>
+    public int Schema { get; set; }
+
     public DockSplit? Root { get; set; }
 
     public List<DockPin> Pins { get; set; } = [];
@@ -43,12 +48,18 @@ public sealed class DockSplit
 
 public sealed class DockSlot
 {
-    /// <summary>Tool or document id. Empty when <see cref="Split"/> is set.</summary>
+    /// <summary>Tool id. Empty when <see cref="Split"/> or <see cref="Tabs"/> is set.</summary>
     public string Id { get; set; } = "";
 
     public double Proportion { get; set; }
 
     public DockSplit? Split { get; set; }
+
+    /// <summary>Tools that share one dock as tabs. Empty unless this slot is a tab group.</summary>
+    public List<string>? Tabs { get; set; }
+
+    /// <summary>Selected tab id. Empty selects the first tab.</summary>
+    public string Active { get; set; } = "";
 }
 
 public sealed class DockPin
@@ -77,6 +88,8 @@ public sealed class DockFloat
 
 public static class DockLayouts
 {
+    public const int CurrentSchema = 1;
+
     public static DockLayout Default() => Seed(220, 520, 180, showLocations: true);
 
     /// <summary>A saved layout that names every pane and uses positive proportions. Otherwise the legacy pane sizes.</summary>
@@ -136,12 +149,18 @@ public static class DockLayouts
                 Slots =
                 [
                     new DockSlot { Id = DockIds.Changes, Proportion = fileShare },
-                    new DockSlot { Id = DockIds.Diff, Proportion = 1 - fileShare },
+                    new DockSlot
+                    {
+                        Proportion = 1 - fileShare,
+                        Tabs = [DockIds.Diff, DockIds.Blame],
+                        Active = DockIds.Diff,
+                    },
                 ],
             },
         });
         return new DockLayout
         {
+            Schema = CurrentSchema,
             Root = new DockSplit { Orientation = "horizontal", Slots = slots },
         };
     }
@@ -173,6 +192,43 @@ public static class DockLayouts
         Rewrite(layout.Root);
         layout.Pins.RemoveAll(pin => pin.Id == DockIds.Documents);
         layout.Floats.RemoveAll(floated => floated.Id == DockIds.Documents);
+        if (layout.Schema >= CurrentSchema)
+            return;
+        if (layout.Root is not null && !Holds(layout.Root, DockIds.Blame) && Holds(layout.Root, DockIds.Diff))
+            GroupBlameWithDiff(layout.Root);
+        layout.Schema = CurrentSchema;
+    }
+
+    private static bool GroupBlameWithDiff(DockSplit split)
+    {
+        foreach (var slot in split.Slots)
+        {
+            if (slot.Id == DockIds.Diff && slot.Split is null && slot.Tabs is not { Count: > 0 })
+            {
+                slot.Id = "";
+                slot.Tabs = [DockIds.Diff, DockIds.Blame];
+                slot.Active = DockIds.Diff;
+                return true;
+            }
+
+            if (slot.Split is not null && GroupBlameWithDiff(slot.Split))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool Holds(DockSplit split, string id)
+    {
+        foreach (var slot in split.Slots)
+        {
+            if (slot.Id == id || slot.Tabs?.Contains(id) == true)
+                return true;
+            if (slot.Split is not null && Holds(slot.Split, id))
+                return true;
+        }
+
+        return false;
     }
 
     private static void Rewrite(DockSplit? split)
@@ -197,7 +253,22 @@ public static class DockLayouts
                 return false;
             if (slot.Split is not null)
             {
-                if (slot.Id.Length > 0 || !Walk(slot.Split, ids))
+                if (slot.Id.Length > 0 || slot.Tabs is { Count: > 0 } || !Walk(slot.Split, ids))
+                    return false;
+                continue;
+            }
+
+            if (slot.Tabs is { Count: > 0 } tabs)
+            {
+                if (slot.Id.Length > 0)
+                    return false;
+                foreach (var tab in tabs)
+                {
+                    if (!DockIds.IsKnown(tab) || !ids.Add(tab))
+                        return false;
+                }
+
+                if (slot.Active.Length > 0 && !tabs.Contains(slot.Active))
                     return false;
                 continue;
             }

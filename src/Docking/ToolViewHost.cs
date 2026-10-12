@@ -16,7 +16,7 @@ public sealed class ToolViewHost : Panel
             DockIds.Changes => new ChangesToolView(),
             DockIds.Files => new RepositoryFilesToolView(),
             DockIds.Commands => new CommandLogToolView(),
-            DockIds.Diff => new DiffDocumentView(),
+            DockIds.Diff or DockIds.Blame => new DiffDocumentView(),
             _ => new Panel(),
         };
         view.Bind(DataContextProperty, new Binding(nameof(RepositoryDock.Focused)) { Source = tool.Surface });
