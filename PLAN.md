@@ -114,6 +114,8 @@ On 2026-10-12 `Clicking_a_tag_outside_the_loaded_history_loads_history_up_to_it`
 
 On 2026-10-13 Stage all, Unstage all, and Discard all sit on the left of the diff command bar. Expand all and Collapse all sit on the right, and they are the last buttons. The three working-copy actions hide while blame is open, while a commit is selected, and while the staging list has no files. The staging tool has the same three buttons on the left of its own command bar, and that bar has no Expand all or Collapse all.
 
+On 2026-10-13 the dock panes moved from the View menu into View → Window. The items are Locations, History, Changes, Staging, Diff, Blame, Repository files, and Command log. Choosing one shows that pane and selects it, including a floating window or the other review tab. It does not hide the pane. Reset layout stays on the View menu. The command palette uses the same show actions for Locations, Blame, Staging, and Command log.
+
 On 2026-10-13 a repository that does not use Git LFS no longer runs Git LFS commands on its own. Opening Files in a fresh init was running `git lfs locks`, and git-lfs exited 2 with `missing protocol: ""` because the remote address was empty. Sextant now asks only when that repository has a local `lfs.url`, a local LFS clean, smudge, or process filter with a command, or a `filter=lfs` attribute in a `.gitattributes` file or in `info/attributes`. An empty local filter and a global `git lfs install` do not count. Checkout skips `git lfs checkout` on the same test. Track with LFS still writes the attribute and stages it. Lock and Unlock stay hidden until a lock lookup succeeds.
 
 Update this block at the end of any session that lands or revises a step.

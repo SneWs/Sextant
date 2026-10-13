@@ -114,14 +114,18 @@
             </NativeMenuItem>
             <NativeMenuItem Header="_View" IsEnabled="{Binding HasActiveTab}">
                 <NativeMenu>
-                    <NativeMenuItem Header="Toggle _locations" Command="{Binding ToggleBranchViewCommand}"/>
-                    <NativeMenuItem Header="Toggle _history" Command="{Binding ToggleHistoryCommand}"/>
-                    <NativeMenuItem Header="Toggle _changes" Command="{Binding ToggleChangesCommand}"/>
-                    <NativeMenuItem Header="Toggle _staging" Command="{Binding ToggleStagingCommand}"/>
-                    <NativeMenuItem Header="Toggle _diff" Command="{Binding ToggleDiffCommand}"/>
-                    <NativeMenuItem Header="Toggle _blame" Command="{Binding ToggleBlameCommand}"/>
-                    <NativeMenuItem Header="_Repository files" Command="{Binding ToggleFilesCommand}"/>
-                    <NativeMenuItem Header="Command _log" Command="{Binding ToggleCommandsCommand}"/>
+                    <NativeMenuItem Header="_Window">
+                        <NativeMenu>
+                            <NativeMenuItem Header="_Locations" Command="{Binding ShowLocationsCommand}"/>
+                            <NativeMenuItem Header="_History" Command="{Binding ShowHistoryCommand}"/>
+                            <NativeMenuItem Header="_Changes" Command="{Binding ShowChangesCommand}"/>
+                            <NativeMenuItem Header="_Staging" Command="{Binding ShowStagingCommand}"/>
+                            <NativeMenuItem Header="_Diff" Command="{Binding ShowDiffCommand}"/>
+                            <NativeMenuItem Header="_Blame" Command="{Binding ShowBlameCommand}"/>
+                            <NativeMenuItem Header="_Repository files" Command="{Binding ShowFilesCommand}"/>
+                            <NativeMenuItem Header="Command _log" Command="{Binding ShowCommandsCommand}"/>
+                        </NativeMenu>
+                    </NativeMenuItem>
                     <NativeMenuItemSeparator/>
                     <NativeMenuItem Header="_Reset layout" Command="{Binding ResetLayoutCommand}"/>
                 </NativeMenu>

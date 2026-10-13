@@ -84,7 +84,20 @@ public partial class RepositoryDock : ObservableObject
         return InMain(tool) || Pinned(tool) || Floated(tool);
     }
 
-    public void Toggle(string id) => SetOpen(id, !IsOpen(id));
+    /// <summary>Opens a tool and selects it. An open tool stays open.</summary>
+    public void Show(string id)
+    {
+        if (!_tools.ContainsKey(id))
+            return;
+        if (!IsOpen(id))
+            SetOpen(id, true);
+        BringForward(id);
+    }
+
+    public bool IsSelected(string id) =>
+        _tools.TryGetValue(id, out var tool)
+        && tool.Owner is IDock owner
+        && ReferenceEquals(owner.ActiveDockable, tool);
 
     public void SetOpen(string id, bool open)
     {
@@ -832,6 +845,36 @@ public partial class RepositoryDock : ObservableObject
             VisibleDockables = Factory.CreateList<IDockable>(members.Cast<IDockable>().ToArray()),
             ActiveDockable = active,
         };
+    }
+
+    private void BringForward(string id)
+    {
+        if (!_tools.TryGetValue(id, out var tool) || !IsOpen(id))
+            return;
+        if (Floated(tool))
+        {
+            SelectInOwner(tool);
+            var window = Root?.Windows?.LastOrDefault(item =>
+                item.Layout is not null && SextantDockFactory.Collect(item.Layout).Contains(tool));
+            window?.Host?.SetActive();
+        }
+        else if (Pinned(tool))
+        {
+            Factory.PreviewPinnedDockable(tool);
+        }
+        else
+        {
+            SelectInOwner(tool);
+        }
+
+        if (id is DockIds.Diff or DockIds.Blame)
+            Present(id);
+    }
+
+    private static void SelectInOwner(RepositoryTool tool)
+    {
+        if (tool.Owner is IDock owner && !ReferenceEquals(owner.ActiveDockable, tool))
+            owner.ActiveDockable = tool;
     }
 
     private void Present(string? id)

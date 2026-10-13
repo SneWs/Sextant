@@ -20,7 +20,7 @@ Below that, the window is three columns. Drag the splitters to resize them. The 
 2. **History / Files** switches between the commit graph and the repository file tree.
 3. **Files and the diff** describe the selected commit, or the working copy.
 
-View, Toggle locations hides the first column. The command palette has the same action.
+View → Window → Locations shows the locations pane and brings it forward. It does not hide it. The command palette has the same action. The other entries in that menu do the same for History, Changes, Staging, Diff, Blame, Repository files, and Command log.
 
 ## Locations
 
@@ -71,7 +71,7 @@ The same menu offers Open in editor and Open in Finder, File Explorer, or File M
 
 ## Files and commits
 
-Staging is its own docked tool. It starts under Changes. The working-copy list is grouped into Conflicts, then Staged, then Unstaged. Empty groups are omitted. Each group title is a bar. The rows under it are the files, with a status letter and Stage, Unstage, Discard, or History. A past commit lists its files in that same tool. View → Toggle staging hides and shows it.
+Staging is its own docked tool. It starts under Changes. The working-copy list is grouped into Conflicts, then Staged, then Unstaged. Empty groups are omitted. Each group title is a bar. The rows under it are the files, with a status letter and Stage, Unstage, Discard, or History. A past commit lists its files in that same tool. View → Window → Staging shows it and brings it forward. It does not hide it.
 
 Stage all, Unstage all, and Discard all sit on the left of the staging command bar, and again on the left of the diff command bar, while the working copy is open and the staging list has files. They hide when that list is empty. The staging bar has no fold buttons. Expand all and Collapse all sit on the right of the diff bar. Stage all is Ctrl+Shift+A (Command+Shift+A on macOS) and Unstage all is Ctrl+Shift+R (Command+Shift+R). Stage all is unavailable when there is nothing to stage, and Unstage all when nothing is staged. Both are also in the Repository menu and the command palette. Discard all is in the command palette. Discard all asks before it restores tracked files and removes untracked files.
 

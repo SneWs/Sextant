@@ -1,8 +1,10 @@
+using Avalonia.Controls;
 using Avalonia.Headless;
 using Sextant.Docking;
 using Sextant.Git.Repo;
 using Sextant.Git.Workspace;
 using Sextant.ViewModels;
+using Sextant.Views;
 
 namespace Sextant.Git.Tests;
 
@@ -111,6 +113,99 @@ public class DockLayoutTests
             [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
             vm.View.Dock.PaneOrder());
         Assert.True(vm.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
+    }
+
+    [Fact]
+    public void Showing_a_pane_opens_it_selects_it_and_does_not_hide_it()
+    {
+        using var vm = Open(new WorkspaceState());
+        var tab = new RepositoryViewModel(vm.View, Path.GetTempPath());
+        vm.View.Tabs.Add(tab);
+        vm.View.ActiveTab = tab;
+
+        Assert.True(vm.View.Dock.IsSelected(DockIds.Diff));
+        vm.View.ShowBlameCommand.Execute(null);
+        Assert.True(vm.View.Dock.IsOpen(DockIds.Diff));
+        Assert.True(vm.View.Dock.IsOpen(DockIds.Blame));
+        Assert.True(vm.View.Dock.IsSelected(DockIds.Blame));
+        Assert.False(vm.View.Dock.IsSelected(DockIds.Diff));
+        vm.View.ShowBlameCommand.Execute(null);
+        Assert.True(vm.View.Dock.IsOpen(DockIds.Blame));
+        Assert.True(vm.View.Dock.IsSelected(DockIds.Blame));
+
+        vm.View.ShowDiffCommand.Execute(null);
+        Assert.True(vm.View.Dock.IsOpen(DockIds.Blame));
+        Assert.True(vm.View.Dock.IsSelected(DockIds.Diff));
+
+        vm.View.Dock.SetOpen(DockIds.Staging, false);
+        Assert.False(vm.View.Dock.IsOpen(DockIds.Staging));
+        vm.View.ShowStagingCommand.Execute(null);
+        Assert.True(vm.View.Dock.IsOpen(DockIds.Staging));
+        vm.View.ShowStagingCommand.Execute(null);
+        Assert.True(vm.View.Dock.IsOpen(DockIds.Staging));
+
+        Assert.False(vm.View.Dock.IsOpen(DockIds.Commands));
+        vm.View.ShowCommandsCommand.Execute(null);
+        Assert.True(vm.View.Dock.IsOpen(DockIds.Commands));
+        Assert.True(tab.CommandsOpen);
+        vm.View.ShowCommandsCommand.Execute(null);
+        Assert.True(vm.View.Dock.IsOpen(DockIds.Commands));
+        Assert.True(tab.CommandsOpen);
+
+        vm.View.Dock.SetOpen(DockIds.Locations, false);
+        Assert.False(tab.ShowLocations);
+        vm.View.ShowLocationsCommand.Execute(null);
+        Assert.True(vm.View.Dock.IsOpen(DockIds.Locations));
+        Assert.True(tab.ShowLocations);
+        vm.View.ShowLocationsCommand.Execute(null);
+        Assert.True(tab.ShowLocations);
+    }
+
+    [Fact]
+    public async Task View_menu_puts_the_panes_under_window()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-window-menu-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var store = new WorkspaceStore(directory);
+                var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner());
+                var window = new MainWindow { DataContext = vm, Width = 800, Height = 600 };
+                window.Show();
+
+                var menu = NativeMenu.GetMenu(window);
+                Assert.NotNull(menu);
+                var view = menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_View");
+                var panes = view.Menu!.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Window");
+                var headers = panes.Menu!.Items.OfType<NativeMenuItem>().Select(item => item.Header).ToList();
+                Assert.Equal(
+                    [
+                        "_Locations",
+                        "_History",
+                        "_Changes",
+                        "_Staging",
+                        "_Diff",
+                        "_Blame",
+                        "_Repository files",
+                        "Command _log",
+                    ],
+                    headers);
+                Assert.DoesNotContain(headers, header => header?.Contains("Toggle", StringComparison.Ordinal) == true);
+                Assert.Contains(view.Menu.Items.OfType<NativeMenuItem>(), item => item.Header == "_Reset layout");
+                Assert.DoesNotContain(view.Menu.Items.OfType<NativeMenuItem>(), item => item.Header == "_Locations");
+
+                await vm.Shutdown();
+                window.Close();
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact]

@@ -383,31 +383,31 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     private Task Push() => ActiveTab?.PushCommand.ExecuteAsync(null) ?? Task.CompletedTask;
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
-    private void ToggleCommands() => ActiveTab?.ToggleCommandsCommand.Execute(null);
-
-    [RelayCommand(CanExecute = nameof(HasActiveTab))]
     private void ToggleHistorySearch() => ActiveTab?.ToggleHistorySearchCommand.Execute(null);
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
-    private void ToggleBranchView() => ActiveTab?.ToggleLocationsCommand.Execute(null);
+    private void ShowLocations() => Dock.Show(DockIds.Locations);
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
-    private void ToggleHistory() => Dock.Toggle(DockIds.History);
+    private void ShowHistory() => Dock.Show(DockIds.History);
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
-    private void ToggleChanges() => Dock.Toggle(DockIds.Changes);
+    private void ShowChanges() => Dock.Show(DockIds.Changes);
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
-    private void ToggleStaging() => Dock.Toggle(DockIds.Staging);
+    private void ShowStaging() => Dock.Show(DockIds.Staging);
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
-    private void ToggleDiff() => Dock.Toggle(DockIds.Diff);
+    private void ShowDiff() => Dock.Show(DockIds.Diff);
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
-    private void ToggleBlame() => Dock.Toggle(DockIds.Blame);
+    private void ShowBlame() => Dock.Show(DockIds.Blame);
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
-    private void ToggleFiles() => Dock.Toggle(DockIds.Files);
+    private void ShowFiles() => Dock.Show(DockIds.Files);
+
+    [RelayCommand(CanExecute = nameof(HasActiveTab))]
+    private void ShowCommands() => Dock.Show(DockIds.Commands);
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
     private void ResetLayout() => Dock.Reset();
@@ -558,15 +558,15 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         PullLfsCommand.NotifyCanExecuteChanged();
         PullCommand.NotifyCanExecuteChanged();
         PushCommand.NotifyCanExecuteChanged();
-        ToggleCommandsCommand.NotifyCanExecuteChanged();
         ToggleHistorySearchCommand.NotifyCanExecuteChanged();
-        ToggleBranchViewCommand.NotifyCanExecuteChanged();
-        ToggleHistoryCommand.NotifyCanExecuteChanged();
-        ToggleChangesCommand.NotifyCanExecuteChanged();
-        ToggleStagingCommand.NotifyCanExecuteChanged();
-        ToggleDiffCommand.NotifyCanExecuteChanged();
-        ToggleBlameCommand.NotifyCanExecuteChanged();
-        ToggleFilesCommand.NotifyCanExecuteChanged();
+        ShowLocationsCommand.NotifyCanExecuteChanged();
+        ShowHistoryCommand.NotifyCanExecuteChanged();
+        ShowChangesCommand.NotifyCanExecuteChanged();
+        ShowStagingCommand.NotifyCanExecuteChanged();
+        ShowDiffCommand.NotifyCanExecuteChanged();
+        ShowBlameCommand.NotifyCanExecuteChanged();
+        ShowFilesCommand.NotifyCanExecuteChanged();
+        ShowCommandsCommand.NotifyCanExecuteChanged();
         ResetLayoutCommand.NotifyCanExecuteChanged();
     }
 
@@ -1099,20 +1099,20 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _palette.Add(new PaletteItem { Title = "Apply patch", Run = () => tab.ApplyPatchCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Fetch LFS objects", Run = () => tab.FetchLfsCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Pull LFS files", Run = () => tab.PullLfsCommand.ExecuteAsync(null) });
-            _palette.Add(new PaletteItem { Title = "Toggle locations", Run = () => { tab.ToggleLocationsCommand.Execute(null); return Task.CompletedTask; } });
+            _palette.Add(new PaletteItem { Title = "Locations", Run = () => { ShowLocations(); return Task.CompletedTask; } });
             _palette.Add(new PaletteItem { Title = "Toggle side-by-side diff", Run = ToggleSavedSideBySide });
             _palette.Add(new PaletteItem { Title = "Toggle ignore whitespace", Run = ToggleSavedWhitespace });
             if (!tab.ShowingWorkingCopy || tab.ShowingBlame)
                 _palette.Add(new PaletteItem { Title = "Toggle all files", Run = () => tab.ToggleAllFilesCommand.ExecuteAsync(null) });
-            _palette.Add(new PaletteItem { Title = "Toggle blame", Run = () => { ToggleBlame(); return Task.CompletedTask; } });
-            _palette.Add(new PaletteItem { Title = "Toggle staging", Run = () => { ToggleStaging(); return Task.CompletedTask; } });
+            _palette.Add(new PaletteItem { Title = "Blame", Run = () => { ShowBlame(); return Task.CompletedTask; } });
+            _palette.Add(new PaletteItem { Title = "Staging", Run = () => { ShowStaging(); return Task.CompletedTask; } });
             if (tab.IsConflicted)
             {
                 _palette.Add(new PaletteItem { Title = "Continue", Run = tab.ContinueSequencer });
                 _palette.Add(new PaletteItem { Title = "Abort", Run = tab.AbortMerge });
                 _palette.Add(new PaletteItem { Title = "Save conflict resolution", Run = tab.SaveConflict });
             }
-            _palette.Add(new PaletteItem { Title = "Toggle command log", Run = () => { tab.CommandsOpen = !tab.CommandsOpen; return Task.CompletedTask; } });
+            _palette.Add(new PaletteItem { Title = "Command log", Run = () => { ShowCommands(); return Task.CompletedTask; } });
         }
 
         _palette.Add(new PaletteItem { Title = "Next tab", Run = () => NextTabCommand.ExecuteAsync(null) });

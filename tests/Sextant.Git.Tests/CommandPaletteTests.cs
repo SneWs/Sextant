@@ -93,7 +93,7 @@ public class CommandPaletteTests
                 window.KeyTextInput("toggle");
                 Dispatcher.UIThread.RunJobs();
                 Assert.Equal("toggle", vm.PaletteQuery);
-                Assert.Contains(vm.PaletteMatches, item => item.Title == "Toggle staging");
+                Assert.Equal("toggle", box.Text);
 
                 await vm.Shutdown();
                 window.DataContext = null;
@@ -137,7 +137,7 @@ public class CommandPaletteTests
                 Dispatcher.UIThread.RunJobs();
                 Assert.True(vm.PaletteOpen);
 
-                var command = vm.PaletteMatches.Single(item => item.Title == "Toggle command log");
+                var command = vm.PaletteMatches.Single(item => item.Title == "Command log");
                 list.ScrollIntoView(command);
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
@@ -151,7 +151,11 @@ public class CommandPaletteTests
 
                 Assert.False(vm.PaletteOpen);
                 Assert.True(tab.CommandsOpen);
-                Assert.Equal("Toggle command log", vm.SelectedPalette?.Title);
+                Assert.Equal("Command log", vm.SelectedPalette?.Title);
+                Assert.True(vm.Dock.IsOpen(DockIds.Commands));
+                vm.ShowCommandsCommand.Execute(null);
+                Assert.True(tab.CommandsOpen);
+                Assert.True(vm.Dock.IsOpen(DockIds.Commands));
 
                 await vm.Shutdown();
                 window.DataContext = null;
@@ -195,14 +199,15 @@ public class CommandPaletteTests
                 vm.PaletteQuery = "toggle";
                 Assert.Equal(
                     [
-                        "Toggle blame",
-                        "Toggle command log",
                         "Toggle ignore whitespace",
-                        "Toggle locations",
                         "Toggle side-by-side diff",
-                        "Toggle staging",
                     ],
                     vm.PaletteMatches.Select(item => item.Title).ToList());
+                vm.PaletteQuery = "";
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Locations");
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Blame");
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Staging");
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Command log");
 
                 vm.ClosePalette();
                 tab.ShowingWorkingCopy = false;
