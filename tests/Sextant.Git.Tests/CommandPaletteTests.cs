@@ -282,4 +282,151 @@ public class CommandPaletteTests
             Directory.Delete(directory, recursive: true);
         }
     }
+
+    [Fact]
+    public async Task Enter_on_create_branch_keeps_the_prompt_open()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("first");
+
+        await session.Dispatch(async () =>
+        {
+            var (vm, tab, window) = await Open(repo);
+            try
+            {
+                await WaitUntilIdle(tab);
+                vm.TogglePalette();
+                vm.PaletteQuery = "create branch";
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal("Create branch", vm.SelectedPalette?.Title);
+                var box = window.FindControl<TextBox>("PaletteBox");
+                Assert.NotNull(box);
+                Assert.True(box.Focus());
+
+                window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+                // A repeat of the key that chose the command must not confirm the empty prompt.
+                if (window.OwnedWindows.Count == 1)
+                    window.OwnedWindows[0].KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+                window.KeyRelease(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+                Dispatcher.UIThread.RunJobs();
+
+                var dialog = Assert.Single(window.OwnedWindows);
+                Assert.Equal("Create branch", dialog.Title);
+                Assert.False(vm.PaletteOpen);
+                Assert.False(tab.IsBusy, tab.BusyText);
+                Assert.DoesNotContain("topic", repo.RunCapture("branch", "--list"), StringComparison.Ordinal);
+                var name = Assert.IsType<TextBox>(dialog.FocusManager?.GetFocusedElement());
+
+                window.Activate();
+                Dispatcher.UIThread.RunJobs();
+                Assert.Same(dialog, Assert.Single(window.OwnedWindows));
+                Assert.False(tab.IsBusy, tab.BusyText);
+
+                name.Text = "topic";
+                dialog.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+                Assert.NotNull(vm.RunPaletteCommand.ExecutionTask);
+                await vm.RunPaletteCommand.ExecutionTask;
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.Empty(window.OwnedWindows);
+                Assert.Contains("topic", repo.RunCapture("branch", "--list"), StringComparison.Ordinal);
+                Assert.False(tab.HasBanner, tab.Banner);
+            }
+            finally
+            {
+                await vm.Shutdown();
+                window.DataContext = null;
+                window.Close();
+            }
+
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Clicking_create_branch_keeps_the_prompt_open()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("first");
+
+        await session.Dispatch(async () =>
+        {
+            var (vm, tab, window) = await Open(repo);
+            try
+            {
+                await WaitUntilIdle(tab);
+                vm.TogglePalette();
+                vm.PaletteQuery = "create branch";
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                var list = window.FindControl<ListBox>("PaletteList");
+                Assert.NotNull(list);
+                var command = vm.PaletteMatches.Single(item => item.Title == "Create branch");
+                list.ScrollIntoView(command);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                var row = list.ContainerFromItem(command) as ListBoxItem;
+                Assert.NotNull(row);
+                var point = row.TranslatePoint(new Point(row.Bounds.Width / 2, row.Bounds.Height / 2), window);
+                Assert.NotNull(point);
+                window.MouseDown(point.Value, MouseButton.Left);
+                window.MouseUp(point.Value, MouseButton.Left);
+                Dispatcher.UIThread.RunJobs();
+
+                var dialog = Assert.Single(window.OwnedWindows);
+                Assert.Equal("Create branch", dialog.Title);
+                Assert.False(tab.IsBusy, tab.BusyText);
+
+                window.Activate();
+                Dispatcher.UIThread.RunJobs();
+                Assert.Same(dialog, Assert.Single(window.OwnedWindows));
+                Assert.False(tab.IsBusy, tab.BusyText);
+                dialog.Close();
+                if (vm.RunPaletteCommand.ExecutionTask is { } task)
+                    await task;
+            }
+            finally
+            {
+                await vm.Shutdown();
+                window.DataContext = null;
+                window.Close();
+            }
+
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    private static async Task<(MainViewModel Vm, RepositoryViewModel Tab, MainWindow Window)> Open(TempRepo repo)
+    {
+        var store = new WorkspaceStore(Path.Combine(repo.Directory, ".git", "sextant-workspace"));
+        var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings { GitExecutable = repo.Git, ReopenTabs = false }, new GitProcessRunner())
+        {
+            GitExecutable = repo.Git,
+            GitReady = true,
+        };
+        var tab = new RepositoryViewModel(vm, repo.Directory);
+        vm.Tabs.Add(tab);
+        await vm.Activate(tab);
+        var window = new MainWindow { DataContext = vm, Width = 1000, Height = 700 };
+        window.Show();
+        await vm.InitializeAsync();
+        window.UpdateLayout();
+        Dispatcher.UIThread.RunJobs();
+        return (vm, tab, window);
+    }
+
+    private static async Task WaitUntilIdle(RepositoryViewModel tab)
+    {
+        var until = DateTime.UtcNow.AddSeconds(5);
+        while (tab.IsBusy && DateTime.UtcNow < until)
+            await Task.Delay(30);
+        Assert.False(tab.IsBusy, tab.BusyText);
+        Assert.True(tab.IsReady);
+    }
 }
