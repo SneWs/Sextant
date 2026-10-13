@@ -469,6 +469,74 @@ public class RepositoryFileTreeTests
         }, CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Files_tab_in_a_repository_without_lfs_does_not_query_locks()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.Run("config", "filter.lfs.process", "");
+        repo.Run("config", "filter.lfs.clean", "");
+        repo.Run("config", "filter.lfs.smudge", "");
+        repo.Run("config", "filter.lfs.required", "false");
+        repo.WriteFile("readme.txt", "hello\n");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new TreeHost(repo.Git), repo.Directory);
+            await vm.EnsureLoadedAsync();
+            await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
+            var file = vm.RepositoryFileTree.Single(item => item.Path == "readme.txt");
+            Assert.False(vm.HasBanner, vm.Banner);
+            Assert.False(vm.IsBusy);
+            Assert.False(file.LfsTracked);
+            Assert.False(file.LocksKnown);
+            Assert.False(file.ShowLock);
+            Assert.False(file.ShowUnlock);
+            Assert.False(CommandLogInvokedLfs(vm.CommandLog));
+            await vm.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Files_tab_queries_locks_when_an_attribute_pattern_matches_no_file()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.Run("config", "filter.lfs.process", "");
+        repo.Run("config", "filter.lfs.clean", "");
+        repo.Run("config", "filter.lfs.smudge", "");
+        repo.Run("config", "filter.lfs.required", "false");
+        repo.WriteFile(".gitattributes", "*.bin filter=lfs diff=lfs -text\n");
+        repo.WriteFile("readme.txt", "hello\n");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new TreeHost(repo.Git), repo.Directory);
+            await vm.EnsureLoadedAsync();
+            await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
+            var file = vm.RepositoryFileTree.Single(item => item.Path == "readme.txt");
+            Assert.False(file.LfsTracked);
+            Assert.Equal(file.LocksKnown, file.ShowLock);
+            Assert.False(vm.IsBusy);
+            Assert.True(CommandLogInvokedLfs(vm.CommandLog));
+            await vm.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
+    private static bool CommandLogInvokedLfs(string log)
+    {
+        foreach (var line in log.Split('\n'))
+        {
+            foreach (var token in line.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (token == "lfs")
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     private static async Task WaitUntilIdle(RepositoryViewModel tab)
     {
         var until = DateTime.UtcNow.AddSeconds(10);

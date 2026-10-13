@@ -87,7 +87,7 @@ public partial class RepositoryView : UserControl
 
     private ColumnDefinition GraphColumn => Columns.ColumnDefinitions[2];
 
-    private RowDefinition FilesRow => Details.RowDefinitions[2];
+    private RowDefinition FilesRow => Details.RowDefinitions[1];
 
     public void ReadWidths()
     {

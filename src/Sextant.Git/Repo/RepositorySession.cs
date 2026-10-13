@@ -1433,7 +1433,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
     }
 
     // Asking for an LFS password can sit forever in the credential helper, so checkout must not download.
-    // git lfs checkout afterwards writes objects that are already in the local store, and it does not download.
+    // When this repository uses Git LFS, git lfs checkout afterwards writes objects already in the local store.
     private static readonly Dictionary<string, string> CheckoutEnvironment = new()
     {
         ["GIT_LFS_SKIP_SMUDGE"] = "1",
@@ -1482,10 +1482,12 @@ public sealed partial class RepositorySession : IAsyncDisposable
     }
 
     /// <summary>
-    /// Fills pointer files from the local LFS store. A repository without Git LFS leaves those pointers as they are.
+    /// Fills pointer files from the local LFS store. A repository that does not use Git LFS is left alone.
     /// </summary>
     private async Task HydrateLocalLfsAsync(string directory, CancellationToken cancellationToken)
     {
+        if (!await UsesLfsCoreAsync(null, cancellationToken).ConfigureAwait(false))
+            return;
         var output = await ExecuteAsync(GitCommands.LfsCheckoutAll(directory), null, cancellationToken).ConfigureAwait(false);
         Track(output);
     }

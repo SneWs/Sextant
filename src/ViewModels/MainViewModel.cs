@@ -398,6 +398,9 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     private void ToggleChanges() => Dock.Toggle(DockIds.Changes);
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
+    private void ToggleStaging() => Dock.Toggle(DockIds.Staging);
+
+    [RelayCommand(CanExecute = nameof(HasActiveTab))]
     private void ToggleDiff() => Dock.Toggle(DockIds.Diff);
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
@@ -560,6 +563,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         ToggleBranchViewCommand.NotifyCanExecuteChanged();
         ToggleHistoryCommand.NotifyCanExecuteChanged();
         ToggleChangesCommand.NotifyCanExecuteChanged();
+        ToggleStagingCommand.NotifyCanExecuteChanged();
         ToggleDiffCommand.NotifyCanExecuteChanged();
         ToggleBlameCommand.NotifyCanExecuteChanged();
         ToggleFilesCommand.NotifyCanExecuteChanged();
@@ -1101,6 +1105,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             if (!tab.ShowingWorkingCopy || tab.ShowingBlame)
                 _palette.Add(new PaletteItem { Title = "Toggle all files", Run = () => tab.ToggleAllFilesCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Toggle blame", Run = () => { ToggleBlame(); return Task.CompletedTask; } });
+            _palette.Add(new PaletteItem { Title = "Toggle staging", Run = () => { ToggleStaging(); return Task.CompletedTask; } });
             if (tab.IsConflicted)
             {
                 _palette.Add(new PaletteItem { Title = "Continue", Run = tab.ContinueSequencer });

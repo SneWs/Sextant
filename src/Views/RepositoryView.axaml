@@ -77,14 +77,14 @@
             <Grid x:Name="Details" Grid.Column="4">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="180" MinHeight="80"/>
                     <RowDefinition Height="4"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <views:ChangesToolView Grid.Row="0" Grid.RowSpan="3"/>
-                <GridSplitter Grid.Row="3" ResizeDirection="Rows"/>
-                <views:DiffDocumentView Grid.Row="4"/>
+                <views:ChangesToolView Grid.Row="0"/>
+                <views:StagingToolView Grid.Row="1"/>
+                <GridSplitter Grid.Row="2" ResizeDirection="Rows"/>
+                <views:DiffDocumentView Grid.Row="3"/>
             </Grid>
         </Grid>
 

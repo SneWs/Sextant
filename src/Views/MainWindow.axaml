@@ -117,6 +117,7 @@
                     <NativeMenuItem Header="Toggle _locations" Command="{Binding ToggleBranchViewCommand}"/>
                     <NativeMenuItem Header="Toggle _history" Command="{Binding ToggleHistoryCommand}"/>
                     <NativeMenuItem Header="Toggle _changes" Command="{Binding ToggleChangesCommand}"/>
+                    <NativeMenuItem Header="Toggle _staging" Command="{Binding ToggleStagingCommand}"/>
                     <NativeMenuItem Header="Toggle _diff" Command="{Binding ToggleDiffCommand}"/>
                     <NativeMenuItem Header="Toggle _blame" Command="{Binding ToggleBlameCommand}"/>
                     <NativeMenuItem Header="_Repository files" Command="{Binding ToggleFilesCommand}"/>

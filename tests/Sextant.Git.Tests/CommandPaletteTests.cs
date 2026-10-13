@@ -152,6 +152,7 @@ public class CommandPaletteTests
                         "Toggle ignore whitespace",
                         "Toggle locations",
                         "Toggle side-by-side diff",
+                        "Toggle staging",
                     ],
                     vm.PaletteMatches.Select(item => item.Title).ToList());
 

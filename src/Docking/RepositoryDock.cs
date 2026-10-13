@@ -27,6 +27,7 @@ public partial class RepositoryDock : ObservableObject
             [DockIds.Locations] = new RepositoryTool(this, DockIds.Locations, "Locations"),
             [DockIds.History] = new RepositoryTool(this, DockIds.History, "History"),
             [DockIds.Changes] = new RepositoryTool(this, DockIds.Changes, "Changes"),
+            [DockIds.Staging] = new RepositoryTool(this, DockIds.Staging, "Staging"),
             [DockIds.Files] = new RepositoryTool(this, DockIds.Files, "Repository files"),
             [DockIds.Commands] = new RepositoryTool(this, DockIds.Commands, "Command log"),
             [DockIds.Diff] = new RepositoryTool(this, DockIds.Diff, "Diff"),
@@ -584,6 +585,10 @@ public partial class RepositoryDock : ObservableObject
             return;
         if (id is DockIds.Diff or DockIds.Blame && TryAttachReview(layout.Root, id))
             return;
+        if (id == DockIds.Staging && DockLayouts.TryInsertStaging(layout.Root))
+            return;
+        if (id == DockIds.Changes && DockLayouts.TryInsertChanges(layout.Root))
+            return;
         if (id == DockIds.Changes && TryWrapReview(layout.Root, id))
             return;
         foreach (var slot in layout.Root.Slots)
@@ -634,8 +639,11 @@ public partial class RepositoryDock : ObservableObject
             {
                 if (split.Orientation == "vertical")
                 {
+                    var insertAt = i + 1;
+                    if (insertAt < split.Slots.Count && split.Slots[insertAt].Id == DockIds.Staging)
+                        insertAt++;
                     slot.Proportion = Math.Max(0.2, slot.Proportion * 0.36 / 0.64);
-                    split.Slots.Insert(i + 1, new DockSlot { Id = id, Proportion = 0.64 });
+                    split.Slots.Insert(insertAt, new DockSlot { Id = id, Proportion = 0.64 });
                     return true;
                 }
 

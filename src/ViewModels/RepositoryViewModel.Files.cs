@@ -66,18 +66,29 @@ public partial class RepositoryViewModel
             return;
         try
         {
-            if (needsLocks)
-                BusyText = "Loading LFS locks…";
-            var locks = needsLocks
-                ? await _session.LfsLocksAsync(token)
-                : [];
+            // git lfs locks asks the server. A repository that does not use Git LFS has no server,
+            // and the command fails with an empty remote address.
+            var usesLfs = needsLocks && (files.Any(file => file.LfsTracked)
+                || await _session.UsesLfsAsync(files.Select(file => file.Path).ToArray(), token));
+            token.ThrowIfCancellationRequested();
+            if (generation != _repositoryFilesGeneration)
+                return;
+            if (!usesLfs)
+            {
+                _repositoryLocks.Clear();
+                _repositoryLocksKnown = false;
+                return;
+            }
+
+            BusyText = "Loading LFS locks…";
+            var locks = await _session.LfsLocksAsync(token);
             token.ThrowIfCancellationRequested();
             if (generation != _repositoryFilesGeneration)
                 return;
             _repositoryLocks.Clear();
             foreach (var item in locks)
                 _repositoryLocks[item.Path] = item;
-            _repositoryLocksKnown = needsLocks;
+            _repositoryLocksKnown = true;
         }
         finally
         {

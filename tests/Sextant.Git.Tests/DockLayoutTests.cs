@@ -14,7 +14,7 @@ public class DockLayoutTests
     {
         using var vm = Open(new WorkspaceState());
         Assert.Equal(
-            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Diff, DockIds.Blame],
+            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
             vm.View.Dock.PaneOrder());
         Assert.True(vm.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
     }
@@ -32,7 +32,7 @@ public class DockLayoutTests
         vm.View.Dock.Reset();
 
         Assert.Equal(
-            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Diff, DockIds.Blame],
+            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
             vm.View.Dock.PaneOrder());
         Assert.True(vm.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
         Assert.False(vm.View.Dock.IsOpen(DockIds.Files));
@@ -68,7 +68,7 @@ public class DockLayoutTests
             var store = new WorkspaceStore(directory);
             var vm = new MainViewModel(store, state, new AppSettings(), new GitProcessRunner());
             Assert.Equal(
-                [DockIds.History, DockIds.Changes, DockIds.Diff, DockIds.Blame],
+                [DockIds.History, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
                 vm.Dock.PaneOrder());
             Assert.False(vm.Dock.IsOpen(DockIds.Locations));
 
@@ -92,7 +92,7 @@ public class DockLayoutTests
         using var vm = Open(new WorkspaceState());
         vm.View.Dock.SetOpen(DockIds.Diff, false);
         Assert.Equal(
-            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Blame],
+            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Staging, DockIds.Blame],
             vm.View.Dock.PaneOrder());
         Assert.False(vm.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
     }
@@ -108,7 +108,7 @@ public class DockLayoutTests
         vm.View.Dock.SetOpen(DockIds.Blame, true);
 
         Assert.Equal(
-            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Diff, DockIds.Blame],
+            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
             vm.View.Dock.PaneOrder());
         Assert.True(vm.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
     }
@@ -144,6 +144,104 @@ public class DockLayoutTests
         Assert.Same(layout, again);
         Assert.Equal(DockIds.Diff, again.Root!.Slots[1].Id);
         Assert.Null(again.Root.Slots[1].Tabs);
+    }
+
+    [Fact]
+    public void Saved_changes_pane_gains_a_staging_pane_once()
+    {
+        var state = new WorkspaceState
+        {
+            DockLayout = new DockLayout
+            {
+                Schema = 1,
+                Root = new DockSplit
+                {
+                    Orientation = "vertical",
+                    Slots =
+                    [
+                        new DockSlot { Id = DockIds.Changes, Proportion = 0.4 },
+                        new DockSlot
+                        {
+                            Proportion = 0.6,
+                            Tabs = [DockIds.Diff, DockIds.Blame],
+                            Active = DockIds.Diff,
+                        },
+                    ],
+                },
+            },
+        };
+        var layout = DockLayouts.Resolve(state);
+        Assert.Same(state.DockLayout, layout);
+        Assert.Equal(DockLayouts.CurrentSchema, layout.Schema);
+        Assert.Equal(DockIds.Changes, layout.Root!.Slots[0].Id);
+        Assert.Equal(DockIds.Staging, layout.Root.Slots[1].Id);
+        Assert.Equal([DockIds.Diff, DockIds.Blame], layout.Root.Slots[2].Tabs);
+        Assert.True(layout.Root.Slots[0].Proportion < 0.4);
+        Assert.True(layout.Root.Slots[1].Proportion > 0);
+
+        var again = DockLayouts.Resolve(state);
+        Assert.Equal(3, again.Root!.Slots.Count);
+        Assert.Equal(DockIds.Staging, again.Root.Slots[1].Id);
+    }
+
+    [Fact]
+    public void Pinned_changes_still_gains_a_staging_pane()
+    {
+        var state = new WorkspaceState
+        {
+            DockLayout = new DockLayout
+            {
+                Schema = 1,
+                Root = new DockSplit
+                {
+                    Orientation = "horizontal",
+                    Slots =
+                    [
+                        new DockSlot { Id = DockIds.History, Proportion = 0.4 },
+                        new DockSlot
+                        {
+                            Proportion = 0.6,
+                            Tabs = [DockIds.Diff, DockIds.Blame],
+                            Active = DockIds.Diff,
+                        },
+                    ],
+                },
+                Pins = [new DockPin { Id = DockIds.Changes, Side = "right" }],
+            },
+        };
+        var layout = DockLayouts.Resolve(state);
+        Assert.Equal(DockIds.History, layout.Root!.Slots[0].Id);
+        Assert.Equal(DockIds.Staging, layout.Root.Slots[1].Id);
+        Assert.Equal([DockIds.Diff, DockIds.Blame], layout.Root.Slots[2].Tabs);
+    }
+
+    [Fact]
+    public void A_closed_file_list_stays_closed()
+    {
+        var state = new WorkspaceState
+        {
+            DockLayout = new DockLayout
+            {
+                Schema = DockLayouts.CurrentSchema,
+                Root = new DockSplit
+                {
+                    Orientation = "vertical",
+                    Slots =
+                    [
+                        new DockSlot { Id = DockIds.Changes, Proportion = 0.3 },
+                        new DockSlot
+                        {
+                            Proportion = 0.7,
+                            Tabs = [DockIds.Diff, DockIds.Blame],
+                            Active = DockIds.Diff,
+                        },
+                    ],
+                },
+            },
+        };
+        var layout = DockLayouts.Resolve(state);
+        Assert.Equal(2, layout.Root!.Slots.Count);
+        Assert.DoesNotContain(layout.Root.Slots, slot => slot.Id == DockIds.Staging);
     }
 
     [Fact]
@@ -198,7 +296,7 @@ public class DockLayoutTests
         };
         using var vm = Open(state);
         Assert.Equal(
-            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Diff, DockIds.Blame],
+            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
             vm.View.Dock.PaneOrder());
     }
 

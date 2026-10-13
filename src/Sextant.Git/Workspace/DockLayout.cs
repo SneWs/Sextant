@@ -8,6 +8,8 @@ public static class DockIds
 
     public const string Changes = "changes";
 
+    public const string Staging = "staging";
+
     public const string Files = "files";
 
     public const string Commands = "commands";
@@ -19,16 +21,20 @@ public static class DockIds
     /// <summary>Older layouts used this id for the repository document dock. It is read as <see cref="Diff"/>.</summary>
     public const string Documents = "documents";
 
-    public static readonly string[] Tools = [Locations, History, Changes, Files, Commands, Diff, Blame];
+    public static readonly string[] Tools = [Locations, History, Changes, Staging, Files, Commands, Diff, Blame];
 
     public static bool IsKnown(string id) =>
-        id is Locations or History or Changes or Files or Commands or Diff or Blame;
+        id is Locations or History or Changes or Staging or Files or Commands or Diff or Blame;
 }
 
 /// <summary>Sextant's own layout record. It is not Dock's object graph.</summary>
 public sealed class DockLayout
 {
-    /// <summary>1 groups an older lone Diff slot with Blame once. Later saves keep a closed Blame closed.</summary>
+    /// <summary>
+    /// 1 groups an older lone Diff slot with Blame once.
+    /// 2 places the staged and unstaged file list in its own tool under Changes.
+    /// Later saves keep a closed tool closed.
+    /// </summary>
     public int Schema { get; set; }
 
     public DockSplit? Root { get; set; }
@@ -88,7 +94,7 @@ public sealed class DockFloat
 
 public static class DockLayouts
 {
-    public const int CurrentSchema = 1;
+    public const int CurrentSchema = 2;
 
     public static DockLayout Default() => Seed(220, 520, 180, showLocations: true);
 
@@ -148,10 +154,11 @@ public static class DockLayouts
                 Orientation = "vertical",
                 Slots =
                 [
-                    new DockSlot { Id = DockIds.Changes, Proportion = fileShare },
+                    new DockSlot { Id = DockIds.Changes, Proportion = 0.18 },
+                    new DockSlot { Id = DockIds.Staging, Proportion = Math.Max(0.16, fileShare * 0.82) },
                     new DockSlot
                     {
-                        Proportion = 1 - fileShare,
+                        Proportion = Math.Max(0.34, (1 - fileShare) * 0.82),
                         Tabs = [DockIds.Diff, DockIds.Blame],
                         Active = DockIds.Diff,
                     },
@@ -194,9 +201,82 @@ public static class DockLayouts
         layout.Floats.RemoveAll(floated => floated.Id == DockIds.Documents);
         if (layout.Schema >= CurrentSchema)
             return;
-        if (layout.Root is not null && !Holds(layout.Root, DockIds.Blame) && Holds(layout.Root, DockIds.Diff))
+        if (layout.Schema < 1 && layout.Root is not null && !Holds(layout.Root, DockIds.Blame) && Holds(layout.Root, DockIds.Diff))
             GroupBlameWithDiff(layout.Root);
+        if (layout.Schema < 2)
+            EnsureStaging(layout);
         layout.Schema = CurrentSchema;
+    }
+
+    /// <summary>
+    /// A Changes tool that is still open, including one that is pinned or floating, keeps its file list.
+    /// The list becomes the Staging tool under that commit box, or above the diff when Changes is not in the main split.
+    /// </summary>
+    private static void EnsureStaging(DockLayout layout)
+    {
+        if (layout.Root is null || HoldsTool(layout, DockIds.Staging))
+            return;
+        if (TryInsertStaging(layout.Root) || !HoldsTool(layout, DockIds.Changes))
+            return;
+        if (!PlaceBeforeReview(layout.Root))
+            layout.Root.Slots.Add(new DockSlot { Id = DockIds.Staging, Proportion = 0.22 });
+    }
+
+    private static bool HoldsTool(DockLayout layout, string id) =>
+        (layout.Root is not null && Holds(layout.Root, id))
+        || layout.Pins.Any(pin => pin.Id == id)
+        || layout.Floats.Any(floated => floated.Id == id);
+
+    private static bool PlaceBeforeReview(DockSplit split)
+    {
+        for (var i = 0; i < split.Slots.Count; i++)
+        {
+            var slot = split.Slots[i];
+            if (IsReviewSlot(slot))
+            {
+                var given = Math.Max(0.16, slot.Proportion * 0.28);
+                slot.Proportion = Math.Max(0.2, slot.Proportion - given);
+                split.Slots.Insert(i, new DockSlot { Id = DockIds.Staging, Proportion = given });
+                return true;
+            }
+
+            if (slot.Split is not null && PlaceBeforeReview(slot.Split))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsReviewSlot(DockSlot slot) =>
+        slot.Id is DockIds.Diff or DockIds.Blame
+        || slot.Tabs?.Any(tab => tab is DockIds.Diff or DockIds.Blame) == true;
+
+    /// <summary>Splits a Changes slot so the file list sits under the commit box. A layout that already closed Changes is left alone.</summary>
+    public static bool TryInsertStaging(DockSplit split) =>
+        !Holds(split, DockIds.Staging) && PlaceBeside(split, DockIds.Changes, DockIds.Staging, before: false, keep: 0.42);
+
+    /// <summary>Puts Changes back above an open Staging tool.</summary>
+    public static bool TryInsertChanges(DockSplit split) =>
+        !Holds(split, DockIds.Changes) && PlaceBeside(split, DockIds.Staging, DockIds.Changes, before: true, keep: 0.62);
+
+    private static bool PlaceBeside(DockSplit split, string anchor, string id, bool before, double keep)
+    {
+        for (var i = 0; i < split.Slots.Count; i++)
+        {
+            var slot = split.Slots[i];
+            if (slot.Id == anchor && slot.Split is null && slot.Tabs is not { Count: > 0 })
+            {
+                var given = Math.Max(0.12, slot.Proportion * (1 - keep));
+                slot.Proportion = Math.Max(0.12, slot.Proportion * keep);
+                split.Slots.Insert(before ? i : i + 1, new DockSlot { Id = id, Proportion = given });
+                return true;
+            }
+
+            if (slot.Split is not null && PlaceBeside(slot.Split, anchor, id, before, keep))
+                return true;
+        }
+
+        return false;
     }
 
     private static bool GroupBlameWithDiff(DockSplit split)
