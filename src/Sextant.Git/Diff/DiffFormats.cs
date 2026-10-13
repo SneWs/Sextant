@@ -323,17 +323,18 @@ public static class DiffFormatTool
         info.Environment.TryGetValue("PATH", out var path);
         info.Environment["PATH"] = GitProcessRunner.ToolPath(path, gitExecutable ?? "");
 
-        Process process;
+        Process? process;
         try
         {
-            process = new Process { StartInfo = info, EnableRaisingEvents = true };
-            if (!process.Start())
-                return DiffFormatRun.Failed("The formatter could not be started.", display);
+            process = await StartFormatterAsync(info, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
         {
-            return DiffFormatRun.Failed("The formatter could not be started. " + tokens[0] + " was not found.", display);
+            return DiffFormatRun.Failed("The formatter could not be started. " + StartFailure(exception, tokens[0]), display);
         }
+
+        if (process is null)
+            return DiffFormatRun.Failed("The formatter could not be started.", display);
 
         using (process)
         {
@@ -381,6 +382,47 @@ public static class DiffFormatTool
 
             return new DiffFormatRun(true, output, "", display, 0, started.Elapsed);
         }
+    }
+
+    // Linux and macOS refuse to execute a file another process still has open for writing.
+    // A fork that overlapped that write inherits the handle until exec, so one start can fail with ETXTBSY even though the file is there.
+    private static async Task<Process?> StartFormatterAsync(ProcessStartInfo info, CancellationToken cancellationToken)
+    {
+        const int textFileBusy = 26;
+        const int attempts = 8;
+        for (var attempt = 1; ; attempt++)
+        {
+            var process = new Process { StartInfo = info, EnableRaisingEvents = true };
+            try
+            {
+                if (!process.Start())
+                {
+                    process.Dispose();
+                    return null;
+                }
+
+                return process;
+            }
+            catch (System.ComponentModel.Win32Exception exception) when (!OperatingSystem.IsWindows() && exception.NativeErrorCode == textFileBusy && attempt < attempts)
+            {
+                process.Dispose();
+                await Task.Delay(TimeSpan.FromMilliseconds(10 * attempt), cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                process.Dispose();
+                throw;
+            }
+        }
+    }
+
+    private static string StartFailure(Exception exception, string program)
+    {
+        // ENOENT is 2 on Linux and macOS. Windows uses 2 for a missing file and 3 for a missing directory.
+        if (exception is System.ComponentModel.Win32Exception win32 && win32.NativeErrorCode is 2 or 3)
+            return program + " was not found.";
+        var message = exception.Message.Trim();
+        return message.Length == 0 ? program + " was not found." : message;
     }
 
     private static async Task WriteInputAsync(Process process, byte[] input, CancellationToken cancellationToken)

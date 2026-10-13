@@ -80,6 +80,58 @@ public class DiffFormatTests
     }
 
     [Fact]
+    public async Task Formatter_script_starts_while_other_processes_fork()
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+
+        using var stop = new CancellationTokenSource();
+        var workers = Enumerable.Range(0, 6).Select(_ => Task.Run(() => ForkUntil(stop.Token))).ToArray();
+        try
+        {
+            for (var i = 0; i < 40; i++)
+            {
+                var text = await RunToolAsync("IN:", "alpha"u8.ToArray(), useFile: false);
+                Assert.Equal("IN:alpha", text);
+            }
+        }
+        finally
+        {
+            await stop.CancelAsync();
+            await Task.WhenAll(workers);
+        }
+    }
+
+    [Fact]
+    public async Task Busy_formatter_reports_the_system_error()
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-busy-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var script = Path.Combine(directory, "format.sh");
+        try
+        {
+            File.WriteAllText(script, """
+                #!/bin/sh
+                printf '%s' ok
+                """);
+            File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            // The write handle stays open for the whole start, so every attempt is text-file-busy.
+            await using var held = new FileStream(script, FileMode.Open, FileAccess.Write, FileShare.ReadWrite);
+            var run = await DiffFormatTool.RunAsync("\"" + script + "\"", [], null, null, CancellationToken.None);
+            Assert.False(run.Ok);
+            Assert.Contains("busy", run.Error, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("was not found", run.Error, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Settings_round_trip_keeps_file_type_tools()
     {
         var directory = Path.Combine(Path.GetTempPath(), "sextant-fmt-" + Guid.NewGuid().ToString("N"));
@@ -225,6 +277,35 @@ public class DiffFormatTests
         repo.Run("switch", trunk);
         repo.WriteFile("data.json", "{\"a\":1}\n");
         repo.CommitAll("main");
+    }
+
+    private static void ForkUntil(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                using var process = new System.Diagnostics.Process
+                {
+                    StartInfo = new System.Diagnostics.ProcessStartInfo("/bin/true")
+                    {
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        RedirectStandardInput = true,
+                        UseShellExecute = false,
+                    },
+                };
+                process.Start();
+                process.StandardInput.Close();
+                process.WaitForExit();
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
     }
 
     private static async Task<string> RunToolAsync(string prefix, byte[] input, bool useFile)
