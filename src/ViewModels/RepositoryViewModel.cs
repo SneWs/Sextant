@@ -7,6 +7,7 @@ using Sextant.Git;
 using Sextant.Git.Parsing;
 using Sextant.Services;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Text;
 using System.Windows.Input;
@@ -1019,6 +1020,12 @@ public partial class RepositoryViewModel : ViewModelBase
             Fail(exception.Message);
             if (_session is not null)
                 Apply(_session.Snapshot());
+        }
+        catch (Win32Exception)
+        {
+            // The folder can be removed while a debounced refresh is still waiting to start git.
+            // Process.Start then fails with "No such file or directory", and the command posts that
+            // exception back onto the UI thread. A background refresh must not tear the app down.
         }
     }
 
