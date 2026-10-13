@@ -148,8 +148,8 @@
                     </Canvas>
                     <SplitButton.Flyout>
                         <MenuFlyout>
-                            <MenuItem Header="Push" Command="{Binding PushCommand}"/>
-                            <MenuItem Header="Push ignoring local checks" Command="{Binding PushIgnoringLocalChecksCommand}"/>
+                            <MenuItem Header="Push" Command="{Binding PushCommand}" IsEnabled="{Binding CanPush}"/>
+                            <MenuItem Header="Push ignoring local checks" Command="{Binding PushIgnoringLocalChecksCommand}" IsEnabled="{Binding CanPush}"/>
                             <MenuItem Header="Push with force-with-lease" Command="{Binding PushForceWithLeaseCommand}"/>
                         </MenuFlyout>
                     </SplitButton.Flyout>

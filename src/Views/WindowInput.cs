@@ -26,7 +26,7 @@ public static class WindowInput
         if (AppGestures.Matches(e, Key.P, KeyModifiers.Shift))
         {
             e.Handled = true;
-            if (vm.CanRunRepositoryCommands)
+            if (vm.PushCommand.CanExecute(null))
                 vm.PushCommand.Execute(null);
             return;
         }

@@ -388,6 +388,16 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public bool CanRunCommands => !IsBusy;
 
+    /// <summary>
+    /// Push runs only when this branch has commits the remote does not.
+    /// Ahead is that count once an upstream exists, including when the upstream is origin.
+    /// </summary>
+    public bool CanPush => !IsBusy && _canPush;
+
+    private bool _canPush;
+
+    private int _pushGate;
+
     public bool ShowDirtyDot => IsDirty && !IsConflicted;
 
     public bool ShowCleanDot => !IsDirty && !IsConflicted;
@@ -726,6 +736,7 @@ public partial class RepositoryViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanCommitOrAmend));
         OnPropertyChanged(nameof(CanRunCommands));
         OnPropertyChanged(nameof(ShowBranchStatus));
+        NotePush();
         NotifyBulkStage();
         NotifyRepositoryFileCommands();
         NotifyStashCommands();
@@ -1153,35 +1164,140 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private async Task PushCoreAsync(bool noVerify)
     {
-        if (_session is null || IsBusy)
+        if (_session is null || IsBusy || _pushGate > 0)
             return;
-        var label = noVerify ? "Pushing without local checks…" : "Pushing…";
         var state = _session.Snapshot();
-        if (state.Branch.Upstream is null && !state.Branch.Detached && state.Branch.HeadName is { } branch)
+        if (!HasCommitsToPush(state))
+            return;
+
+        _pushGate++;
+        try
         {
-            if (_host.Dialogs is null)
-                return;
-            if (state.Remotes.Count == 0)
+            var label = noVerify ? "Pushing without local checks…" : "Pushing…";
+            if (state.Branch.Upstream is null && !state.Branch.Detached && state.Branch.HeadName is { } branch)
             {
-                Fail("This branch has no upstream, and this repository has no remotes. Add a remote, then push.");
+                if (state.Remotes.Count == 0)
+                {
+                    Fail("This branch has no upstream, and this repository has no remotes. Add a remote, then push.");
+                    return;
+                }
+
+                IReadOnlyList<string> pending;
+                try
+                {
+                    pending = await RemotesMissingCommitsAsync(state.Remotes);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (GitCommandFailedException exception)
+                {
+                    Fail(exception.Message);
+                    return;
+                }
+                catch (RepositoryActionException exception)
+                {
+                    Fail(exception.Message);
+                    return;
+                }
+
+                if (_session is null)
+                    return;
+                if (pending.Count == 0)
+                {
+                    Fail(AlreadyPublished(state.Remotes));
+                    return;
+                }
+
+                // The only remote is the only place this branch can go.
+                if (state.Remotes.Count == 1)
+                {
+                    var remote = state.Remotes[0];
+                    var progress = Progress();
+                    await RunAsync(label, ct => _session.PushUpstreamAsync(remote, branch, progress, ct, noVerify));
+                    return;
+                }
+
+                if (_host.Dialogs is not { } dialogs)
+                    return;
+                await HoldFocus(async () =>
+                {
+                    var remote = await dialogs.PickAsync("Push", $"Push {branch} and set its upstream.", pending);
+                    if (remote is null || _session is null || !pending.Contains(remote))
+                        return;
+                    var progress = Progress();
+                    await RunAsync(label, ct => _session.PushUpstreamAsync(remote, branch, progress, ct, noVerify));
+                });
                 return;
             }
 
-            var dialogs = _host.Dialogs;
-            await HoldFocus(async () =>
+            var pushProgress = Progress();
+            await RunAsync(label, ct => _session.PushAsync(pushProgress, ct, noVerify));
+        }
+        finally
+        {
+            _pushGate--;
+        }
+    }
+
+    /// <summary>
+    /// A branch with an upstream can push only its ahead commits. That upstream may be origin.
+    /// With no upstream, a remote-tracking tip at HEAD means origin, or that other remote, already has these commits.
+    /// </summary>
+    private static bool HasCommitsToPush(SessionState state)
+    {
+        var branch = state.Branch;
+        if (branch.Detached || branch.Unborn || branch.HeadName is null || branch.Oid is null)
+            return false;
+        if (branch.Upstream is not null)
+            return branch.Ahead > 0;
+        if (state.Remotes.Count == 0)
+            return true;
+
+        var head = branch.Oid;
+        foreach (var remote in state.Remotes)
+        {
+            var prefix = "refs/remotes/" + remote + "/";
+            var tracked = false;
+            var published = false;
+            foreach (var reference in state.Refs)
             {
-                var remote = await dialogs.PickAsync("Push", $"Push {branch} and set its upstream.", state.Remotes);
-                if (remote is null || _session is null)
-                    return;
-                var progress = Progress();
-                await RunAsync(label, ct => _session.PushUpstreamAsync(remote, branch, progress, ct, noVerify));
-            });
-            return;
+                if (!reference.Name.StartsWith(prefix, StringComparison.Ordinal))
+                    continue;
+                tracked = true;
+                if (string.Equals(reference.Oid, head, StringComparison.OrdinalIgnoreCase))
+                    published = true;
+            }
+
+            if (!tracked || !published)
+                return true;
         }
 
-        var pushProgress = Progress();
-        await RunAsync(label, ct => _session.PushAsync(pushProgress, ct, noVerify));
+        return false;
     }
+
+    private async Task<IReadOnlyList<string>> RemotesMissingCommitsAsync(IReadOnlyList<string> remotes)
+    {
+        var missing = new List<string>();
+        foreach (var remote in remotes)
+        {
+            if (_session is null)
+                break;
+            var count = await _session.CountCommitsNotOnRemoteAsync(remote, _lifetime.Token);
+            if (count > 0)
+                missing.Add(remote);
+        }
+
+        return missing;
+    }
+
+    private static string AlreadyPublished(IReadOnlyList<string> remotes) =>
+        remotes.Count == 1
+            ? $"Nothing to push. {remotes[0]} already has these commits."
+            : "Nothing to push. The remotes already have these commits.";
+
+    private void NotePush() => OnPropertyChanged(nameof(CanPush));
 
     private IProgress<string> Progress() => new Progress<string>(text =>
     {
@@ -1223,6 +1339,12 @@ public partial class RepositoryViewModel : ViewModelBase
             BranchText = DescribeBranch(state.Branch);
             ShowAheadBehind = state.Branch.Ahead != 0 || state.Branch.Behind != 0;
             AheadBehindText = ShowAheadBehind ? $"↑{state.Branch.Ahead}  ↓{state.Branch.Behind}" : "";
+            var canPush = HasCommitsToPush(state);
+            if (canPush != _canPush)
+            {
+                _canPush = canPush;
+                NotePush();
+            }
             IsDirty = state.Entries.Count > 0;
             SparseCheckout = state.SparseCheckout;
             IsConflicted = state.Sequencer != SequencerKind.None;

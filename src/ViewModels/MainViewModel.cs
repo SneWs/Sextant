@@ -126,6 +126,9 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     public bool CanUnstageAll => ActiveTab is { CanUnstageAll: true };
 
+    /// <summary>Push is available when the active branch has commits that are not on the remote or origin yet.</summary>
+    public bool CanPush => ActiveTab is { CanPush: true };
+
     public bool HasStatusText => !string.IsNullOrWhiteSpace(StatusText);
 
     public bool HasActiveTab => ActiveTab is not null;
@@ -379,8 +382,10 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         ? unstageTab.UnstageAllCommand.ExecuteAsync(null)
         : Task.CompletedTask;
 
-    [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
-    private Task Push() => ActiveTab?.PushCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+    [RelayCommand(CanExecute = nameof(CanPush))]
+    private Task Push() => ActiveTab is { CanPush: true } tab
+        ? tab.PushCommand.ExecuteAsync(null)
+        : Task.CompletedTask;
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
     private void ToggleHistorySearch() => ActiveTab?.ToggleHistorySearchCommand.Execute(null);
@@ -529,7 +534,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         if (e.PropertyName is not (nameof(RepositoryViewModel.CanRunCommands) or nameof(RepositoryViewModel.IsBusy)
             or nameof(RepositoryViewModel.CanStash) or nameof(RepositoryViewModel.CanStashUntracked)
             or nameof(RepositoryViewModel.CanStashStaged) or nameof(RepositoryViewModel.CanPopLatestStash)
-            or nameof(RepositoryViewModel.CanStageAll) or nameof(RepositoryViewModel.CanUnstageAll)))
+            or nameof(RepositoryViewModel.CanStageAll) or nameof(RepositoryViewModel.CanUnstageAll)
+            or nameof(RepositoryViewModel.CanPush)))
             return;
         OnPropertyChanged(nameof(CanRunRepositoryCommands));
         NotifyRepositoryCommands();
@@ -549,6 +555,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         PopLatestStashCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(CanStageAll));
         OnPropertyChanged(nameof(CanUnstageAll));
+        OnPropertyChanged(nameof(CanPush));
         StageAllCommand.NotifyCanExecuteChanged();
         UnstageAllCommand.NotifyCanExecuteChanged();
         AddRemoteCommand.NotifyCanExecuteChanged();
@@ -1077,8 +1084,11 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _palette.Add(new PaletteItem { Title = "Fetch all", Run = tab.FetchAll });
             _palette.Add(new PaletteItem { Title = "Fetch all and clean up", Run = tab.FetchAllAndCleanUp });
             _palette.Add(new PaletteItem { Title = "Pull", Run = tab.Pull });
-            _palette.Add(new PaletteItem { Title = "Push", Run = tab.Push });
-            _palette.Add(new PaletteItem { Title = "Push ignoring local checks", Run = () => tab.PushIgnoringLocalChecksCommand.ExecuteAsync(null) });
+            if (tab.CanPush)
+            {
+                _palette.Add(new PaletteItem { Title = "Push", Run = tab.Push });
+                _palette.Add(new PaletteItem { Title = "Push ignoring local checks", Run = () => tab.PushIgnoringLocalChecksCommand.ExecuteAsync(null) });
+            }
             _palette.Add(new PaletteItem { Title = "Push with force-with-lease", Run = () => tab.PushForceWithLeaseCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Commit", Run = tab.Commit });
             _palette.Add(new PaletteItem { Title = "Commit without hooks", Run = () => tab.CommitWithoutHooksCommand.ExecuteAsync(null) });
