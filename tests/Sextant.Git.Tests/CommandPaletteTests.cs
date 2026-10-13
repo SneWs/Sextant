@@ -4,6 +4,7 @@ using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Sextant;
 using Sextant.Git;
 using Sextant.Git.Workspace;
 using Sextant.ViewModels;
@@ -46,6 +47,53 @@ public class CommandPaletteTests
                 var item = window.GetVisualDescendants().OfType<ListBoxItem>().First(row => row.IsEffectivelyVisible);
                 Assert.Equal(new Thickness(12, 6, 12, 6), item.Padding);
                 Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Open repository");
+
+                await vm.Shutdown();
+                window.DataContext = null;
+                window.Close();
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Command_palette_focuses_its_input_when_opened_from_the_keyboard()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-palette-focus-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var store = new WorkspaceStore(directory);
+                var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner());
+                var window = new MainWindow { DataContext = vm, Width = 1000, Height = 700 };
+                window.Show();
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                var raw = AppGestures.Command == KeyModifiers.Meta
+                    ? RawInputModifiers.Meta
+                    : RawInputModifiers.Control;
+                window.KeyPress(Key.P, raw, PhysicalKey.P, null);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                var box = window.FindControl<TextBox>("PaletteBox");
+                Assert.NotNull(box);
+                Assert.True(vm.PaletteOpen);
+                Assert.True(box.IsEffectivelyVisible);
+                Assert.Same(box, window.FocusManager?.GetFocusedElement());
+
+                window.KeyTextInput("toggle");
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal("toggle", vm.PaletteQuery);
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Toggle staging");
 
                 await vm.Shutdown();
                 window.DataContext = null;

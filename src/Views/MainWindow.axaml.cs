@@ -135,7 +135,26 @@ public partial class MainWindow : Window
         if (e.PropertyName == nameof(MainViewModel.ActiveTab))
             SyncRepositoryTabs();
         if (e.PropertyName == nameof(MainViewModel.PaletteOpen) && sender is MainViewModel { PaletteOpen: true })
-            PaletteBox.Focus();
+            FocusPalette();
+    }
+
+    // The key that opens the palette is still in progress, and the box stays hidden
+    // until the next layout. Focus after that layout, then again after idle in case
+    // layout moves focus. Select all only while the query is still empty.
+    private void FocusPalette()
+    {
+        Dispatcher.UIThread.Post(() => Apply(select: true), DispatcherPriority.Background);
+        Dispatcher.UIThread.Post(() => Apply(select: false), DispatcherPriority.ContextIdle);
+
+        void Apply(bool select)
+        {
+            if (DataContext is not MainViewModel { PaletteOpen: true })
+                return;
+            if (!PaletteBox.Focus())
+                return;
+            if (select || string.IsNullOrEmpty(PaletteBox.Text))
+                PaletteBox.SelectAll();
+        }
     }
 
     private void OnTunnelKey(object? sender, KeyEventArgs e)
