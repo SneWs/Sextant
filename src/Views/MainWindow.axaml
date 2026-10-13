@@ -168,10 +168,11 @@
                     <NativeMenuItem Header="_Get help" Command="{Binding GetHelpCommand}"/>
                 </NativeMenu>
             </NativeMenuItem>
-            <!-- Windows and Linux keep About Sextant under About. -->
-            <NativeMenuItem Header="_About" IsVisible="{Binding ShowWindowAboutMenu}">
+            <!-- Windows and Linux keep About Sextant under Help. -->
+            <NativeMenuItem Header="_Help" IsVisible="{Binding ShowWindowAboutMenu}">
                 <NativeMenu>
                     <NativeMenuItem Header="_Get help" Command="{Binding GetHelpCommand}"/>
+                    <NativeMenuItemSeparator />
                     <NativeMenuItem Header="_About Sextant" Command="{Binding ShowAboutCommand}"/>
                 </NativeMenu>
             </NativeMenuItem>
