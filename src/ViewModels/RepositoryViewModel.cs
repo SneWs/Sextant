@@ -378,8 +378,8 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public bool CanDiscardAll => !IsBusy && ShowingWorkingCopy && (_hasUnstagedWork || _hasStagedWork);
 
-    /// <summary>Stage all, unstage all, and discard all are on the left of the diff command bar while the working copy is open.</summary>
-    public bool ShowBulkActions => ShowingWorkingCopy && !ShowingBlame;
+    /// <summary>Stage all, unstage all, and discard all are on the left of the diff command bar while the working copy is open and the staging list has files.</summary>
+    public bool ShowBulkActions => ShowingWorkingCopy && !ShowingBlame && IsDirty;
 
     private bool _hasUnstagedWork;
 
@@ -753,6 +753,8 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(ShowDirtyDot));
         OnPropertyChanged(nameof(ShowCleanDot));
+        OnPropertyChanged(nameof(ShowBulkActions));
+        NoteSectionFolds();
     }
 
     partial void OnIsConflictedChanged(bool value)

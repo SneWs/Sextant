@@ -110,6 +110,56 @@ public class BulkStageButtonTests
         }, CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Stage_unstage_and_discard_all_hide_when_the_staging_list_is_empty()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(App));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("first");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new BulkHost(repo.Git), repo.Directory);
+            await vm.EnsureLoadedAsync();
+            Assert.True(vm.ShowingWorkingCopy);
+            Assert.False(vm.IsDirty);
+            Assert.False(vm.ShowBulkActions);
+            Assert.DoesNotContain(vm.Files, row => !row.IsHeader);
+
+            var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 700 };
+            var window = new Window { Content = view, Width = 1100, Height = 700 };
+            window.Show();
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            var diff = view.GetVisualDescendants().OfType<DiffDocumentView>().Single();
+            var stage = BarButton(diff, "Stage all");
+            var unstage = BarButton(diff, "Unstage all");
+            var discard = BarButton(diff, "Discard all");
+            Assert.False(stage.IsVisible);
+            Assert.False(unstage.IsVisible);
+            Assert.False(discard.IsVisible);
+
+            repo.WriteFile("unstaged.txt", "unstaged\n");
+            await vm.Refresh();
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(vm.ShowBulkActions);
+            Assert.Contains(vm.Files, row => !row.IsHeader && row.Path == "unstaged.txt");
+            Assert.True(stage.IsEffectivelyVisible);
+            Assert.True(unstage.IsEffectivelyVisible);
+            Assert.True(discard.IsEffectivelyVisible);
+            Assert.True(stage.IsEnabled);
+            Assert.False(unstage.IsEnabled);
+            Assert.True(discard.IsEnabled);
+
+            window.Close();
+            await vm.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
     private static CommandBarButton BarButton(DiffDocumentView diff, string label) =>
         diff.GetVisualDescendants().OfType<CommandBarButton>().Single(button => button.Label == label);
 
