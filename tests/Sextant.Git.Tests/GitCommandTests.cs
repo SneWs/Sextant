@@ -83,6 +83,9 @@ public class GitCommandTests
         Assert.Equal(["-C", "repo", "branch", "-D", "topic"], GitCommands.ForceDeleteBranch("repo", "topic"));
         Assert.Equal(["-C", "repo", "push", "--progress", "origin", "--delete", "topic"], GitCommands.DeleteRemoteBranch("repo", "origin", "topic"));
         Assert.Equal(["-C", "repo", "--no-optional-locks", "rev-list", "--count", "HEAD..origin/topic"], GitCommands.NotInHeadCount("repo", "origin/topic"));
+        Assert.Equal(
+            ["-C", "repo", "--no-optional-locks", "rev-list", "--count", "HEAD", "--not", "--remotes=origin"],
+            GitCommands.NotOnRemoteCount("repo", "origin"));
         Assert.Contains("--no-edit", GitCommands.Merge("repo", "topic"));
         Assert.Equal(["-C", "repo", "rebase", "topic"], GitCommands.Rebase("repo", "topic"));
         Assert.Contains("--no-edit", GitCommands.Pull("repo"));

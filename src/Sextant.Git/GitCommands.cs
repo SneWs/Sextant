@@ -606,6 +606,13 @@ public static class GitCommands
     public static IReadOnlyList<string> NotInHeadCount(string toplevel, string revision) =>
         ["-C", toplevel, "--no-optional-locks", "rev-list", "--count", "HEAD.." + revision];
 
+    /// <summary>
+    /// Commits on HEAD that no remote-tracking branch of <paramref name="remote"/> contains.
+    /// A remote with no tracking refs counts every local commit, which matches a remote that has not been fetched.
+    /// </summary>
+    public static IReadOnlyList<string> NotOnRemoteCount(string toplevel, string remote) =>
+        ["-C", toplevel, "--no-optional-locks", "rev-list", "--count", "HEAD", "--not", "--remotes=" + remote];
+
     public static IReadOnlyList<string> SetUpstream(string toplevel, string branch, string upstream) =>
         ["-C", toplevel, "branch", "--set-upstream-to=" + upstream, branch];
 

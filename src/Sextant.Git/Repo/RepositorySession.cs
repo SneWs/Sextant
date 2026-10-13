@@ -918,6 +918,21 @@ public sealed partial class RepositorySession : IAsyncDisposable
             return _encoding.GetString(output.Stdout).Trim() == "0";
         }, cancellationToken);
 
+    /// <summary>How many commits on HEAD are missing from <paramref name="remote"/>'s remote-tracking branches.</summary>
+    public Task<int> CountCommitsNotOnRemoteAsync(string remote, CancellationToken cancellationToken) =>
+        RunAsync(async ct =>
+        {
+            var output = await _scheduler.ReadAsync(
+                inner => ExecuteAsync(GitCommands.NotOnRemoteCount(_toplevel, remote), null, inner),
+                ct).ConfigureAwait(false);
+            Track(output);
+            if (output.ExitCode != 0)
+                throw new GitCommandFailedException(output);
+            if (!int.TryParse(_encoding.GetString(output.Stdout).Trim(), out var count))
+                throw new RepositoryActionException("Git did not report how many commits are missing from the remote.");
+            return count;
+        }, cancellationToken);
+
     public Task SetUpstreamAsync(string branch, string upstream, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.SetUpstream(_toplevel, branch, upstream), null, cancellationToken);
 
