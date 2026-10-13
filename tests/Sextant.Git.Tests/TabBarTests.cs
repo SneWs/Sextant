@@ -1,4 +1,6 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -30,34 +32,38 @@ public class TabBarTests
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
 
-                var left = window.FindControl<Border>("PaneRuleLeft");
-                var right = window.FindControl<Border>("PaneRuleRight");
-                Assert.NotNull(left);
-                Assert.NotNull(right);
-                Assert.False(left.IsVisible);
-                Assert.False(right.IsVisible);
-                Assert.Equal(0, left.Width);
-                Assert.Equal(0, right.Width);
-                Assert.DoesNotContain(window.GetVisualDescendants().OfType<Border>(), border => border.Classes.Contains("tab") && border.IsEffectivelyVisible);
+                Assert.DoesNotContain(VisibleTabs(window), item => item.IsEffectivelyVisible);
 
                 var tab = new RepositoryViewModel(vm, Path.Combine(directory, "repo"));
+                var other = new RepositoryViewModel(vm, Path.Combine(directory, "other"));
                 vm.Tabs.Add(tab);
-                vm.ActiveTab = tab;
+                vm.Tabs.Add(other);
+                vm.ActiveTab = other;
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
 
-                Assert.True(left.IsVisible || right.IsVisible);
-                Assert.True(left.Width + right.Width > 1);
-                Assert.Contains(window.GetVisualDescendants().OfType<Border>(), border => border.Classes.Contains("tab") && border.IsEffectivelyVisible);
+                var shown = VisibleTabs(window).Where(item => item.IsEffectivelyVisible).ToList();
+                Assert.Equal(2, shown.Count);
+                Assert.False(shown[0].IsSelected);
+                Assert.True(shown[1].IsSelected);
+                Assert.InRange(shown[1].Bounds.Height, 20, 32);
+                Assert.Equal(window.FindResource("DockSurfaceHeaderActiveBrush"), shown[1].Background);
+                Assert.Equal(window.FindResource("DockSurfacePanelBrush"), shown[0].Background);
+                var close = shown[1].GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Path>().First(path => path.Data is not null);
+                Assert.InRange(close.Bounds.Width, 1, 10);
+                Assert.InRange(close.Bounds.Height, 1, 10);
+                var dot = shown[1].GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Ellipse>().First(item => item.IsVisible);
+                var title = shown[1].GetVisualDescendants().OfType<TextBlock>().First(item => item.Text == other.Title);
+                var dotRight = dot.TranslatePoint(new Point(dot.Bounds.Width, 0), shown[1])!.Value.X;
+                var titleLeft = title.TranslatePoint(new Point(0, 0), shown[1])!.Value.X;
+                Assert.InRange(titleLeft - dotRight, 3, 8);
 
+                await vm.Close(other);
                 await vm.Close(tab);
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
 
-                Assert.False(left.IsVisible);
-                Assert.False(right.IsVisible);
-                Assert.Equal(0, left.Width);
-                Assert.Equal(0, right.Width);
+                Assert.DoesNotContain(VisibleTabs(window), item => item.IsEffectivelyVisible);
 
                 await vm.Shutdown();
                 window.DataContext = null;
@@ -70,6 +76,9 @@ public class TabBarTests
                 Directory.Delete(directory, recursive: true);
         }
     }
+
+    private static IEnumerable<TabStripItem> VisibleTabs(Visual root) =>
+        root.GetVisualDescendants().OfType<TabStripItem>();
 
     [Fact]
     public async Task Switching_to_a_tab_refreshes_that_repository()

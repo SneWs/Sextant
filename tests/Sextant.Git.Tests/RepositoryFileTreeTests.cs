@@ -1,9 +1,10 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
-using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Sextant;
+using Sextant.Git;
 using Sextant.Git.Models;
 using Sextant.Git.Repo;
 using Sextant.Git.Workspace;
@@ -47,16 +48,11 @@ public class RepositoryFileTreeTests
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
 
-            var historyButton = view.FindControl<Button>("HistoryTabButton")!;
-            var filesButton = view.FindControl<Button>("RepositoryFilesTabButton")!;
-            Assert.Contains("selected", historyButton.Classes);
             await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
             Assert.True(vm.RepositoryFilesTabOn);
-            Assert.Contains("selected", filesButton.Classes);
-            Assert.DoesNotContain("selected", historyButton.Classes);
-            Assert.False(view.FindControl<ListBox>("GraphList")!.IsEffectivelyVisible);
+            Assert.True(view.FindControl<ListBox>("GraphList")!.IsEffectivelyVisible);
             Assert.Equal(history, vm.Rows);
             Assert.Same(selected, vm.SelectedGraphRow);
             var commandLog = vm.CommandLog;
@@ -105,20 +101,59 @@ public class RepositoryFileTreeTests
             Assert.Contains(vm.Rows, row => row.Subject == "first");
             await vm.ShowAllCommitsCommand.ExecuteAsync(null);
             await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
-            historyButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            vm.ShowHistoryTabCommand.Execute(null);
             Assert.True(vm.HistoryTabOn);
             Assert.Equal(history.Select(row => row.Subject), vm.Rows.Select(row => row.Subject));
             vm.ShowHistorySearch = true;
             await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
-            Assert.False(vm.ShowHistoryChrome);
-            vm.ToggleHistorySearchCommand.Execute(null);
-            Assert.True(vm.HistoryTabOn);
-            Assert.True(vm.ShowHistorySearch);
             Assert.True(vm.ShowHistoryChrome);
+            Assert.True(view.FindControl<ListBox>("GraphList")!.IsEffectivelyVisible);
+            vm.ToggleHistorySearchCommand.Execute(null);
+            Assert.True(vm.RepositoryFilesTabOn);
+            Assert.False(vm.ShowHistorySearch);
+            Assert.False(vm.ShowHistoryChrome);
 
             window.Close();
             await vm.DisposeAsync();
         }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Startup_populates_repository_files_when_that_pane_is_open()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("docs/readme.txt", "tracked\n");
+        repo.CommitAll("first");
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-files-startup-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var store = new WorkspaceStore(directory);
+                var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner())
+                {
+                    GitExecutable = repo.Git,
+                    GitReady = true,
+                };
+                var tab = new RepositoryViewModel(vm, repo.Directory);
+                vm.Tabs.Add(tab);
+                await vm.Activate(tab);
+
+                Assert.True(vm.Dock.IsOpen(DockIds.Files));
+                Assert.True(tab.RepositoryFilesTabOn);
+                Assert.Contains(tab.RepositoryFileTree, item => item.Path == "docs");
+                Assert.Contains(tab.RepositoryFileTree.Single(item => item.Path == "docs").Children, item => item.Path == "docs/readme.txt");
+
+                await vm.Shutdown();
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact]
@@ -472,6 +507,74 @@ public class RepositoryFileTreeTests
                 await main.Shutdown();
             }
         }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Files_tab_in_a_repository_without_lfs_does_not_query_locks()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.Run("config", "filter.lfs.process", "");
+        repo.Run("config", "filter.lfs.clean", "");
+        repo.Run("config", "filter.lfs.smudge", "");
+        repo.Run("config", "filter.lfs.required", "false");
+        repo.WriteFile("readme.txt", "hello\n");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new TreeHost(repo.Git), repo.Directory);
+            await vm.EnsureLoadedAsync();
+            await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
+            var file = vm.RepositoryFileTree.Single(item => item.Path == "readme.txt");
+            Assert.False(vm.HasBanner, vm.Banner);
+            Assert.False(vm.IsBusy);
+            Assert.False(file.LfsTracked);
+            Assert.False(file.LocksKnown);
+            Assert.False(file.ShowLock);
+            Assert.False(file.ShowUnlock);
+            Assert.False(CommandLogInvokedLfs(vm.CommandLog));
+            await vm.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Files_tab_queries_locks_when_an_attribute_pattern_matches_no_file()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.Run("config", "filter.lfs.process", "");
+        repo.Run("config", "filter.lfs.clean", "");
+        repo.Run("config", "filter.lfs.smudge", "");
+        repo.Run("config", "filter.lfs.required", "false");
+        repo.WriteFile(".gitattributes", "*.bin filter=lfs diff=lfs -text\n");
+        repo.WriteFile("readme.txt", "hello\n");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new TreeHost(repo.Git), repo.Directory);
+            await vm.EnsureLoadedAsync();
+            await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
+            var file = vm.RepositoryFileTree.Single(item => item.Path == "readme.txt");
+            Assert.False(file.LfsTracked);
+            Assert.Equal(file.LocksKnown, file.ShowLock);
+            Assert.False(vm.IsBusy);
+            Assert.True(CommandLogInvokedLfs(vm.CommandLog));
+            await vm.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
+    private static bool CommandLogInvokedLfs(string log)
+    {
+        foreach (var line in log.Split('\n'))
+        {
+            foreach (var token in line.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (token == "lfs")
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private static async Task WaitUntilIdle(RepositoryViewModel tab)

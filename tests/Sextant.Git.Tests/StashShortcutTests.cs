@@ -370,14 +370,6 @@ public class StashShortcutTests
                 var pullRebase = pullFlyout.Items.OfType<MenuItem>().Single(item => item.Header as string == "Pull with rebase");
                 Assert.Same(tab.PullRebaseCommand, pullRebase.Command);
                 pullFlyout.Hide();
-                var sidebar = view.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "SidebarToggleButton");
-                Assert.Same(tab.ToggleLocationsCommand, sidebar.Command);
-                Assert.Equal(stash.Bounds.Height, sidebar.Bounds.Height);
-                Assert.True(tab.ShowLocations);
-                sidebar.Command!.Execute(null);
-                Assert.False(tab.ShowLocations);
-                sidebar.Command.Execute(null);
-                Assert.True(tab.ShowLocations);
                 var group = stash.Parent;
                 Assert.IsType<StackPanel>(group);
                 Assert.Same(group, search.Parent);

@@ -4,6 +4,7 @@ using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Sextant;
 using Sextant.Git;
 using Sextant.Git.Workspace;
 using Sextant.ViewModels;
@@ -60,6 +61,53 @@ public class CommandPaletteTests
     }
 
     [Fact]
+    public async Task Command_palette_focuses_its_input_when_opened_from_the_keyboard()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-palette-focus-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var store = new WorkspaceStore(directory);
+                var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner());
+                var window = new MainWindow { DataContext = vm, Width = 1000, Height = 700 };
+                window.Show();
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                var raw = AppGestures.Command == KeyModifiers.Meta
+                    ? RawInputModifiers.Meta
+                    : RawInputModifiers.Control;
+                window.KeyPress(Key.P, raw, PhysicalKey.P, null);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                var box = window.FindControl<TextBox>("PaletteBox");
+                Assert.NotNull(box);
+                Assert.True(vm.PaletteOpen);
+                Assert.True(box.IsEffectivelyVisible);
+                Assert.Same(box, window.FocusManager?.GetFocusedElement());
+
+                window.KeyTextInput("toggle");
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal("toggle", vm.PaletteQuery);
+                Assert.Equal("toggle", box.Text);
+
+                await vm.Shutdown();
+                window.DataContext = null;
+                window.Close();
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Clicking_a_command_after_scrolling_runs_it_and_closes_the_palette()
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
@@ -89,7 +137,7 @@ public class CommandPaletteTests
                 Dispatcher.UIThread.RunJobs();
                 Assert.True(vm.PaletteOpen);
 
-                var command = vm.PaletteMatches.Single(item => item.Title == "Toggle command log");
+                var command = vm.PaletteMatches.Single(item => item.Title == "Command log");
                 list.ScrollIntoView(command);
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
@@ -103,7 +151,11 @@ public class CommandPaletteTests
 
                 Assert.False(vm.PaletteOpen);
                 Assert.True(tab.CommandsOpen);
-                Assert.Equal("Toggle command log", vm.SelectedPalette?.Title);
+                Assert.Equal("Command log", vm.SelectedPalette?.Title);
+                Assert.True(vm.Dock.IsOpen(DockIds.Commands));
+                vm.ShowCommandsCommand.Execute(null);
+                Assert.True(tab.CommandsOpen);
+                Assert.True(vm.Dock.IsOpen(DockIds.Commands));
 
                 await vm.Shutdown();
                 window.DataContext = null;
@@ -147,13 +199,15 @@ public class CommandPaletteTests
                 vm.PaletteQuery = "toggle";
                 Assert.Equal(
                     [
-                        "Toggle blame",
-                        "Toggle command log",
                         "Toggle ignore whitespace",
-                        "Toggle locations",
                         "Toggle side-by-side diff",
                     ],
                     vm.PaletteMatches.Select(item => item.Title).ToList());
+                vm.PaletteQuery = "";
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Locations");
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Blame");
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Changes");
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Command log");
 
                 vm.ClosePalette();
                 tab.ShowingWorkingCopy = false;

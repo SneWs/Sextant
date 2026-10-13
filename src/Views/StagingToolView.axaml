@@ -1,0 +1,91 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Sextant.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="Sextant.Views.StagingToolView"
+             x:DataType="vm:RepositoryViewModel">
+    <DockPanel>
+        <CommandBar x:Name="StagingCommandBar" DockPanel.Dock="Top" Margin="0,4,0,0"
+                    IsVisible="{Binding ShowBulkActions}"
+                    DefaultLabelPosition="Right" OverflowButtonVisibility="Collapsed" IsDynamicOverflowEnabled="False">
+            <CommandBar.Content>
+                <StackPanel Orientation="Horizontal" Spacing="2">
+                    <CommandBarButton Label="Stage all" LabelPosition="Right" Command="{Binding StageAllCommand}" IsEnabled="{Binding CanStageAll}" IsVisible="{Binding ShowBulkActions}">
+                        <CommandBarButton.Icon>
+                            <PathIcon Width="14" Height="14" Data="M6,1 L8,1 L8,6 L13,6 L13,8 L8,8 L8,13 L6,13 L6,8 L1,8 L1,6 L6,6 Z"/>
+                        </CommandBarButton.Icon>
+                    </CommandBarButton>
+                    <CommandBarButton Label="Unstage all" LabelPosition="Right" Command="{Binding UnstageAllCommand}" IsEnabled="{Binding CanUnstageAll}" IsVisible="{Binding ShowBulkActions}">
+                        <CommandBarButton.Icon>
+                            <PathIcon Width="14" Height="14" Data="M1,6 L13,6 L13,8 L1,8 Z"/>
+                        </CommandBarButton.Icon>
+                    </CommandBarButton>
+                    <CommandBarButton Label="Discard all" LabelPosition="Right" Command="{Binding DiscardAllCommand}" IsEnabled="{Binding CanDiscardAll}" IsVisible="{Binding ShowBulkActions}">
+                        <CommandBarButton.Icon>
+                            <PathIcon Width="14" Height="14" Data="M2,2 L4,2 L7,5 L10,2 L12,2 L8,6 L12,10 L10,10 L7,7 L4,10 L2,10 L6,6 Z"/>
+                        </CommandBarButton.Icon>
+                    </CommandBarButton>
+                </StackPanel>
+            </CommandBar.Content>
+        </CommandBar>
+        <ListBox x:Name="FileList" ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}"
+             PointerReleased="OnFilePointerReleased">
+        <ListBox.Styles>
+            <Style Selector="ListBoxItem">
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            </Style>
+        </ListBox.Styles>
+        <ListBox.ItemsPanel>
+            <ItemsPanelTemplate>
+                <VirtualizingStackPanel/>
+            </ItemsPanelTemplate>
+        </ListBox.ItemsPanel>
+        <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:FileRowViewModel">
+                <Panel>
+                    <Border Classes="filehead" IsVisible="{Binding IsHeader}"
+                            Margin="4,8,4,2" Padding="8,4" CornerRadius="4" BorderThickness="1"
+                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </Border>
+                    <Border Background="Transparent" Padding="6,2" IsVisible="{Binding IsFile}">
+                        <Border.ContextMenu>
+                            <ContextMenu Opening="OnMenuOpening">
+                                <MenuItem Header="Stage" Command="{Binding StageCommand}" IsVisible="{Binding ShowStage}"/>
+                                <MenuItem Header="Unstage" Command="{Binding UnstageCommand}" IsVisible="{Binding ShowUnstage}"/>
+                                <MenuItem Header="Discard" Command="{Binding DiscardCommand}" IsVisible="{Binding ShowDiscard}"/>
+                                <MenuItem Header="{Binding MergetoolMenu}" Command="{Binding MergetoolCommand}" IsVisible="{Binding ShowMergetool}"/>
+                                <MenuItem Header="File history" Command="{Binding HistoryCommand}" IsVisible="{Binding ShowHistory}"/>
+                                <Separator IsVisible="{Binding ShowLfsMenu}"/>
+                                <MenuItem Header="Track with LFS" Command="{Binding LfsTrackCommand}" IsVisible="{Binding ShowLfsTrack}"/>
+                                <MenuItem Header="Stop tracking with LFS" Command="{Binding LfsUntrackCommand}" IsVisible="{Binding ShowLfsUntrack}"/>
+                                <MenuItem Header="Download" Command="{Binding LfsDownloadCommand}" IsVisible="{Binding ShowLfsDownload}"/>
+                            </ContextMenu>
+                        </Border.ContextMenu>
+                        <Grid ColumnDefinitions="22,*,Auto,Auto">
+                            <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Tip}"/>
+                            <Border Grid.Column="2" IsVisible="{Binding LfsTracked}" Margin="8,0,0,0" Padding="5,0" CornerRadius="3"
+                                    VerticalAlignment="Center" Background="#3347C4C4" ToolTip.Tip="Tracked with Git LFS">
+                                <TextBlock Text="LFS" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4">
+                                <Button Classes="flat" Content="Stage" Command="{Binding StageCommand}" IsVisible="{Binding ShowStage}" Padding="6,0"/>
+                                <Button Classes="flat" Content="Unstage" Command="{Binding UnstageCommand}" IsVisible="{Binding ShowUnstage}" Padding="6,0"/>
+                                <Button Classes="flat" Content="Discard" Command="{Binding DiscardCommand}" IsVisible="{Binding ShowDiscard}" Padding="6,0"/>
+                                <Button Classes="flat" Content="{Binding MergetoolLabel}" Command="{Binding MergetoolCommand}" IsVisible="{Binding ShowMergetool}" Padding="6,0"/>
+                                <Button Classes="flat" Content="History" Command="{Binding HistoryCommand}" IsVisible="{Binding ShowHistory}" Padding="6,0"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Panel>
+            </DataTemplate>
+        </ListBox.ItemTemplate>
+    </ListBox>
+    </DockPanel>
+</UserControl>

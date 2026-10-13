@@ -42,6 +42,9 @@
     <PackageReference Include="Avalonia.Markup.Xaml.Loader" Version="12.1.4" />
     <PackageReference Include="BitMiracle.LibTiff.NET" Version="2.4.660" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Dock.Avalonia" Version="12.1.0.8" />
+    <PackageReference Include="Dock.Avalonia.Themes.Fluent" Version="12.1.0.8" />
+    <PackageReference Include="Dock.Model.Mvvm" Version="12.1.0.8" />
     <!-- Svg.Skia 5 pulls SkiaSharp 4. Pin the managed package and the Linux native together; Avalonia.Skia still brings the 3.119 Linux native. -->
     <PackageReference Include="SkiaSharp" Version="4.153.1" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="4.153.1" />

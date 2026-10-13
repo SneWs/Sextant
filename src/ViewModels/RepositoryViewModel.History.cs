@@ -33,7 +33,7 @@ public partial class RepositoryViewModel
     [ObservableProperty]
     public partial bool ShowHistorySearch { get; set; }
 
-    public bool ShowHistoryChrome => HistoryTabOn && (ShowHistorySearch || HasHistoryFilter);
+    public bool ShowHistoryChrome => ShowHistorySearch || HasHistoryFilter;
 
     [ObservableProperty]
     public partial string ConflictText { get; set; } = "";
@@ -98,6 +98,7 @@ public partial class RepositoryViewModel
     {
         OnPropertyChanged(nameof(ShowingDiff));
         OnPropertyChanged(nameof(DiffTabOn));
+        OnPropertyChanged(nameof(ShowBulkActions));
         NoteSectionFolds();
     }
 
@@ -113,16 +114,7 @@ public partial class RepositoryViewModel
     partial void OnShowHistorySearchChanged(bool value) => OnPropertyChanged(nameof(ShowHistoryChrome));
 
     [RelayCommand]
-    private void ToggleHistorySearch()
-    {
-        if (RepositoryFilesTabOn)
-        {
-            RepositoryFilesTabOn = false;
-            ShowHistorySearch = true;
-            return;
-        }
-        ShowHistorySearch = !ShowHistorySearch;
-    }
+    private void ToggleHistorySearch() => ShowHistorySearch = !ShowHistorySearch;
 
     partial void OnShowMergeBaseChanged(bool value) => OnPropertyChanged(nameof(MergeBaseLabel));
 

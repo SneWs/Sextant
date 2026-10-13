@@ -1,3 +1,4 @@
+using System.Reflection;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
@@ -249,6 +250,53 @@ public class DiffHeaderLayoutTests
 
             return 0;
         }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Watcher_refresh_ignores_a_repository_folder_that_is_gone()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(App));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("base");
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new HeaderHost(repo.Git), repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                ReleaseWatcher(vm);
+                PointSessionAtMissingFolder(vm);
+                await vm.RefreshFromWatcherCommand.ExecuteAsync(null);
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(vm.HasBanner, vm.Banner);
+            }
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    private static void ReleaseWatcher(RepositoryViewModel vm)
+    {
+        var field = typeof(RepositoryViewModel).GetField("_watcher", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        (field.GetValue(vm) as IDisposable)?.Dispose();
+        field.SetValue(vm, null);
+    }
+
+    private static void PointSessionAtMissingFolder(RepositoryViewModel vm)
+    {
+        var sessionField = typeof(RepositoryViewModel).GetField("_session", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(sessionField);
+        var git = sessionField.GetValue(vm);
+        Assert.NotNull(git);
+        var toplevel = git.GetType().GetField("_toplevel", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(toplevel);
+        toplevel.SetValue(git, Path.Combine(Path.GetTempPath(), "sextant-missing-" + Guid.NewGuid().ToString("N")));
     }
 
     private static Button ButtonOn(Visual root, object row, string content) =>

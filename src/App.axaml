@@ -3,6 +3,7 @@
              x:Class="Sextant.App"
              xmlns:local="using:Sextant"
              xmlns:views="using:Sextant.Views"
+             xmlns:vm="using:Sextant.ViewModels"
              Name="Sextant"
              RequestedThemeVariant="Default">
              <!-- "Default" follows the system until settings choose Light or Dark. -->
@@ -125,6 +126,48 @@
             </Styles.Resources>
             <Style Selector="Button.flat">
                 <Setter Property="Theme" Value="{StaticResource FlatButton}"/>
+            </Style>
+            <Style Selector="Button.locationsearch.pressed">
+                <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}"/>
+            </Style>
+            <Style Selector="SplitButton.commit /template/ Button#PART_PrimaryButton" x:DataType="vm:RepositoryViewModel">
+                <Setter Property="IsEnabled" Value="{Binding CanCommit}"/>
+            </Style>
+            <Style Selector="SplitButton.compact /template/ Button#PART_PrimaryButton">
+                <Setter Property="Padding" Value="6,0"/>
+                <Setter Property="MinWidth" Value="0"/>
+            </Style>
+            <Style Selector="SplitButton.compact /template/ ToggleButton#PART_FlyoutToggle">
+                <Setter Property="MinWidth" Value="0"/>
+                <Setter Property="Padding" Value="3,0"/>
+            </Style>
+            <Style Selector="Button.viewtab">
+                <Setter Property="Theme" Value="{StaticResource FlatButton}"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="1,1,1,0"/>
+                <Setter Property="CornerRadius" Value="6,6,0,0"/>
+                <Setter Property="Padding" Value="16,6"/>
+                <Setter Property="MinWidth" Value="72"/>
+                <Setter Property="FontWeight" Value="Normal"/>
+                <Setter Property="Opacity" Value="0.62"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalAlignment" Value="Bottom"/>
+            </Style>
+            <Style Selector="Button.viewtab:pointerover /template/ ContentPresenter">
+                <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}"/>
+            </Style>
+            <Style Selector="Button.viewtab.selected">
+                <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Opacity" Value="1"/>
+            </Style>
+            <Style Selector="Button.viewtab.selected:pointerover /template/ ContentPresenter">
+                <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumBrush}"/>
+            </Style>
+            <Style Selector="Button.viewtab.selected /template/ ContentPresenter">
+                <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
             </Style>
             <Style Selector="Button.accent /template/ ContentPresenter">
                 <Setter Property="Foreground" Value="{DynamicResource CatppuccinOnAccentBrush}"/>

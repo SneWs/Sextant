@@ -7,6 +7,7 @@ using Sextant.Git;
 using Sextant.Git.Parsing;
 using Sextant.Services;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Text;
 using System.Windows.Input;
@@ -66,9 +67,13 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public bool ShowSectionFolds => AllDiffFiles && ShowingDiff && _sections.Count > 0;
 
+    /// <summary>The diff command bar holds working-copy actions on the left and fold actions on the right.</summary>
+    public bool ShowDiffCommandBar => ShowSectionFolds || ShowBulkActions;
+
     private void NoteSectionFolds()
     {
         OnPropertyChanged(nameof(ShowSectionFolds));
+        OnPropertyChanged(nameof(ShowDiffCommandBar));
         ExpandAllSectionsCommand.NotifyCanExecuteChanged();
         CollapseAllSectionsCommand.NotifyCanExecuteChanged();
     }
@@ -373,6 +378,9 @@ public partial class RepositoryViewModel : ViewModelBase
     public bool CanUnstageAll => !IsBusy && ShowingWorkingCopy && _hasStagedWork;
 
     public bool CanDiscardAll => !IsBusy && ShowingWorkingCopy && (_hasUnstagedWork || _hasStagedWork);
+
+    /// <summary>Stage all, unstage all, and discard all are on the left of the staging and diff command bars while the working copy is open and the staging list has files.</summary>
+    public bool ShowBulkActions => ShowingWorkingCopy && !ShowingBlame && IsDirty;
 
     private bool _hasUnstagedWork;
 
@@ -731,6 +739,7 @@ public partial class RepositoryViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanAmend));
         OnPropertyChanged(nameof(CanCommitOrAmend));
         NotifyBulkStage();
+        OnPropertyChanged(nameof(ShowBulkActions));
         NoteSectionFolds();
     }
 
@@ -745,6 +754,8 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(ShowDirtyDot));
         OnPropertyChanged(nameof(ShowCleanDot));
+        OnPropertyChanged(nameof(ShowBulkActions));
+        NoteSectionFolds();
     }
 
     partial void OnIsConflictedChanged(bool value)
@@ -908,6 +919,10 @@ public partial class RepositoryViewModel : ViewModelBase
         if (_session is not null && !_lifetime.IsCancellationRequested)
         {
             await LoadDetailsAsync();
+            // The files pane can already be open when this session is created. The
+            // refresh started then finds no session and does not run again.
+            if (RepositoryFilesTabOn)
+                await LoadRepositoryFilesAsync(_lifetime.Token, refreshLocks: true);
             await MaybeSuggestAsync();
         }
     }
@@ -1005,6 +1020,12 @@ public partial class RepositoryViewModel : ViewModelBase
             Fail(exception.Message);
             if (_session is not null)
                 Apply(_session.Snapshot());
+        }
+        catch (Win32Exception)
+        {
+            // The folder can be removed while a debounced refresh is still waiting to start git.
+            // Process.Start then fails with "No such file or directory", and the command posts that
+            // exception back onto the UI thread. A background refresh must not tear the app down.
         }
     }
 

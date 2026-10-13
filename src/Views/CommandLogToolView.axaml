@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Sextant.ViewModels"
+             xmlns:views="using:Sextant.Views"
+             xmlns:app="using:Sextant"
+             xmlns:controls="using:Sextant.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="Sextant.Views.CommandLogToolView"
+             x:DataType="vm:RepositoryViewModel">
+    <Grid RowDefinitions="Auto,*">
+                <TextBlock Text="Commands" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBox x:Name="CommandLogBox" Grid.Row="1" Classes="diff"
+                         IsReadOnly="True" AcceptsReturn="True" IsUndoEnabled="False"
+                         TextWrapping="NoWrap" VerticalContentAlignment="Top"
+                         HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                         ClearSelectionOnLostFocus="False"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         PlaceholderText="No commands yet.">
+                    <TextBox.ContextFlyout>
+                        <MenuFlyout Opening="OnCommandLogMenuOpening">
+                            <MenuItem Header="Copy" Command="{Binding $parent[TextBox].Copy}" IsEnabled="{Binding $parent[TextBox].CanCopy}" InputGesture="{x:Static TextBox.CopyGesture}"/>
+                            <MenuItem x:Name="CommandLogSelectAllItem" Header="Select all" Command="{Binding $parent[TextBox].SelectAll}"/>
+                        </MenuFlyout>
+                    </TextBox.ContextFlyout>
+                </TextBox>
+    </Grid>
+</UserControl>

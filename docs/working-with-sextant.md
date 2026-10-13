@@ -10,17 +10,17 @@ The command palette (Ctrl+P, or Command+P on macOS) lists the actions for the op
 
 ## The window
 
-Under the tabs, the branch bar names the checked-out branch and, when Git knows, how many commits you are ahead of or behind the upstream. On the far left, a sidebar button toggles the Locations column, the same as View, Toggle locations. The name sits in a rounded pill with a Stash button beside it on the left and a search button beside it on the right, and the group stays centered. The Stash split menu holds the stash variants, and the search button toggles the history search box, the same as the Search menu item. The down and up arrow buttons for Pull and Push sit on the right of the bar. While a command runs, its label replaces that status, and Cancel appears when the command can be cancelled.
+Under the tabs, the branch bar names the checked-out branch and, when Git knows, how many commits you are ahead of or behind the upstream. The name sits in a rounded pill with a Stash button beside it on the left and a search button beside it on the right, and the group stays centered. The Stash split menu holds the stash variants, and the search button toggles the history search box, the same as the Search menu item. The down and up arrow buttons for Pull and Push sit on the right of the bar. While a command runs, its label replaces that status, and Cancel appears when the command can be cancelled.
 
 A conflict replaces that quiet state with a banner and Continue and Abort. A sparse checkout adds a banner: excluded paths stay out of the working tree. Sextant does not check those paths out to read them.
 
 Below that, the window is three columns. Drag the splitters to resize them. The widths are remembered.
 
 1. **Locations** lists branches, remotes, tags, stashes, submodules, and worktrees.
-2. **History / Files** switches between the commit graph and the repository file tree.
+2. **History** and **Repository files** share one dock as tabs. History is the selected tab. Reset layout restores that pair.
 3. **Files and the diff** describe the selected commit, or the working copy.
 
-View, Toggle locations hides the first column. The command palette has the same action.
+View → Window → Locations shows the locations pane and brings it forward. It does not hide it. The command palette has the same action. The other entries in that menu do the same for History, Commit, Changes, Diff, Blame, Repository files, and Command log.
 
 ## Locations
 
@@ -63,27 +63,27 @@ A file's History button is the same search limited to that path.
 
 The Files tab beside History lists the current repository's tracked files and non-ignored untracked files, not just changed files. Directories expand with the arrow or a double-click. Only visible rows are drawn, and a refresh keeps expanded directories. Sparse-checkout paths are listed from Git's index without checking them out.
 
-Each file has a Git or LFS badge. Only locked files show lock information, including the owner's name. Opening the Files tab, returning to its repository tab, or reactivating the window refreshes files and asks the LFS server for current locks, including locks on ordinary Git files; ordinary history browsing does not. There is no separate Refresh button in the file tree. F5 also refreshes locks while the Files tab is open. Loading LFS locks is shown in the centered branch bar. A failed lookup uses the global error banner, like other Git commands, and lock actions stay disabled until the lookup succeeds.
+Each file has a Git or LFS badge. Only locked files show lock information, including the owner's name. Opening the Files tab, returning to its repository tab, or reactivating the window refreshes files. That refresh asks the LFS server for current locks when this repository uses Git LFS: a local `lfs.url`, a local LFS clean, smudge, or process filter, or a `filter=lfs` attribute in `.gitattributes` or `info/attributes`. The request includes locks on ordinary Git files in that repository. A repository that does not use Git LFS skips the request, and so does ordinary history browsing. There is no separate Refresh button in the file tree. F5 refreshes locks while the Files tab is open in a repository that uses Git LFS. Loading LFS locks is shown in the centered branch bar. A failed lookup uses the global error banner, like other Git commands, and lock actions stay hidden until the lookup succeeds.
 
-Right-click any unlocked file for Lock file, or a locked file for Unlock file. A file does not need to be stored in LFS to use an LFS lock. Force Unlock file sits below Unlock file and asks for confirmation before removing a lock, including another user's lock. These actions use your installed Git LFS and its configured server and credentials. Server errors are shown in the window, rather than treating unknown locks as unlocked. Lock protection depends on the Git LFS lock checks; it does not prevent editing a local file. A file's History action returns to the History tab.
+When locks have been loaded, right-click an unlocked file for Lock file, or a locked file for Unlock file. A file does not need to be stored in LFS to use an LFS lock. Force Unlock file sits below Unlock file and asks for confirmation before removing a lock, including another user's lock. These actions use your installed Git LFS and its configured server and credentials. Server errors are shown in the window, rather than treating unknown locks as unlocked. Lock protection depends on the Git LFS lock checks; it does not prevent editing a local file. A file's History action returns to the History tab.
 
 The same menu offers Open in editor and Open in Finder, File Explorer, or File Manager, using the same desktop actions as the diff's file header. Remove file asks before deleting the file from disk and removing it from Git tracking. A tracked file's deletion is staged; an untracked file is only deleted from disk. Uncommitted changes are lost, but committed history and LFS locks remain unchanged. Directories and submodules cannot be removed with this file action.
 
 ## Files and commits
 
-The working-copy list is grouped into Conflicts, then Staged, then Unstaged. Empty groups are omitted. Each group title is a bar. The rows under it are the files, with a status letter and Stage, Unstage, Discard, or History.
+Changes is its own docked tool. It starts under Commit. The working-copy list is grouped into Conflicts, then Staged, then Unstaged. Empty groups are omitted. Each group title is a bar. The rows under it are the files, with a status letter and Stage, Unstage, Discard, or History. A past commit lists its files in that same tool. View → Window → Changes shows it and brings it forward. It does not hide it.
 
-Stage all is Ctrl+Shift+A (Command+Shift+A on macOS) and Unstage all is Ctrl+Shift+R (Command+Shift+R). Stage all is unavailable when there is nothing to stage, and Unstage all when nothing is staged. Both are also in the Repository menu and the command palette. Discard all is in the command palette. Discard all asks before it restores tracked files and removes untracked files.
+Stage all, Unstage all, and Discard all sit on the left of the Changes command bar, and again on the left of the diff command bar, while the working copy is open and that list has files. They hide when that list is empty. The Changes bar has no fold buttons. Expand all and Collapse all sit on the right of the diff bar. Stage all is Ctrl+Shift+A (Command+Shift+A on macOS) and Unstage all is Ctrl+Shift+R (Command+Shift+R). Stage all is unavailable when there is nothing to stage, and Unstage all when nothing is staged. Both are also in the Repository menu and the command palette. Discard all is in the command palette. Discard all asks before it restores tracked files and removes untracked files.
 
 Stash saves changes to tracked files with Ctrl+S (Command+S on macOS). It is unavailable when there are no tracked changes to save, before the first commit, or while files have unresolved conflicts. Untracked files are left alone. Ctrl+Shift+S (Command+Shift+S) pops the latest stash after confirmation. Pop is unavailable when there is no stash or files have unresolved conflicts. Both actions are in the Repository menu and appear in the command palette when available. The Repository menu also nests three variants under Stash: Stash (include untracked) also takes untracked files, Stash (keep index) stashes everything but leaves the staged changes in place, and Stash (staged) stashes only the staged changes and keeps the rest. They need what they stash: the untracked variant is enabled by untracked files alone, and the staged variant by staged changes.
 
-The commit box is above the file list. Write the message and press Commit, or Ctrl+Enter (Command+Enter). The commit menu also offers Commit without hooks, and Amend. Amend replaces the tip message and keeps unstaged work unstaged. Nothing staged leaves Commit disabled, and the box says so. Below the message box, the current committer is shown as name and email; click it to change the name and email, either for this repository only or globally. Committing and amending need both a name and an email, so Sextant refuses either without one and points you at that row.
+The commit box is the Commit tool. Write the message and press Commit, or Ctrl+Enter (Command+Enter). The commit menu also offers Commit without hooks, and Amend. Amend replaces the tip message and keeps unstaged work unstaged. Nothing staged leaves Commit disabled, and the box says so. Below the message box, the current committer is shown as name and email; click it to change the name and email, either for this repository only or globally. Committing and amending need both a name and an email, so Sextant refuses either without one and points you at that row.
 
 On a past commit, that area shows the SHA, author, date, and the size of the change instead of a message you can edit.
 
 ## Diffs, blame, and previews
 
-The Diff and Blame tabs sit above the patch. Blame annotates the selected file. The working-copy diff always includes both staged and unstaged files. Selecting a file in the staging list opens and scrolls to its header without hiding the other files. A partially staged file has separate Staged and Unstaged sections. For past commits and commit ranges, Diff can show the selected file or every file.
+Diff and Blame are separate docked tools. They start as two tabs in the pane under Changes. Blame annotates the selected file. The working-copy diff always includes both staged and unstaged files. Selecting a file in Changes opens and scrolls to its header without hiding the other files. A partially staged file has separate Staged and Unstaged sections. For past commits and commit ranges, Diff can show the selected file or every file.
 
 Each working-copy file header has Stage file or Unstage file for that section.
 

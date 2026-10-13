@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Sextant.Docking;
 using Sextant.Git;
 using Sextant.Git.AskPass;
 using Sextant.Git.Workspace;
@@ -21,6 +22,7 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        DockChrome.Ensure(this);
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var store = new WorkspaceStore(AppPaths.ConfigDirectory());

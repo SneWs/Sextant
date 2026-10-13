@@ -1,6 +1,8 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Sextant.ViewModels"
+        xmlns:views="using:Sextant.Views"
+        xmlns:dock="using:Dock.Avalonia.Controls"
         xmlns:app="using:Sextant"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -12,6 +14,88 @@
         Width="1200" Height="760"
         MinWidth="880" MinHeight="520"
         Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+
+    <Window.Resources>
+        <ControlTheme x:Key="RepositoryTabClose" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Width" Value="{DynamicResource DockCloseButtonSize}"/>
+            <Setter Property="Height" Value="{DynamicResource DockCloseButtonSize}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource DockDocumentTabItemCornerRadius}"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter x:Name="PART_ContentPresenter"
+                                      Background="{TemplateBinding Background}"
+                                      Padding="{TemplateBinding Padding}"
+                                      CornerRadius="{TemplateBinding CornerRadius}"
+                                      Content="{TemplateBinding Content}"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover">
+                <Setter Property="Background" Value="{DynamicResource DockChromeButtonDangerHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pressed">
+                <Setter Property="Background" Value="{DynamicResource DockChromeButtonPressedBackgroundBrush}"/>
+            </Style>
+        </ControlTheme>
+    </Window.Resources>
+
+    <Window.Styles>
+        <Style Selector="TabStrip#RepositoryTabs">
+            <Setter Property="Background" Value="{DynamicResource DockTabBackgroundBrush}"/>
+            <Setter Property="MinHeight" Value="{DynamicResource DockHeaderHeight}"/>
+        </Style>
+        <Style Selector="TabStrip#RepositoryTabs TabStripItem" x:DataType="vm:RepositoryViewModel">
+            <Setter Property="ToolTip.Tip" Value="{Binding ShortcutHint}"/>
+            <Setter Property="Background" Value="{DynamicResource DockSurfacePanelBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource DockTabForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource DockBorderSubtleBrush}"/>
+            <Setter Property="BorderThickness" Value="1,1,1,0"/>
+            <Setter Property="Padding" Value="{DynamicResource DockDocumentTabItemPadding}"/>
+            <Setter Property="MinHeight" Value="{DynamicResource DockHeaderHeight}"/>
+            <Setter Property="MinWidth" Value="{DynamicResource DockDocumentTabItemMinWidth}"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource DockDocumentTabItemCornerRadius}"/>
+            <Setter Property="FontSize" Value="{DynamicResource DockFontSizeNormal}"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="TabStrip#RepositoryTabs TabStripItem:pointerover">
+            <Setter Property="Background" Value="{DynamicResource DockTabHoverBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource DockDocumentTabPointerOverForegroundBrush}"/>
+        </Style>
+        <Style Selector="TabStrip#RepositoryTabs TabStripItem:selected">
+            <Setter Property="Background" Value="{DynamicResource DockSurfaceHeaderActiveBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource DockTabActiveForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource DockBorderSubtleBrush}"/>
+        </Style>
+        <Style Selector="TabStrip#RepositoryTabs TabStripItem:selected:pointerover">
+            <Setter Property="Background" Value="{DynamicResource DockSurfaceHeaderActiveBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource DockTabActiveForegroundBrush}"/>
+        </Style>
+    </Window.Styles>
 
     <!-- The platform shows this menu. macOS uses the screen menu bar, so the bar below stays hidden there. -->
     <NativeMenu.Menu>
@@ -30,8 +114,20 @@
             </NativeMenuItem>
             <NativeMenuItem Header="_View" IsEnabled="{Binding HasActiveTab}">
                 <NativeMenu>
-                    <NativeMenuItem Header="Toggle _locations" Command="{Binding ToggleBranchViewCommand}"/>
-                    <NativeMenuItem Header="Command _log" Command="{Binding ToggleCommandsCommand}"/>
+                    <NativeMenuItem Header="_Window">
+                        <NativeMenu>
+                            <NativeMenuItem Header="_Locations" Command="{Binding ShowLocationsCommand}"/>
+                            <NativeMenuItem Header="_History" Command="{Binding ShowHistoryCommand}"/>
+                            <NativeMenuItem Header="_Commit" Command="{Binding ShowChangesCommand}"/>
+                            <NativeMenuItem Header="Chan_ges" Command="{Binding ShowStagingCommand}"/>
+                            <NativeMenuItem Header="_Diff" Command="{Binding ShowDiffCommand}"/>
+                            <NativeMenuItem Header="_Blame" Command="{Binding ShowBlameCommand}"/>
+                            <NativeMenuItem Header="_Repository files" Command="{Binding ShowFilesCommand}"/>
+                            <NativeMenuItem Header="Command _log" Command="{Binding ShowCommandsCommand}"/>
+                        </NativeMenu>
+                    </NativeMenuItem>
+                    <NativeMenuItemSeparator/>
+                    <NativeMenuItem Header="_Reset layout" Command="{Binding ResetLayoutCommand}"/>
                 </NativeMenu>
             </NativeMenuItem>
             <NativeMenuItem Header="_Settings" IsVisible="{Binding ShowWindowSettingsMenu}">
@@ -92,39 +188,57 @@
             </DockPanel>
         </Border>
 
-        <Grid Grid.Row="2" RowDefinitions="Auto,*">
-                <ScrollViewer x:Name="TabScroll" Padding="8,6,8,0"
-                              HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
-                              Background="Transparent">
-                    <ItemsControl x:Name="TabsList" ItemsSource="{Binding Tabs}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal"/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
+        <Grid Grid.Row="2" RowDefinitions="Auto,Auto,*">
+                <Border IsVisible="{Binding HasActiveTab}"
+                        Background="{DynamicResource DockSurfacePanelBrush}"
+                        BorderThickness="0,0,0,1"
+                        BorderBrush="{DynamicResource DockSeparatorBrush}">
+                    <ScrollViewer x:Name="TabScroll"
+                                  HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                                  Background="Transparent">
+                        <TabStrip x:Name="RepositoryTabs" ItemsSource="{Binding Tabs}" SelectionChanged="OnRepositoryTabSelected">
+                            <TabStrip.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </TabStrip.ItemsPanel>
+                            <TabStrip.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RepositoryViewModel">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="{DynamicResource DockToolChromeHeaderMargin}">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Ellipse Width="6" Height="6" Margin="0,0,4,0" Fill="#D04040" IsVisible="{Binding IsConflicted}"/>
+                                            <Ellipse Width="6" Height="6" Margin="0,0,4,0" Fill="#E0A100" IsVisible="{Binding ShowDirtyDot}"/>
+                                            <Ellipse Width="6" Height="6" Margin="0,0,4,0" Fill="#3CB44B" IsVisible="{Binding ShowCleanDot}"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Margin="{DynamicResource DockToolChromeTitleMargin}"/>
+                                        <Button Grid.Column="2" Theme="{StaticResource RepositoryTabClose}"
+                                                Command="{Binding CloseTabCommand}"
+                                                Margin="{DynamicResource DockChromeButtonMargin}">
+                                            <Viewbox Width="8" Height="8">
+                                                <Path Fill="{Binding $parent[TabStripItem].Foreground}"
+                                                      Data="{DynamicResource DockToolIconCloseGeometry}"
+                                                      Stretch="Uniform"/>
+                                            </Viewbox>
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </TabStrip.ItemTemplate>
+                        </TabStrip>
+                    </ScrollViewer>
+                </Border>
+                <Panel Grid.Row="1" IsVisible="{Binding HasActiveTab}">
+                    <ContentControl Content="{Binding ActiveTab}">
+                        <ContentControl.ContentTemplate>
                             <DataTemplate x:DataType="vm:RepositoryViewModel">
-                                <Panel Margin="0,0,6,0" ToolTip.Tip="{Binding ShortcutHint}" PointerPressed="OnTabPointerPressed">
-                                    <Border Classes="tab"
-                                            BorderThickness="1,1,1,0"
-                                            CornerRadius="6,6,0,0"
-                                            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
-                                            Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"/>
-                                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="16,10">
-                                        <Ellipse Width="6" Height="6" Fill="#D04040" IsVisible="{Binding IsConflicted}" VerticalAlignment="Center"/>
-                                        <Ellipse Width="6" Height="6" Fill="#E0A100" IsVisible="{Binding ShowDirtyDot}" VerticalAlignment="Center"/>
-                                        <Ellipse Width="6" Height="6" Fill="#3CB44B" IsVisible="{Binding ShowCleanDot}" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding Title}" VerticalAlignment="Center" Background="Transparent"/>
-                                        <Button Classes="flat" Content="×" Command="{Binding CloseTabCommand}" Padding="4,0" MinWidth="0"/>
-                                    </StackPanel>
-                                </Panel>
+                                <views:RepositoryChrome/>
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-
-                <Panel x:Name="PaneHost" Grid.Row="1">
-                    <ContentControl Content="{Binding ActiveTab}" IsVisible="{Binding HasActiveTab}"/>
+                        </ContentControl.ContentTemplate>
+                    </ContentControl>
+                </Panel>
+                <Panel Grid.Row="2">
+                    <dock:DockControl Layout="{Binding Dock.Root}" IsVisible="{Binding HasActiveTab}"/>
                     <Grid IsVisible="{Binding ShowEmpty}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="32,24">
                             <Image Width="120" Height="120" Stretch="Uniform" HorizontalAlignment="Center"
@@ -162,10 +276,6 @@
                             </StackPanel>
                         </StackPanel>
                     </Grid>
-                    <Border x:Name="PaneRuleLeft" Height="1" VerticalAlignment="Top" HorizontalAlignment="Left"
-                            IsHitTestVisible="False" Background="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
-                    <Border x:Name="PaneRuleRight" Height="1" VerticalAlignment="Top" HorizontalAlignment="Left"
-                            IsHitTestVisible="False" Background="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
                 </Panel>
         </Grid>
 

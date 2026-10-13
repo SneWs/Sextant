@@ -112,6 +112,18 @@ public class GitCommandTests
         Assert.Equal(["-C", "repo", "rm", "-f", "--", "a.txt"], GitCommands.DiscardUnbornPaths("repo", ["a.txt"]));
         Assert.Equal(["-C", "repo", "clean", "-fd", "--", "new.txt"], GitCommands.DiscardUntrackedPaths("repo", ["new.txt"]));
         Assert.DoesNotContain("-x", GitCommands.DiscardUntrackedPaths("repo", ["new.txt"]));
+        Assert.Equal(
+            ["-C", "repo", "--no-optional-locks", "config", "--local", "--null", "--list"],
+            GitCommands.LocalConfigList("repo"));
+        Assert.Equal(
+            ["-C", "repo", "--no-optional-locks", "rev-parse", "--git-path", "info/attributes"],
+            GitCommands.RevParseGitPath("repo", "info/attributes"));
+        Assert.Equal(
+            ["-C", "repo", "--no-optional-locks", "cat-file", "-p", ":.gitattributes"],
+            GitCommands.CatFileIndex("repo", ".gitattributes"));
+        Assert.Equal(
+            ["-C", "repo", "--no-optional-locks", "cat-file", "-p", ":dir/file.bin"],
+            GitCommands.CatFileIndex("repo", "dir\\file.bin"));
     }
 
     [Fact]

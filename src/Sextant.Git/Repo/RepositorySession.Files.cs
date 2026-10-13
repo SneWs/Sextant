@@ -25,6 +25,106 @@ public sealed partial class RepositorySession
             return LfsLockParser.Parse(output.Stdout);
         }, ct), cancellationToken);
 
+    /// <summary>
+    /// True when this repository has a local LFS address, a local LFS filter command,
+    /// or a <c>filter=lfs</c> attribute. Paths come from the repository file list.
+    /// A failed probe is false, so a lookup that cannot tell does not call Git LFS.
+    /// </summary>
+    public Task<bool> UsesLfsAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken) =>
+        RunAsync(ct => _scheduler.ReadAsync(token => UsesLfsCoreAsync(paths, token), ct), cancellationToken);
+
+    /// <summary>
+    /// Same probe as <see cref="UsesLfsAsync"/>, using only <see cref="ExecuteAsync"/>.
+    /// Checkout already holds the write lock, so this must not take the scheduler again.
+    /// Pass null to discover attribute files from the index and the worktree.
+    /// </summary>
+    private async Task<bool> UsesLfsCoreAsync(IReadOnlyList<string>? paths, CancellationToken cancellationToken)
+    {
+        var config = await ExecuteAsync(GitCommands.LocalConfigList(_toplevel), null, cancellationToken).ConfigureAwait(false);
+        Track(config);
+        if (config.ExitCode != 0)
+            return false;
+        if (LfsRepo.ConfigEnables(ConfigParser.Parse(config.Stdout)))
+            return true;
+
+        foreach (var path in await AttributeCandidatePathsAsync(paths, cancellationToken).ConfigureAwait(false))
+        {
+            if (!IsAttributesPath(path))
+                continue;
+            if (await AttributesPathEnablesAsync(path, cancellationToken).ConfigureAwait(false))
+                return true;
+        }
+
+        return await InfoAttributesEnableAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<string>> AttributeCandidatePathsAsync(IReadOnlyList<string>? paths, CancellationToken cancellationToken)
+    {
+        if (paths is not null)
+            return paths;
+        var output = await ExecuteAsync(GitCommands.RepositoryFiles(_toplevel), null, cancellationToken).ConfigureAwait(false);
+        Track(output);
+        if (output.ExitCode != 0)
+            return [];
+        return Encoding.UTF8.GetString(output.Stdout).Split('\0', StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    private async Task<bool> AttributesPathEnablesAsync(string path, CancellationToken cancellationToken)
+    {
+        if (TryReadAttributes(RepoPath.CombineUnder(_toplevel, path), out var enables) && enables)
+            return true;
+        if (path.Contains('\0') || path.Contains('\n') || path.Contains('\r'))
+            return false;
+        var output = await ExecuteAsync(GitCommands.CatFileIndex(_toplevel, path), null, cancellationToken).ConfigureAwait(false);
+        Track(output);
+        return output.ExitCode == 0 && LfsRepo.AttributesEnable(Encoding.UTF8.GetString(output.Stdout));
+    }
+
+    private async Task<bool> InfoAttributesEnableAsync(CancellationToken cancellationToken)
+    {
+        var output = await ExecuteAsync(GitCommands.RevParseGitPath(_toplevel, "info/attributes"), null, cancellationToken).ConfigureAwait(false);
+        Track(output);
+        if (output.ExitCode != 0)
+            return false;
+        var printed = Encoding.UTF8.GetString(output.Stdout).Trim();
+        if (printed.Length == 0 || printed.Contains('\n') || printed.Contains('\0'))
+            return false;
+        var host = HostPath(printed);
+        var full = Path.IsPathRooted(host) ? host : RepoPath.CombineUnder(_toplevel, host);
+        return TryReadAttributes(full, out var enables) && enables;
+    }
+
+    private static bool IsAttributesPath(string path)
+    {
+        var gitPath = path.Replace('\\', '/');
+        return gitPath.Equals(".gitattributes", StringComparison.Ordinal)
+            || gitPath.EndsWith("/.gitattributes", StringComparison.Ordinal);
+    }
+
+    private static bool TryReadAttributes(string? full, out bool enables)
+    {
+        enables = false;
+        if (string.IsNullOrEmpty(full) || !File.Exists(full))
+            return false;
+        try
+        {
+            enables = LfsRepo.AttributesEnable(File.ReadAllText(full));
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
     public Task LockLfsFileAsync(string path, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.LfsLock(_toplevel, path), null, cancellationToken);
 
