@@ -48,6 +48,24 @@ public static class GitCommands
     public static IReadOnlyList<string> ConfigList(string toplevel) =>
         ["-C", toplevel, "--no-optional-locks", "config", "--null", "--list"];
 
+    /// <summary>
+    /// This repository's config only. A global <c>git lfs install</c> is not in this list.
+    /// </summary>
+    public static IReadOnlyList<string> LocalConfigList(string toplevel) =>
+        ["-C", toplevel, "--no-optional-locks", "config", "--local", "--null", "--list"];
+
+    public static IReadOnlyList<string> RevParseGitPath(string toplevel, string path) =>
+        ["-C", toplevel, "--no-optional-locks", "rev-parse", "--git-path", path];
+
+    /// <summary>
+    /// The index blob. <c>cat-file -p</c> does not run the LFS smudge filter.
+    /// </summary>
+    public static IReadOnlyList<string> CatFileIndex(string toplevel, string path)
+    {
+        var gitPath = path.Replace('\\', '/');
+        return ["-C", toplevel, "--no-optional-locks", "cat-file", "-p", ":" + gitPath];
+    }
+
     public static IReadOnlyList<string> Log(
         string toplevel,
         int skip,
