@@ -17,7 +17,7 @@ A conflict replaces that quiet state with a banner and Continue and Abort. A spa
 Below that, the window is three columns. Drag the splitters to resize them. The widths are remembered.
 
 1. **Locations** lists branches, remotes, tags, stashes, submodules, and worktrees.
-2. **History / Files** switches between the commit graph and the repository file tree.
+2. **History** and **Repository files** share one dock as tabs. History is the selected tab. Reset layout restores that pair.
 3. **Files and the diff** describe the selected commit, or the working copy.
 
 View → Window → Locations shows the locations pane and brings it forward. It does not hide it. The command palette has the same action. The other entries in that menu do the same for History, Changes, Staging, Diff, Blame, Repository files, and Command log.

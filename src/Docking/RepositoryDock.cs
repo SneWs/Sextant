@@ -598,6 +598,8 @@ public partial class RepositoryDock : ObservableObject
             return;
         if (id is DockIds.Diff or DockIds.Blame && TryAttachReview(layout.Root, id))
             return;
+        if (id == DockIds.Files && TryJoinHistory(layout.Root))
+            return;
         if (id == DockIds.Staging && DockLayouts.TryInsertStaging(layout.Root))
             return;
         if (id == DockIds.Changes && DockLayouts.TryInsertChanges(layout.Root))
@@ -615,6 +617,37 @@ public partial class RepositoryDock : ObservableObject
         if (index < 0)
             index = layout.Root.Slots.Count;
         layout.Root.Slots.Insert(Math.Clamp(index, 0, layout.Root.Slots.Count), new DockSlot { Id = id, Proportion = 0.18 });
+    }
+
+    private static bool TryJoinHistory(DockSplit split)
+    {
+        for (var i = 0; i < split.Slots.Count; i++)
+        {
+            var slot = split.Slots[i];
+            if (slot.Split is not null)
+            {
+                if (TryJoinHistory(slot.Split))
+                    return true;
+                continue;
+            }
+
+            if (slot.Id == DockIds.History && slot.Tabs is not { Count: > 0 })
+            {
+                slot.Id = "";
+                slot.Tabs = [DockIds.History, DockIds.Files];
+                slot.Active = DockIds.Files;
+                return true;
+            }
+
+            if (slot.Tabs is { } tabs && tabs.Contains(DockIds.History) && !tabs.Contains(DockIds.Files))
+            {
+                tabs.Add(DockIds.Files);
+                slot.Active = DockIds.Files;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool TryJoinReview(DockSplit split, string id)

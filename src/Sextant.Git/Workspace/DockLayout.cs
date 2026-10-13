@@ -145,7 +145,12 @@ public static class DockLayouts
         var slots = new List<DockSlot>();
         if (showLocations)
             slots.Add(new DockSlot { Id = DockIds.Locations, Proportion = loc / sum });
-        slots.Add(new DockSlot { Id = DockIds.History, Proportion = history / sum });
+        slots.Add(new DockSlot
+        {
+            Proportion = history / sum,
+            Tabs = [DockIds.History, DockIds.Files],
+            Active = DockIds.History,
+        });
         slots.Add(new DockSlot
         {
             Proportion = details / sum,

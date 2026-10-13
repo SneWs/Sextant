@@ -16,8 +16,10 @@ public class DockLayoutTests
     {
         using var vm = Open(new WorkspaceState());
         Assert.Equal(
-            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
+            [DockIds.Locations, DockIds.History, DockIds.Files, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
             vm.View.Dock.PaneOrder());
+        Assert.True(vm.View.Dock.SharesHost(DockIds.History, DockIds.Files));
+        Assert.True(vm.View.Dock.IsSelected(DockIds.History));
         Assert.True(vm.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
     }
 
@@ -25,19 +27,20 @@ public class DockLayoutTests
     public void Reset_restores_the_default_tools()
     {
         using var vm = Open(new WorkspaceState());
-        vm.View.Dock.SetOpen(DockIds.Files, true);
+        vm.View.Dock.SetOpen(DockIds.Files, false);
         vm.View.Dock.SetOpen(DockIds.Commands, true);
-        Assert.Contains(DockIds.Files, vm.View.Dock.PaneOrder());
+        Assert.False(vm.View.Dock.IsOpen(DockIds.Files));
+        Assert.False(vm.View.Dock.SharesHost(DockIds.History, DockIds.Files));
         Assert.True(vm.View.Dock.IsOpen(DockIds.Commands));
-        Assert.True(vm.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
 
         vm.View.Dock.Reset();
 
         Assert.Equal(
-            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
+            [DockIds.Locations, DockIds.History, DockIds.Files, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
             vm.View.Dock.PaneOrder());
+        Assert.True(vm.View.Dock.SharesHost(DockIds.History, DockIds.Files));
+        Assert.True(vm.View.Dock.IsSelected(DockIds.History));
         Assert.True(vm.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
-        Assert.False(vm.View.Dock.IsOpen(DockIds.Files));
         Assert.False(vm.View.Dock.IsOpen(DockIds.Commands));
     }
 
@@ -70,8 +73,9 @@ public class DockLayoutTests
             var store = new WorkspaceStore(directory);
             var vm = new MainViewModel(store, state, new AppSettings(), new GitProcessRunner());
             Assert.Equal(
-                [DockIds.History, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
+                [DockIds.History, DockIds.Files, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
                 vm.Dock.PaneOrder());
+            Assert.True(vm.Dock.SharesHost(DockIds.History, DockIds.Files));
             Assert.False(vm.Dock.IsOpen(DockIds.Locations));
 
             vm.Save();
@@ -94,7 +98,7 @@ public class DockLayoutTests
         using var vm = Open(new WorkspaceState());
         vm.View.Dock.SetOpen(DockIds.Diff, false);
         Assert.Equal(
-            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Staging, DockIds.Blame],
+            [DockIds.Locations, DockIds.History, DockIds.Files, DockIds.Changes, DockIds.Staging, DockIds.Blame],
             vm.View.Dock.PaneOrder());
         Assert.False(vm.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
     }
@@ -110,9 +114,27 @@ public class DockLayoutTests
         vm.View.Dock.SetOpen(DockIds.Blame, true);
 
         Assert.Equal(
-            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
+            [DockIds.Locations, DockIds.History, DockIds.Files, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
             vm.View.Dock.PaneOrder());
         Assert.True(vm.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
+        Assert.True(vm.View.Dock.SharesHost(DockIds.History, DockIds.Files));
+    }
+
+    [Fact]
+    public void Closing_repository_files_and_opening_them_again_puts_them_back_with_history()
+    {
+        using var vm = Open(new WorkspaceState());
+        vm.View.Dock.SetOpen(DockIds.Files, false);
+        Assert.False(vm.View.Dock.IsOpen(DockIds.Files));
+        Assert.True(vm.View.Dock.IsOpen(DockIds.History));
+        Assert.False(vm.View.Dock.SharesHost(DockIds.History, DockIds.Files));
+
+        vm.View.Dock.SetOpen(DockIds.Files, true);
+
+        Assert.True(vm.View.Dock.IsOpen(DockIds.History));
+        Assert.True(vm.View.Dock.IsOpen(DockIds.Files));
+        Assert.True(vm.View.Dock.SharesHost(DockIds.History, DockIds.Files));
+        Assert.True(vm.View.Dock.IsSelected(DockIds.Files));
     }
 
     [Fact]
@@ -391,8 +413,9 @@ public class DockLayoutTests
         };
         using var vm = Open(state);
         Assert.Equal(
-            [DockIds.Locations, DockIds.History, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
+            [DockIds.Locations, DockIds.History, DockIds.Files, DockIds.Changes, DockIds.Staging, DockIds.Diff, DockIds.Blame],
             vm.View.Dock.PaneOrder());
+        Assert.True(vm.View.Dock.SharesHost(DockIds.History, DockIds.Files));
     }
 
     [Fact]
