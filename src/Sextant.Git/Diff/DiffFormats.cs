@@ -384,8 +384,9 @@ public static class DiffFormatTool
         }
     }
 
-    // Linux and macOS refuse to execute a file another process still has open for writing.
-    // A fork that overlapped that write inherits the handle until exec, so one start can fail with ETXTBSY even though the file is there.
+    // Linux refuses to execute a file another process still has open for writing (ETXTBSY, errno 26).
+    // A fork that overlapped that write inherits the handle until exec, so one start can fail even though the file is there.
+    // macOS uses the same errno when it refuses. A script this process still has open is not refused there.
     private static async Task<Process?> StartFormatterAsync(ProcessStartInfo info, CancellationToken cancellationToken)
     {
         const int textFileBusy = 26;

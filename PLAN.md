@@ -132,6 +132,8 @@ On 2026-10-13 the Windows release workflow publishes both win-x64 and win-arm64.
 
 On 2026-10-13 a file-type tool can fail to start on Linux while other processes are forking. The tool test writes a script and runs it at once. A fork that overlapped that write keeps the script open until exec, and the kernel answers "Text file busy". That failure was reported as the script was not found. The start is tried again, and any other start failure keeps the operating system's reason. A missing command is reported as not found. `Tool_reads_stdin_and_a_file_token`, `Formatter_script_starts_while_other_processes_fork`, and `Busy_formatter_reports_the_system_error` passed. `DiffFormatTests` passed 11/11 against system git on Linux. The desktop window was not launched.
 
+On 2026-10-13 `Busy_formatter_reports_the_system_error` runs on Linux only. macOS executes a script this process still has open for writing, so that check returned success and failed the assertion. The same test passed on Linux. The macOS worker was not run from here. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

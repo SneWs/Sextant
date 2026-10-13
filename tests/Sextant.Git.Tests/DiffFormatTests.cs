@@ -105,7 +105,9 @@ public class DiffFormatTests
     [Fact]
     public async Task Busy_formatter_reports_the_system_error()
     {
-        if (OperatingSystem.IsWindows())
+        // Linux refuses the exec while this process holds the script open for writing.
+        // macOS runs that script, so the same setup is not a failed start there.
+        if (!OperatingSystem.IsLinux())
             return;
 
         var directory = Path.Combine(Path.GetTempPath(), "sextant-busy-" + Guid.NewGuid().ToString("N"));
