@@ -1176,8 +1176,6 @@ public partial class RepositoryViewModel : ViewModelBase
             var label = noVerify ? "Pushing without local checks…" : "Pushing…";
             if (state.Branch.Upstream is null && !state.Branch.Detached && state.Branch.HeadName is { } branch)
             {
-                if (_host.Dialogs is null)
-                    return;
                 if (state.Remotes.Count == 0)
                 {
                     Fail("This branch has no upstream, and this repository has no remotes. Add a remote, then push.");
@@ -1212,7 +1210,17 @@ public partial class RepositoryViewModel : ViewModelBase
                     return;
                 }
 
-                var dialogs = _host.Dialogs;
+                // The only remote is the only place this branch can go.
+                if (state.Remotes.Count == 1)
+                {
+                    var remote = state.Remotes[0];
+                    var progress = Progress();
+                    await RunAsync(label, ct => _session.PushUpstreamAsync(remote, branch, progress, ct, noVerify));
+                    return;
+                }
+
+                if (_host.Dialogs is not { } dialogs)
+                    return;
                 await HoldFocus(async () =>
                 {
                     var remote = await dialogs.PickAsync("Push", $"Push {branch} and set its upstream.", pending);

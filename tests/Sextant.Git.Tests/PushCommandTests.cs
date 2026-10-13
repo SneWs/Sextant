@@ -184,16 +184,61 @@ public class PushCommandTests
                     await tab.Push();
                     await WaitUntilIdle(tab);
 
-                    Assert.Equal(1, dialogs.Picks);
-                    Assert.Equal(["origin"], dialogs.LastOptions);
+                    Assert.Equal(0, dialogs.Picks);
                     Assert.Equal(1, PushCount(tab.CommandLog));
                     Assert.Equal("topic", Tip(origin.Git, bare, "feature"));
+                    Assert.Equal("origin/feature", Git(origin.Git, clone, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}").Trim());
                     Assert.False(tab.CanPush);
 
                     var pushed = PushCount(tab.CommandLog);
                     await tab.Push();
                     Assert.Equal(pushed, PushCount(tab.CommandLog));
+                    Assert.Equal(0, dialogs.Picks);
+                }
+                finally
+                {
+                    await vm.Shutdown();
+                }
+
+                return 0;
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            origin.Dispose();
+            TryDelete(bare);
+            TryDelete(clone);
+        }
+    }
+
+    [Fact]
+    public async Task Push_asks_which_remote_when_several_exist()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(App));
+        var (origin, bare, clone) = CreateClone();
+        try
+        {
+            Git(origin.Git, clone, "remote", "add", "backup", bare);
+            Git(origin.Git, clone, "switch", "-c", "feature");
+            File.WriteAllText(Path.Combine(clone, "c.txt"), "topic\n");
+            Git(origin.Git, clone, "add", "c.txt");
+            Git(origin.Git, clone, "commit", "-m", "topic");
+            await session.Dispatch(async () =>
+            {
+                var dialogs = new PushDialogs("backup");
+                var (vm, tab) = await Open(clone, origin.Git, dialogs);
+                try
+                {
+                    Assert.True(tab.CanPush);
+                    await tab.Push();
+                    await WaitUntilIdle(tab);
+
                     Assert.Equal(1, dialogs.Picks);
+                    Assert.NotNull(dialogs.LastOptions);
+                    Assert.Contains("origin", dialogs.LastOptions);
+                    Assert.Contains("backup", dialogs.LastOptions);
+                    Assert.Equal("topic", Tip(origin.Git, bare, "feature"));
+                    Assert.Equal("backup/feature", Git(origin.Git, clone, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}").Trim());
                 }
                 finally
                 {
@@ -262,7 +307,7 @@ public class PushCommandTests
         return count;
     }
 
-    private static void Git(string git, string directory, params string[] args)
+    private static string Git(string git, string directory, params string[] args)
     {
         var info = new ProcessStartInfo(git)
         {
@@ -277,10 +322,11 @@ public class PushCommandTests
             info.ArgumentList.Add(arg);
         using var process = Process.Start(info) ?? throw new InvalidOperationException("git did not start.");
         var error = process.StandardError.ReadToEnd();
-        _ = process.StandardOutput.ReadToEnd();
+        var output = process.StandardOutput.ReadToEnd();
         process.WaitForExit();
         if (process.ExitCode != 0)
             throw new InvalidOperationException($"git {string.Join(' ', args)} exited {process.ExitCode}{Environment.NewLine}{error}");
+        return output;
     }
 
     private static string Tip(string git, string gitDirectory, string revision)
