@@ -41,9 +41,14 @@ public class BulkStageButtonTests
 
             var diff = view.GetVisualDescendants().OfType<DiffDocumentView>().Single();
             var changes = view.GetVisualDescendants().OfType<ChangesToolView>().Single();
-            var stage = Button(diff, "Stage all");
-            var unstage = Button(diff, "Unstage all");
-            var discard = Button(diff, "Discard all");
+            var expand = BarButton(diff, "Expand all");
+            var collapse = BarButton(diff, "Collapse all");
+            var stage = BarButton(diff, "Stage all");
+            var unstage = BarButton(diff, "Unstage all");
+            var discard = BarButton(diff, "Discard all");
+            Assert.True(vm.ShowSectionFolds);
+            Assert.True(expand.IsEffectivelyVisible);
+            Assert.True(collapse.IsEffectivelyVisible);
             Assert.True(stage.IsEffectivelyVisible);
             Assert.True(unstage.IsEffectivelyVisible);
             Assert.True(discard.IsEffectivelyVisible);
@@ -53,15 +58,26 @@ public class BulkStageButtonTests
             Assert.Same(vm.StageAllCommand, stage.Command);
             Assert.Same(vm.UnstageAllCommand, unstage.Command);
             Assert.Same(vm.DiscardAllCommand, discard.Command);
+            var bar = expand.FindAncestorOfType<CommandBar>();
+            Assert.NotNull(bar);
+            Assert.Same(bar, collapse.FindAncestorOfType<CommandBar>());
+            Assert.Same(bar, stage.FindAncestorOfType<CommandBar>());
+            Assert.Same(bar, unstage.FindAncestorOfType<CommandBar>());
+            Assert.Same(bar, discard.FindAncestorOfType<CommandBar>());
             Assert.DoesNotContain(
                 changes.GetVisualDescendants().OfType<Button>(),
-                button => button.Content is "Stage all" or "Unstage all" or "Discard all");
+                button => button is CommandBarButton labeled && labeled.Label is "Stage all" or "Unstage all" or "Discard all");
 
             var list = diff.FindControl<CopyListBox>("DiffList");
             Assert.NotNull(list);
-            Assert.True(Bottom(discard, diff) <= Top(list, diff), $"buttons {Bottom(discard, diff)} diff {Top(list, diff)}");
-            Assert.True(Left(stage, diff) < Left(unstage, diff));
-            Assert.True(Right(unstage, diff) < Left(discard, diff));
+            Assert.True(Bottom(bar, diff) <= Top(list, diff), $"bar {Bottom(bar, diff)} diff {Top(list, diff)}");
+            Assert.True(Math.Abs(Top(stage, bar) - Top(expand, bar)) < 8, "Stage all shares the Expand all row");
+            Assert.True(Left(stage, bar) < Left(unstage, bar));
+            Assert.True(Right(unstage, bar) <= Left(discard, bar));
+            Assert.True(Right(discard, bar) < Left(expand, bar), "Expand all sits to the right of Discard all");
+            Assert.True(Right(expand, bar) <= Left(collapse, bar));
+            Assert.True(Left(expand, bar) - Right(discard, bar) > 16, "fold buttons stay on the right side of the bar");
+            Assert.True(Right(collapse, bar) > bar.Bounds.Width - 24, "Collapse all is the last button");
 
             vm.ShowingBlame = true;
             view.UpdateLayout();
@@ -94,8 +110,8 @@ public class BulkStageButtonTests
         }, CancellationToken.None);
     }
 
-    private static Button Button(DiffDocumentView diff, string content) =>
-        diff.GetVisualDescendants().OfType<Button>().Single(button => button.Content as string == content);
+    private static CommandBarButton BarButton(DiffDocumentView diff, string label) =>
+        diff.GetVisualDescendants().OfType<CommandBarButton>().Single(button => button.Label == label);
 
     private static double Top(Control control, Visual relative)
     {

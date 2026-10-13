@@ -66,9 +66,13 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public bool ShowSectionFolds => AllDiffFiles && ShowingDiff && _sections.Count > 0;
 
+    /// <summary>The diff command bar holds working-copy actions on the left and fold actions on the right.</summary>
+    public bool ShowDiffCommandBar => ShowSectionFolds || ShowBulkActions;
+
     private void NoteSectionFolds()
     {
         OnPropertyChanged(nameof(ShowSectionFolds));
+        OnPropertyChanged(nameof(ShowDiffCommandBar));
         ExpandAllSectionsCommand.NotifyCanExecuteChanged();
         CollapseAllSectionsCommand.NotifyCanExecuteChanged();
     }
@@ -374,7 +378,7 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public bool CanDiscardAll => !IsBusy && ShowingWorkingCopy && (_hasUnstagedWork || _hasStagedWork);
 
-    /// <summary>Stage all, unstage all, and discard all sit on the diff while the working copy is open.</summary>
+    /// <summary>Stage all, unstage all, and discard all are on the left of the diff command bar while the working copy is open.</summary>
     public bool ShowBulkActions => ShowingWorkingCopy && !ShowingBlame;
 
     private bool _hasUnstagedWork;
