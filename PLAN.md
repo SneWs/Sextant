@@ -122,6 +122,8 @@ On 2026-10-13 the commit box pane is titled Commit and the file list pane is tit
 
 On 2026-10-13 a repository that does not use Git LFS no longer runs Git LFS commands on its own. Opening Files in a fresh init was running `git lfs locks`, and git-lfs exited 2 with `missing protocol: ""` because the remote address was empty. Sextant now asks only when that repository has a local `lfs.url`, a local LFS clean, smudge, or process filter with a command, or a `filter=lfs` attribute in a `.gitattributes` file or in `info/attributes`. An empty local filter and a global `git lfs install` do not count. Checkout skips `git lfs checkout` on the same test. Track with LFS still writes the attribute and stages it. Lock and Unlock stay hidden until a lock lookup succeeds.
 
+On 2026-10-13 Enter in the command palette runs the command when the key is released. Create branch was opening while Enter was still down, so that key clicked the dialog's OK button, the empty prompt closed, and the main window activated and refreshed the repository. A click still runs the command immediately. `Enter_on_create_branch_keeps_the_prompt_open` and `Clicking_create_branch_keeps_the_prompt_open` passed. A headless window left the prompt open when the main window activated, and Enter after a name created the branch. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

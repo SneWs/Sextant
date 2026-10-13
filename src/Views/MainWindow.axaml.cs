@@ -122,6 +122,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        DisarmPaletteEnter();
         if (DataContext is MainViewModel vm)
         {
             vm.ExitRequested -= OnExitRequested;
@@ -169,14 +170,21 @@ public partial class MainWindow : Window
             WindowInput.OnHistoryEscape(vm, e);
     }
 
-    private async void OnPaletteKeyDown(object? sender, KeyEventArgs e)
+    private EventHandler<KeyEventArgs>? _paletteEnterUp;
+
+    private void OnPaletteKeyDown(object? sender, KeyEventArgs e)
     {
         if (DataContext is not MainViewModel vm)
             return;
         if (e.Key == Key.Enter)
         {
             e.Handled = true;
-            await vm.RunPaletteCommand.ExecuteAsync(null);
+            // The command can open a dialog whose OK button treats Enter as a click.
+            // Running on key-down lets that same key, still held, dismiss the dialog.
+            if (_paletteEnterUp is not null || !vm.PaletteOpen)
+                return;
+            _paletteEnterUp = OnPaletteEnterUp;
+            AddHandler(KeyUpEvent, _paletteEnterUp, RoutingStrategies.Tunnel, handledEventsToo: true);
         }
         else if (e.Key == Key.Down)
         {
@@ -188,6 +196,24 @@ public partial class MainWindow : Window
             vm.MovePalette(-1);
             e.Handled = true;
         }
+    }
+
+    private async void OnPaletteEnterUp(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+        DisarmPaletteEnter();
+        e.Handled = true;
+        if (DataContext is MainViewModel { PaletteOpen: true } vm)
+            await vm.RunPaletteCommand.ExecuteAsync(null);
+    }
+
+    private void DisarmPaletteEnter()
+    {
+        if (_paletteEnterUp is null)
+            return;
+        RemoveHandler(KeyUpEvent, _paletteEnterUp);
+        _paletteEnterUp = null;
     }
 
     private async void OnPaletteChosen(object? sender, TappedEventArgs e)
