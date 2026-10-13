@@ -79,15 +79,48 @@ public class BulkStageButtonTests
             Assert.True(Left(expand, bar) - Right(discard, bar) > 16, "fold buttons stay on the right side of the bar");
             Assert.True(Right(collapse, bar) > bar.Bounds.Width - 24, "Collapse all is the last button");
 
+            var staging = view.GetVisualDescendants().OfType<StagingToolView>().Single();
+            var stagingStage = BarButton(staging, "Stage all");
+            var stagingUnstage = BarButton(staging, "Unstage all");
+            var stagingDiscard = BarButton(staging, "Discard all");
+            Assert.DoesNotContain(
+                staging.GetVisualDescendants().OfType<CommandBarButton>(),
+                button => button.Label is "Expand all" or "Collapse all");
+            Assert.True(stagingStage.IsEffectivelyVisible);
+            Assert.True(stagingUnstage.IsEffectivelyVisible);
+            Assert.True(stagingDiscard.IsEffectivelyVisible);
+            Assert.True(stagingStage.IsEnabled);
+            Assert.True(stagingUnstage.IsEnabled);
+            Assert.True(stagingDiscard.IsEnabled);
+            Assert.Same(vm.StageAllCommand, stagingStage.Command);
+            Assert.Same(vm.UnstageAllCommand, stagingUnstage.Command);
+            Assert.Same(vm.DiscardAllCommand, stagingDiscard.Command);
+            var stagingBar = staging.FindControl<CommandBar>("StagingCommandBar");
+            Assert.NotNull(stagingBar);
+            Assert.NotSame(bar, stagingBar);
+            Assert.Same(stagingBar, stagingStage.FindAncestorOfType<CommandBar>());
+            Assert.Same(stagingBar, stagingUnstage.FindAncestorOfType<CommandBar>());
+            Assert.Same(stagingBar, stagingDiscard.FindAncestorOfType<CommandBar>());
+            var files = staging.FindControl<ListBox>("FileList");
+            Assert.NotNull(files);
+            Assert.True(Bottom(stagingBar, staging) <= Top(files, staging), "staging bar sits above the file list");
+            Assert.True(Math.Abs(Top(stagingStage, stagingBar) - Top(stagingDiscard, stagingBar)) < 8);
+            Assert.True(Left(stagingStage, stagingBar) < Left(stagingUnstage, stagingBar));
+            Assert.True(Right(stagingUnstage, stagingBar) <= Left(stagingDiscard, stagingBar));
+            Assert.True(Left(stagingStage, stagingBar) < 40, "Stage all starts on the left of the staging bar");
+            Assert.True(Right(stagingDiscard, stagingBar) < stagingBar.Bounds.Width - 24, "the staging actions leave the right side empty");
+
             vm.ShowingBlame = true;
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
             Assert.False(stage.IsEffectivelyVisible);
+            Assert.False(stagingStage.IsEffectivelyVisible);
 
             vm.ShowingBlame = false;
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
             Assert.True(stage.IsEffectivelyVisible);
+            Assert.True(stagingStage.IsEffectivelyVisible);
 
             var commit = vm.Rows.Single(row => row.Subject == "first");
             vm.SelectedGraphRow = commit;
@@ -104,6 +137,9 @@ public class BulkStageButtonTests
             Assert.False(stage.IsEffectivelyVisible);
             Assert.False(unstage.IsEffectivelyVisible);
             Assert.False(discard.IsEffectivelyVisible);
+            Assert.False(stagingStage.IsEffectivelyVisible);
+            Assert.False(stagingUnstage.IsEffectivelyVisible);
+            Assert.False(stagingDiscard.IsEffectivelyVisible);
 
             window.Close();
             await vm.DisposeAsync();
@@ -134,12 +170,19 @@ public class BulkStageButtonTests
             Dispatcher.UIThread.RunJobs();
 
             var diff = view.GetVisualDescendants().OfType<DiffDocumentView>().Single();
+            var staging = view.GetVisualDescendants().OfType<StagingToolView>().Single();
             var stage = BarButton(diff, "Stage all");
             var unstage = BarButton(diff, "Unstage all");
             var discard = BarButton(diff, "Discard all");
+            var stagingStage = BarButton(staging, "Stage all");
+            var stagingUnstage = BarButton(staging, "Unstage all");
+            var stagingDiscard = BarButton(staging, "Discard all");
             Assert.False(stage.IsVisible);
             Assert.False(unstage.IsVisible);
             Assert.False(discard.IsVisible);
+            Assert.False(stagingStage.IsVisible);
+            Assert.False(stagingUnstage.IsVisible);
+            Assert.False(stagingDiscard.IsVisible);
 
             repo.WriteFile("unstaged.txt", "unstaged\n");
             await vm.Refresh();
@@ -154,14 +197,20 @@ public class BulkStageButtonTests
             Assert.True(stage.IsEnabled);
             Assert.False(unstage.IsEnabled);
             Assert.True(discard.IsEnabled);
+            Assert.True(stagingStage.IsEffectivelyVisible);
+            Assert.True(stagingUnstage.IsEffectivelyVisible);
+            Assert.True(stagingDiscard.IsEffectivelyVisible);
+            Assert.True(stagingStage.IsEnabled);
+            Assert.False(stagingUnstage.IsEnabled);
+            Assert.True(stagingDiscard.IsEnabled);
 
             window.Close();
             await vm.DisposeAsync();
         }, CancellationToken.None);
     }
 
-    private static CommandBarButton BarButton(DiffDocumentView diff, string label) =>
-        diff.GetVisualDescendants().OfType<CommandBarButton>().Single(button => button.Label == label);
+    private static CommandBarButton BarButton(Visual root, string label) =>
+        root.GetVisualDescendants().OfType<CommandBarButton>().Single(button => button.Label == label);
 
     private static double Top(Control control, Visual relative)
     {

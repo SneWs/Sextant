@@ -378,7 +378,7 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public bool CanDiscardAll => !IsBusy && ShowingWorkingCopy && (_hasUnstagedWork || _hasStagedWork);
 
-    /// <summary>Stage all, unstage all, and discard all are on the left of the diff command bar while the working copy is open and the staging list has files.</summary>
+    /// <summary>Stage all, unstage all, and discard all are on the left of the staging and diff command bars while the working copy is open and the staging list has files.</summary>
     public bool ShowBulkActions => ShowingWorkingCopy && !ShowingBlame && IsDirty;
 
     private bool _hasUnstagedWork;
