@@ -5,8 +5,8 @@
 # Sextant is an Avalonia app. This file keeps the starter workflow's shape
 # and publishes self-contained win-x64 and win-arm64 folders instead of a
 # Visual Studio packaging project. There is no .wapproj. win-x64 runs on
-# windows-latest. win-arm64 runs on windows-11-arm, and that job tests and
-# publishes natively. src/tools/make-msix.ps1 packs each folder into an MSIX
+# windows-latest. win-arm64 runs on windows-11-arm and publishes natively.
+# src/tools/make-msix.ps1 packs each folder into an MSIX
 # after publish. The manifest architecture follows the runtime. The GitHub
 # release stays the loose zips. Each MSIX is a separate artifact for Partner
 # Center. The macOS job publishes a self-contained osx-arm64 app. On a Mac
@@ -80,12 +80,14 @@
 # signature. When it is set, the other five are required.
 #
 # Tag releases live in release.yml. That workflow calls this one and passes
-# the tag, such as v0.1.3-beta. The leading v only selects this workflow.
-# Every imprint uses the rest: 0.1.3-beta. A branch build uses the nearest
-# v* tag the same way. This file also accepts workflow_call for that reason.
-# A push or a pull request to master runs only when src/ or tests/ changes.
-# workflow_dispatch still starts a build by hand, and a tag release is not
-# limited to those folders.
+# the tag, such as v0.1.3-beta, with run_tests false. The leading v only
+# selects this workflow. Every imprint uses the rest: 0.1.3-beta. A branch
+# build uses the nearest v* tag the same way. This file also accepts
+# workflow_call for that reason. A push or a pull request to master runs
+# only when src/ or tests/ changes, and those runs still execute the unit
+# tests. workflow_dispatch still starts a build by hand and still tests.
+# A tag release is not limited to those folders. It builds and packages,
+# and it skips the unit-test steps. The publish checks still run.
 #
 # The two Linux jobs publish self-contained linux-x64 and linux-arm64 apps on
 # native runners and pack each: make-deb.sh builds a .deb for Ubuntu and Debian,
@@ -113,6 +115,11 @@ on:
         required: false
         type: string
         default: ""
+      run_tests:
+        description: Run the unit tests before publish. A tag release passes false.
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   actions: write
@@ -155,6 +162,7 @@ jobs:
         dotnet-version: 10.0.x
 
     - name: Execute unit tests
+      if: github.event_name != 'workflow_call' || inputs.run_tests
       run: dotnet test $env:Solution_Name --configuration Release --verbosity normal
 
     - name: Publish the application
@@ -313,6 +321,7 @@ jobs:
         dotnet-version: 10.0.x
 
     - name: Execute unit tests
+      if: github.event_name != 'workflow_call' || inputs.run_tests
       run: dotnet test "$Solution_Name" --configuration Release --verbosity normal
 
     - name: Publish the application
@@ -392,6 +401,7 @@ jobs:
         dotnet-version: 10.0.x
 
     - name: Execute unit tests
+      if: github.event_name != 'workflow_call' || inputs.run_tests
       run: dotnet test "$Solution_Name" --configuration Release --verbosity normal
 
     - name: Publish the application
@@ -464,6 +474,7 @@ jobs:
         dotnet-version: 10.0.x
 
     - name: Execute unit tests
+      if: github.event_name != 'workflow_call' || inputs.run_tests
       run: dotnet test "$Solution_Name" --configuration Release --verbosity normal
 
     - name: Publish the application

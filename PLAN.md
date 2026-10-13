@@ -134,6 +134,8 @@ On 2026-10-13 a file-type tool can fail to start on Linux while other processes 
 
 On 2026-10-13 `Busy_formatter_reports_the_system_error` runs on Linux only. macOS executes a script this process still has open for writing, so that check returned success and failed the assertion. The same test passed on Linux. The macOS worker was not run from here. The desktop window was not launched.
 
+On 2026-10-13 a tagged release builds and packages without the unit tests. `release.yml` calls `dotnet-desktop.yml` with `run_tests` false, so each platform skips `dotnet test` and still publishes. A push, a pull request, and a manual run of that workflow still test. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
