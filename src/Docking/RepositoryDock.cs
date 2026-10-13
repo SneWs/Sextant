@@ -32,8 +32,8 @@ public partial class RepositoryDock : ObservableObject
         {
             [DockIds.Locations] = new RepositoryTool(this, DockIds.Locations, "Locations"),
             [DockIds.History] = new RepositoryTool(this, DockIds.History, "History"),
-            [DockIds.Changes] = new RepositoryTool(this, DockIds.Changes, "Changes"),
-            [DockIds.Staging] = new RepositoryTool(this, DockIds.Staging, "Staging"),
+            [DockIds.Changes] = new RepositoryTool(this, DockIds.Changes, "Commit"),
+            [DockIds.Staging] = new RepositoryTool(this, DockIds.Staging, "Changes"),
             [DockIds.Files] = new RepositoryTool(this, DockIds.Files, "Repository files"),
             [DockIds.Commands] = new RepositoryTool(this, DockIds.Commands, "Command log"),
             [DockIds.Diff] = new RepositoryTool(this, DockIds.Diff, "Diff"),

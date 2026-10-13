@@ -20,7 +20,7 @@ Below that, the window is three columns. Drag the splitters to resize them. The 
 2. **History** and **Repository files** share one dock as tabs. History is the selected tab. Reset layout restores that pair.
 3. **Files and the diff** describe the selected commit, or the working copy.
 
-View → Window → Locations shows the locations pane and brings it forward. It does not hide it. The command palette has the same action. The other entries in that menu do the same for History, Changes, Staging, Diff, Blame, Repository files, and Command log.
+View → Window → Locations shows the locations pane and brings it forward. It does not hide it. The command palette has the same action. The other entries in that menu do the same for History, Commit, Changes, Diff, Blame, Repository files, and Command log.
 
 ## Locations
 
@@ -71,19 +71,19 @@ The same menu offers Open in editor and Open in Finder, File Explorer, or File M
 
 ## Files and commits
 
-Staging is its own docked tool. It starts under Changes. The working-copy list is grouped into Conflicts, then Staged, then Unstaged. Empty groups are omitted. Each group title is a bar. The rows under it are the files, with a status letter and Stage, Unstage, Discard, or History. A past commit lists its files in that same tool. View → Window → Staging shows it and brings it forward. It does not hide it.
+Changes is its own docked tool. It starts under Commit. The working-copy list is grouped into Conflicts, then Staged, then Unstaged. Empty groups are omitted. Each group title is a bar. The rows under it are the files, with a status letter and Stage, Unstage, Discard, or History. A past commit lists its files in that same tool. View → Window → Changes shows it and brings it forward. It does not hide it.
 
-Stage all, Unstage all, and Discard all sit on the left of the staging command bar, and again on the left of the diff command bar, while the working copy is open and the staging list has files. They hide when that list is empty. The staging bar has no fold buttons. Expand all and Collapse all sit on the right of the diff bar. Stage all is Ctrl+Shift+A (Command+Shift+A on macOS) and Unstage all is Ctrl+Shift+R (Command+Shift+R). Stage all is unavailable when there is nothing to stage, and Unstage all when nothing is staged. Both are also in the Repository menu and the command palette. Discard all is in the command palette. Discard all asks before it restores tracked files and removes untracked files.
+Stage all, Unstage all, and Discard all sit on the left of the Changes command bar, and again on the left of the diff command bar, while the working copy is open and that list has files. They hide when that list is empty. The Changes bar has no fold buttons. Expand all and Collapse all sit on the right of the diff bar. Stage all is Ctrl+Shift+A (Command+Shift+A on macOS) and Unstage all is Ctrl+Shift+R (Command+Shift+R). Stage all is unavailable when there is nothing to stage, and Unstage all when nothing is staged. Both are also in the Repository menu and the command palette. Discard all is in the command palette. Discard all asks before it restores tracked files and removes untracked files.
 
 Stash saves changes to tracked files with Ctrl+S (Command+S on macOS). It is unavailable when there are no tracked changes to save, before the first commit, or while files have unresolved conflicts. Untracked files are left alone. Ctrl+Shift+S (Command+Shift+S) pops the latest stash after confirmation. Pop is unavailable when there is no stash or files have unresolved conflicts. Both actions are in the Repository menu and appear in the command palette when available. The Repository menu also nests three variants under Stash: Stash (include untracked) also takes untracked files, Stash (keep index) stashes everything but leaves the staged changes in place, and Stash (staged) stashes only the staged changes and keeps the rest. They need what they stash: the untracked variant is enabled by untracked files alone, and the staged variant by staged changes.
 
-The commit box is the Changes tool. Write the message and press Commit, or Ctrl+Enter (Command+Enter). The commit menu also offers Commit without hooks, and Amend. Amend replaces the tip message and keeps unstaged work unstaged. Nothing staged leaves Commit disabled, and the box says so. Below the message box, the current committer is shown as name and email; click it to change the name and email, either for this repository only or globally. Committing and amending need both a name and an email, so Sextant refuses either without one and points you at that row.
+The commit box is the Commit tool. Write the message and press Commit, or Ctrl+Enter (Command+Enter). The commit menu also offers Commit without hooks, and Amend. Amend replaces the tip message and keeps unstaged work unstaged. Nothing staged leaves Commit disabled, and the box says so. Below the message box, the current committer is shown as name and email; click it to change the name and email, either for this repository only or globally. Committing and amending need both a name and an email, so Sextant refuses either without one and points you at that row.
 
 On a past commit, that area shows the SHA, author, date, and the size of the change instead of a message you can edit.
 
 ## Diffs, blame, and previews
 
-Diff and Blame are separate docked tools. They start as two tabs in the pane under Staging. Blame annotates the selected file. The working-copy diff always includes both staged and unstaged files. Selecting a file in the staging list opens and scrolls to its header without hiding the other files. A partially staged file has separate Staged and Unstaged sections. For past commits and commit ranges, Diff can show the selected file or every file.
+Diff and Blame are separate docked tools. They start as two tabs in the pane under Changes. Blame annotates the selected file. The working-copy diff always includes both staged and unstaged files. Selecting a file in Changes opens and scrolls to its header without hiding the other files. A partially staged file has separate Staged and Unstaged sections. For past commits and commit ranges, Diff can show the selected file or every file.
 
 Each working-copy file header has Stage file or Unstage file for that section.
 

@@ -1105,7 +1105,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             if (!tab.ShowingWorkingCopy || tab.ShowingBlame)
                 _palette.Add(new PaletteItem { Title = "Toggle all files", Run = () => tab.ToggleAllFilesCommand.ExecuteAsync(null) });
             _palette.Add(new PaletteItem { Title = "Blame", Run = () => { ShowBlame(); return Task.CompletedTask; } });
-            _palette.Add(new PaletteItem { Title = "Staging", Run = () => { ShowStaging(); return Task.CompletedTask; } });
+            _palette.Add(new PaletteItem { Title = "Changes", Run = () => { ShowStaging(); return Task.CompletedTask; } });
             if (tab.IsConflicted)
             {
                 _palette.Add(new PaletteItem { Title = "Continue", Run = tab.ContinueSequencer });

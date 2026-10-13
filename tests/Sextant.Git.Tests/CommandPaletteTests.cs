@@ -206,7 +206,7 @@ public class CommandPaletteTests
                 vm.PaletteQuery = "";
                 Assert.Contains(vm.PaletteMatches, item => item.Title == "Locations");
                 Assert.Contains(vm.PaletteMatches, item => item.Title == "Blame");
-                Assert.Contains(vm.PaletteMatches, item => item.Title == "Staging");
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Changes");
                 Assert.Contains(vm.PaletteMatches, item => item.Title == "Command log");
 
                 vm.ClosePalette();

@@ -118,8 +118,8 @@
                         <NativeMenu>
                             <NativeMenuItem Header="_Locations" Command="{Binding ShowLocationsCommand}"/>
                             <NativeMenuItem Header="_History" Command="{Binding ShowHistoryCommand}"/>
-                            <NativeMenuItem Header="_Changes" Command="{Binding ShowChangesCommand}"/>
-                            <NativeMenuItem Header="_Staging" Command="{Binding ShowStagingCommand}"/>
+                            <NativeMenuItem Header="_Commit" Command="{Binding ShowChangesCommand}"/>
+                            <NativeMenuItem Header="Chan_ges" Command="{Binding ShowStagingCommand}"/>
                             <NativeMenuItem Header="_Diff" Command="{Binding ShowDiffCommand}"/>
                             <NativeMenuItem Header="_Blame" Command="{Binding ShowBlameCommand}"/>
                             <NativeMenuItem Header="_Repository files" Command="{Binding ShowFilesCommand}"/>

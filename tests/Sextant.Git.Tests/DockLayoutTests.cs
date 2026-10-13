@@ -212,8 +212,8 @@ public class DockLayoutTests
                     [
                         "_Locations",
                         "_History",
-                        "_Changes",
-                        "_Staging",
+                        "_Commit",
+                        "Chan_ges",
                         "_Diff",
                         "_Blame",
                         "_Repository files",
@@ -221,6 +221,9 @@ public class DockLayoutTests
                     ],
                     headers);
                 Assert.DoesNotContain(headers, header => header?.Contains("Toggle", StringComparison.Ordinal) == true);
+                var tools = SextantDockFactory.Collect(vm.Dock.Root).OfType<RepositoryTool>().ToList();
+                Assert.Equal("Commit", tools.Single(tool => tool.ToolId == DockIds.Changes).Title);
+                Assert.Equal("Changes", tools.Single(tool => tool.ToolId == DockIds.Staging).Title);
                 Assert.Contains(view.Menu.Items.OfType<NativeMenuItem>(), item => item.Header == "_Reset layout");
                 Assert.DoesNotContain(view.Menu.Items.OfType<NativeMenuItem>(), item => item.Header == "_Locations");
 
