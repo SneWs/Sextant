@@ -3,6 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Sextant;
+using Sextant.Git;
 using Sextant.Git.Models;
 using Sextant.Git.Repo;
 using Sextant.Git.Workspace;
@@ -114,6 +116,44 @@ public class RepositoryFileTreeTests
             window.Close();
             await vm.DisposeAsync();
         }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Startup_populates_repository_files_when_that_pane_is_open()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("docs/readme.txt", "tracked\n");
+        repo.CommitAll("first");
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-files-startup-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var store = new WorkspaceStore(directory);
+                var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner())
+                {
+                    GitExecutable = repo.Git,
+                    GitReady = true,
+                };
+                var tab = new RepositoryViewModel(vm, repo.Directory);
+                vm.Tabs.Add(tab);
+                await vm.Activate(tab);
+
+                Assert.True(vm.Dock.IsOpen(DockIds.Files));
+                Assert.True(tab.RepositoryFilesTabOn);
+                Assert.Contains(tab.RepositoryFileTree, item => item.Path == "docs");
+                Assert.Contains(tab.RepositoryFileTree.Single(item => item.Path == "docs").Children, item => item.Path == "docs/readme.txt");
+
+                await vm.Shutdown();
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact]

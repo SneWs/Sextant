@@ -918,6 +918,10 @@ public partial class RepositoryViewModel : ViewModelBase
         if (_session is not null && !_lifetime.IsCancellationRequested)
         {
             await LoadDetailsAsync();
+            // The files pane can already be open when this session is created. The
+            // refresh started then finds no session and does not run again.
+            if (RepositoryFilesTabOn)
+                await LoadRepositoryFilesAsync(_lifetime.Token, refreshLocks: true);
             await MaybeSuggestAsync();
         }
     }
