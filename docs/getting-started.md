@@ -2,18 +2,19 @@
 
 Sextant does not ship its own Git. Clone, commit, push, hooks, and Git LFS all go through the `git` on your machine. Install Git before you open a repository. Install Git LFS as well when a repository stores large files that way.
 
-Published builds are on the [releases page](https://github.com/SneWs/Sextant/releases). Each tagged release has six downloads:
+Published builds are on the [releases page](https://github.com/SneWs/Sextant/releases). Each tagged release has seven downloads:
 
 | Platform | File | What you run |
 | --- | --- | --- |
 | macOS Apple silicon | `Sextant-osx-arm64.tar` | `Sextant.app` |
 | Windows x64 | `Sextant-win-x64.zip` | `Sextant.exe` |
+| Windows arm64 | `Sextant-win-arm64.zip` | `Sextant.exe` |
 | Ubuntu/Debian x64 | `Sextant-linux-x64.deb` | `Sextant` on `PATH` |
 | Ubuntu/Debian arm64 | `Sextant-linux-arm64.deb` | `Sextant` on `PATH` |
 | Fedora x64 | `Sextant-linux-x64.rpm` | `Sextant` on `PATH` |
 | Fedora aarch64 | `Sextant-linux-arm64.rpm` | `Sextant` on `PATH` |
 
-There is no Intel macOS build and no Windows ARM build. You can also build Linux from source, described at the end of this page.
+There is no Intel macOS build. You can also build Linux from source, described at the end of this page.
 
 Installing a release from that page is free, and so is a build you make from source. The terms are in the [license](../LICENSE).
 
@@ -58,7 +59,7 @@ git lfs version
 
 If `git lfs` is not a command, install [Git LFS](https://git-lfs.com/) and run `git lfs install`.
 
-Download `Sextant-win-x64.zip`, extract the whole zip, and run `Sextant.exe`. Keep the extracted files together. The executable expects the libraries that sit beside it.
+Download `Sextant-win-x64.zip` on 64-bit Windows, or `Sextant-win-arm64.zip` on Windows on Arm. Extract the whole zip and run `Sextant.exe`. Keep the extracted files together. The executable expects the libraries that sit beside it.
 
 To update, quit Sextant, download the new zip, and replace that folder. Settings stay in `%APPDATA%\Sextant`, which is `C:\Users\<you>\AppData\Roaming\Sextant`.
 

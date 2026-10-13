@@ -3,11 +3,14 @@
 # https://github.com/actions/starter-workflows/blob/main/ci/dotnet-desktop.yml
 #
 # Sextant is an Avalonia app. This file keeps the starter workflow's shape
-# and publishes a self-contained win-x64 folder instead of a Visual Studio
-# packaging project. There is no .wapproj. src/tools/make-msix.ps1 packs that
-# folder into an MSIX after publish. The GitHub release stays the loose zip.
-# The MSIX is a separate artifact for Partner Center. The macOS job publishes
-# a self-contained osx-arm64 app. On a Mac that publish is a Sextant.app
+# and publishes self-contained win-x64 and win-arm64 folders instead of a
+# Visual Studio packaging project. There is no .wapproj. win-x64 runs on
+# windows-latest. win-arm64 runs on windows-11-arm, and that job tests and
+# publishes natively. src/tools/make-msix.ps1 packs each folder into an MSIX
+# after publish. The manifest architecture follows the runtime. The GitHub
+# release stays the loose zips. Each MSIX is a separate artifact for Partner
+# Center. The macOS job publishes a self-contained osx-arm64 app. On a Mac
+# that publish is a Sextant.app
 # bundle. stamp-mac-app.sh ad-hoc signs that bundle. The SDK's loose apphost
 # signature does not seal bundle resources, and Gatekeeper reports a
 # quarantined copy as damaged. When the Apple secrets below are set, the
@@ -17,8 +20,8 @@
 # attribute. The stapled or ad-hoc bundle is tarred so the app host stays
 # executable, then uploaded with actions/upload-artifact@v7 and
 # archive: false. The artifact name is the filename, Sextant-osx-arm64.tar.
-# The Windows job still uploads a directory, which archive: false does not
-# allow, so it stays on v4.
+# The Windows jobs still upload a directory, which archive: false does not
+# allow, so they stay on v4.
 #
 # Signing uses the same secrets as the starter workflow. Add them under
 # Settings, Secrets and variables, Actions:
@@ -116,15 +119,22 @@ permissions:
   contents: read
 
 jobs:
-  windows-x64:
-    name: Windows x64 Build
-    runs-on: windows-latest
+  build-windows:
+    name: Windows ${{ matrix.arch }} Build
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+          - arch: arm64
+            runner: windows-11-arm
 
     env:
       Solution_Name: Sextant.slnx
       Project_Path: src/Sextant.csproj
-      Publish_Directory: artifacts/win-x64
-      Runtime: win-x64
+      Publish_Directory: artifacts/win-${{ matrix.arch }}
+      Runtime: win-${{ matrix.arch }}
 
     steps:
     - name: Checkout
@@ -150,10 +160,45 @@ jobs:
     - name: Publish the application
       run: dotnet publish $env:Project_Path --configuration Release --runtime $env:Runtime --self-contained true --output $env:Publish_Directory "-p:Version=$env:SEXTANT_VERSION" "-p:InformationalVersion=$env:SEXTANT_VERSION" "-p:IncludeSourceRevisionInInformationalVersion=false"
 
-    - name: Check the published SSH prompt helper
+    - name: Check the published binaries
       shell: pwsh
       run: |
         $PSNativeCommandUseErrorActionPreference = $false
+        function Assert-PeMachine {
+          param(
+            [Parameter(Mandatory)][string] $Path,
+            [Parameter(Mandatory)][string] $Expected
+          )
+          $bytes = [System.IO.File]::ReadAllBytes($Path)
+          if ($bytes.Length -lt 64 -or $bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) {
+            throw "$Path is not a PE file."
+          }
+          $offset = [BitConverter]::ToInt32($bytes, 0x3C)
+          if ($offset -lt 0 -or ($offset + 6) -gt $bytes.Length) {
+            throw "$Path has no PE header."
+          }
+          $machine = [BitConverter]::ToUInt16($bytes, $offset + 4)
+          $actual = switch ($machine) {
+            0x8664 { "x64" }
+            0xAA64 { "arm64" }
+            default { "0x{0:X4}" -f $machine }
+          }
+          if ($actual -ne $Expected) {
+            throw "$Path is $actual. Expected $Expected."
+          }
+        }
+        $expected = switch ($env:Runtime) {
+          "win-x64" { "x64" }
+          "win-arm64" { "arm64" }
+          default { throw "Unsupported runtime: $env:Runtime" }
+        }
+        foreach ($name in @("Sextant.exe", "Sextant.AskPass.exe", "assimp.dll", "libSkiaSharp.dll")) {
+          $path = Join-Path $env:Publish_Directory $name
+          if (-not (Test-Path -LiteralPath $path)) {
+            throw "$name was not in $env:Publish_Directory."
+          }
+          Assert-PeMachine $path $expected
+        }
         $env:SEXTANT_ASKPASS = ""
         $helper = Join-Path $env:Publish_Directory "Sextant.AskPass.exe"
         # Without a pipe, the helper must exit quietly with code 1, not fail to load.
@@ -176,9 +221,10 @@ jobs:
         $pfx = Join-Path $env:RUNNER_TEMP "GitHubActionsWorkflow.pfx"
         try {
           [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:PFX_BASE64))
+          $preferred = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "x64" }
           $signtool = Get-ChildItem -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
-            Where-Object { $_.FullName -match '\\x64\\signtool.exe$' } |
-            Sort-Object FullName -Descending |
+            Where-Object { $_.FullName -match '\\(x64|arm64)\\signtool.exe$' } |
+            Sort-Object @{ Expression = { if ($_.FullName -match "\\$preferred\\signtool.exe$") { 0 } else { 1 } } }, @{ Expression = "FullName"; Descending = $true } |
             Select-Object -First 1
           if (-not $signtool) {
             throw "signtool.exe was not found in the Windows SDK."
@@ -222,20 +268,20 @@ jobs:
           exit 0
         }
         New-Item -ItemType Directory -Force -Path artifacts/store | Out-Null
-        ./src/tools/make-msix.ps1 artifacts/win-x64 $env:SEXTANT_VERSION artifacts/store/Sextant-win-x64.msix
+        ./src/tools/make-msix.ps1 $env:Publish_Directory $env:SEXTANT_VERSION "artifacts/store/Sextant-$($env:Runtime).msix" $env:Runtime
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: Sextant-win-x64
-        path: artifacts/win-x64
+        name: Sextant-win-${{ matrix.arch }}
+        path: artifacts/win-${{ matrix.arch }}
         if-no-files-found: error
 
     - name: Upload the Microsoft Store package
       if: hashFiles('artifacts/store/*.msix') != ''
       uses: actions/upload-artifact@v4
       with:
-        name: Sextant-win-x64-msix
+        name: Sextant-win-${{ matrix.arch }}-msix
         path: artifacts/store/
         if-no-files-found: error
 

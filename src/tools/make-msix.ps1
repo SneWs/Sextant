@@ -1,14 +1,19 @@
-# Packs a published Windows x64 build into an MSIX for the Microsoft Store.
+# Packs a published Windows build into an MSIX for the Microsoft Store.
 # Requires PowerShell 7 and the Windows 10 SDK (makeappx.exe and signtool.exe).
 #
 # Usage:
-#   pwsh src/tools/make-msix.ps1 <publish-dir> <version> <output.msix>
+#   pwsh src/tools/make-msix.ps1 <publish-dir> <version> <output.msix> [win-x64|win-arm64]
 #   pwsh src/tools/make-msix.ps1 -SelfTest
+#
+# The runtime defaults to win-x64 so an existing caller keeps an x64 package.
+# win-arm64 writes ProcessorArchitecture arm64. The SDK tools that pack and
+# sign are the host tools: arm64 on Windows on Arm, and x64 otherwise. An
+# x64 tool still runs on Windows on Arm when the arm64 kit is absent.
 #
 # <version> is the imprint from resolve-version.sh, such as 0.1.9-beta or 1.2.3.
 # The script also writes <output>.msixupload beside the .msix. Upload that
 # file in Partner Center. It holds the package and, when the publish folder
-# has PDBs, a symbol package. The GitHub release stays the loose zip.
+# has PDBs, a symbol package. The GitHub release stays the loose zips.
 #
 # The package is a full-trust desktop app (runFullTrust), not a sandboxed
 # UWP app. Sextant starts the system git, credential helpers, editors, and
@@ -62,6 +67,8 @@
 # and writes a .cer beside the .msix. Trust it once, then install:
 #   Import-Certificate -FilePath .\Sextant-win-x64.cer -CertStoreLocation Cert:\CurrentUser\TrustedPeople
 #   Add-AppxPackage -Path .\Sextant-win-x64.msix
+# An Arm sideload uses the same commands with Sextant-win-arm64.cer and
+# Sextant-win-arm64.msix. Pass win-arm64 as the fourth argument.
 # That identity is not the Store app. Installing one does not update the other.
 #
 # Paste this into the submission's notes for certification:
@@ -79,6 +86,8 @@ param(
     [string] $Version,
     [Parameter(Position = 2)]
     [string] $OutputFile,
+    [Parameter(Position = 3)]
+    [string] $Runtime = "win-x64",
     [string] $PackageName = $env:SEXTANT_STORE_PACKAGE_NAME,
     [string] $Publisher = $env:SEXTANT_STORE_PUBLISHER,
     [string] $PublisherDisplayName = $env:SEXTANT_STORE_PUBLISHER_DISPLAY_NAME,
@@ -112,6 +121,18 @@ $script:StoreDisplayName = "Sextant Git"
 $script:AppDisplayName = "Sextant"
 $script:StorePackageSid = "S-1-15-2-4043513989-1948314254-3861236244-1758161784-3578805874-145697710-4171492892"
 $script:StoreId = "9N1T9BGFCTZS"
+
+function ConvertTo-PackageArchitecture {
+    param([AllowEmptyString()][string] $Runtime)
+    if ([string]::IsNullOrWhiteSpace($Runtime)) {
+        $Runtime = "win-x64"
+    }
+    switch ($Runtime) {
+        "win-x64" { return "x64" }
+        "win-arm64" { return "arm64" }
+        default { throw "Unsupported runtime: $Runtime (expected win-x64 or win-arm64)." }
+    }
+}
 
 function ConvertTo-XmlText {
     param([AllowEmptyString()][string] $Value)
@@ -250,7 +271,15 @@ function Invoke-SelfTest {
     if ((ConvertTo-XmlText 'Marcus & Co "Sextant"') -ne "Marcus &amp; Co &quot;Sextant&quot;") {
         throw "XML escaping did not match the manifest encoder."
     }
-    Write-Host "Store package version rules passed."
+    if ((ConvertTo-PackageArchitecture "win-x64") -ne "x64") { throw "win-x64 must pack as x64." }
+    if ((ConvertTo-PackageArchitecture "win-arm64") -ne "arm64") { throw "win-arm64 must pack as arm64." }
+    if ((ConvertTo-PackageArchitecture "") -ne "x64") { throw "An empty runtime must stay win-x64." }
+    foreach ($bad in @("win-x86", "linux-arm64", "arm64")) {
+        $rejected = $false
+        try { ConvertTo-PackageArchitecture $bad } catch { $rejected = $true }
+        if (-not $rejected) { throw "Expected runtime $bad to be rejected." }
+    }
+    Write-Host "Store package version and architecture rules passed."
 }
 
 function Get-WindowsKitTool {
@@ -259,9 +288,11 @@ function Get-WindowsKitTool {
     if (-not (Test-Path -LiteralPath $root)) {
         throw "Windows SDK not found at $root. Install the Windows 10 SDK so makeappx.exe and signtool.exe are available."
     }
+    $preferred = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "x64" }
+    $escaped = [regex]::Escape($Name)
     $tool = Get-ChildItem -Path $root -Recurse -Filter $Name -File |
-        Where-Object { $_.FullName -match '\\x64\\' + [regex]::Escape($Name) + '$' } |
-        Sort-Object FullName -Descending |
+        Where-Object { $_.FullName -match '\\(x64|arm64)\\' + $escaped + '$' } |
+        Sort-Object @{ Expression = { if ($_.FullName -match "\\$preferred\\$escaped$") { 0 } else { 1 } } }, @{ Expression = "FullName"; Descending = $true } |
         Select-Object -First 1
     if (-not $tool) {
         throw "$Name was not found under $root."
@@ -461,7 +492,8 @@ function Assert-PackageContents {
         [Parameter(Mandatory)][string] $PackagePath,
         [Parameter(Mandatory)][string] $ExpectedVersion,
         [Parameter(Mandatory)][string] $ExpectedPublisher,
-        [Parameter(Mandatory)][string] $ExpectedDisplayName
+        [Parameter(Mandatory)][string] $ExpectedDisplayName,
+        [Parameter(Mandatory)][string] $ExpectedArchitecture
     )
     Add-Type -AssemblyName System.IO.Compression
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -494,7 +526,7 @@ function Assert-PackageContents {
     foreach ($needle in @(
             "Version=`"$ExpectedVersion`"",
             "Publisher=`"$([System.Security.SecurityElement]::Escape($ExpectedPublisher))`"",
-            "ProcessorArchitecture=`"x64`"",
+            "ProcessorArchitecture=`"$ExpectedArchitecture`"",
             "Executable=`"Sextant.exe`"",
             "EntryPoint=`"Windows.FullTrustApplication`"",
             "Name=`"runFullTrust`"",
@@ -527,7 +559,7 @@ if ($SelfTest) {
 }
 
 if (-not $PublishDir -or -not $Version -or -not $OutputFile) {
-    throw "Usage: make-msix.ps1 <publish-dir> <version> <output.msix>"
+    throw "Usage: make-msix.ps1 <publish-dir> <version> <output.msix> [win-x64|win-arm64]"
 }
 
 $PublishDir = [IO.Path]::GetFullPath($PublishDir)
@@ -535,8 +567,12 @@ $OutputFile = [IO.Path]::GetFullPath($OutputFile)
 if (-not $OutputFile.EndsWith(".msix", [StringComparison]::OrdinalIgnoreCase)) {
     throw "The output file must end in .msix. Got: $OutputFile"
 }
+if ([string]::IsNullOrWhiteSpace($Runtime)) {
+    $Runtime = "win-x64"
+}
+$architecture = ConvertTo-PackageArchitecture $Runtime
 if (-not (Test-Path -LiteralPath (Join-Path $PublishDir "Sextant.exe") -PathType Leaf)) {
-    throw "No Sextant.exe in $PublishDir. Publish win-x64 first."
+    throw "No Sextant.exe in $PublishDir. Publish $Runtime first."
 }
 if (-not (Test-Path -LiteralPath (Join-Path $PublishDir "Sextant.AskPass.exe") -PathType Leaf)) {
     throw "No Sextant.AskPass.exe in $PublishDir. The Windows publish copies that helper beside Sextant.exe."
@@ -663,7 +699,7 @@ try {
     Name="$(ConvertTo-XmlText $PackageName)"
     Publisher="$(ConvertTo-XmlText $Publisher)"
     Version="$($mapped.Version)"
-    ProcessorArchitecture="x64" />
+    ProcessorArchitecture="$architecture" />
   <Properties>
     <DisplayName>$(ConvertTo-XmlText $packageDisplayName)</DisplayName>
     <PublisherDisplayName>$(ConvertTo-XmlText $PublisherDisplayName)</PublisherDisplayName>
@@ -745,7 +781,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $tempRoot "dev.cer") -Destination $generatedCer -Force
     }
 
-    Assert-PackageContents -PackagePath $OutputFile -ExpectedVersion $mapped.Version -ExpectedPublisher $Publisher -ExpectedDisplayName $packageDisplayName
+    Assert-PackageContents -PackagePath $OutputFile -ExpectedVersion $mapped.Version -ExpectedPublisher $Publisher -ExpectedDisplayName $packageDisplayName -ExpectedArchitecture $architecture
     $size = (Get-Item -LiteralPath $OutputFile).Length
     if ($size -lt 20MB) {
         throw "The package is $size bytes. A self-contained Sextant build is larger than that, so the layout is incomplete."
