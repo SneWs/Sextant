@@ -47,6 +47,30 @@ public sealed class SextantDockFactory : Factory
         _dock.NoteReview(dockable);
     }
 
+    public override void OnDockableAdded(IDockable? dockable)
+    {
+        base.OnDockableAdded(dockable);
+        _dock.FitChangesHost(dockable);
+    }
+
+    public override void OnDockableRemoved(IDockable? dockable)
+    {
+        base.OnDockableRemoved(dockable);
+        _dock.FitChangesHost(dockable);
+    }
+
+    public override void OnDockableMoved(IDockable? dockable)
+    {
+        base.OnDockableMoved(dockable);
+        _dock.FitChangesHost(dockable);
+    }
+
+    public override void OnDockableDocked(IDockable? dockable, DockOperation operation)
+    {
+        base.OnDockableDocked(dockable, operation);
+        _dock.FitChangesHost(dockable);
+    }
+
     public override bool OnWindowClosing(IDockWindow? window)
     {
         if (!_dock.Rebuilding && window?.Layout is IDock layout)

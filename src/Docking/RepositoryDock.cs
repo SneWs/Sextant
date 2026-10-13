@@ -12,6 +12,12 @@ namespace Sextant.Docking;
 
 public partial class RepositoryDock : ObservableObject
 {
+    /// <summary>
+    /// The Changes slot stays at least this tall. The commit message is 64, the committer row and
+    /// commit button sit under it, and the tool grip is drawn above that view.
+    /// </summary>
+    public const double ChangesPaneMinHeight = 172;
+
     private readonly WorkspaceState _workspace;
     private readonly Dictionary<string, RepositoryTool> _tools;
     private readonly HashSet<RepositoryViewModel> _live = [];
@@ -267,6 +273,8 @@ public partial class RepositoryDock : ObservableObject
             Alignment = Alignment.Left,
             VisibleDockables = Factory.CreateList<IDockable>(),
         };
+        if (tool.ToolId == DockIds.Changes)
+            host.MinHeight = ChangesPaneMinHeight;
         if (main.VisibleDockables is { Count: > 0 })
             Factory.AddDockable(main, Factory.CreateProportionalDockSplitter());
         Factory.AddDockable(main, host);
@@ -430,6 +438,7 @@ public partial class RepositoryDock : ObservableObject
             VisibleDockables = Factory.CreateList<IDockable>(tool),
             ActiveDockable = tool,
             Proportion = 0.2,
+            MinHeight = tool.ToolId == DockIds.Changes ? ChangesPaneMinHeight : 0,
         };
         var main = MainSplit();
         if (main is not null)
@@ -877,7 +886,28 @@ public partial class RepositoryDock : ObservableObject
             Alignment = Alignment.Unset,
             VisibleDockables = Factory.CreateList<IDockable>(members.Cast<IDockable>().ToArray()),
             ActiveDockable = active,
+            MinHeight = members.Any(tool => tool.ToolId == DockIds.Changes) ? ChangesPaneMinHeight : 0,
         };
+    }
+
+    /// <summary>
+    /// Keeps the floor on whichever tool dock currently holds Changes. Dragging the tool builds a new dock.
+    /// </summary>
+    internal void FitChangesHost(IDockable? dockable)
+    {
+        if (dockable is ToolDock dock)
+            ApplyChangesFloor(dock);
+        if (dockable is RepositoryTool { ToolId: DockIds.Changes } tool && tool.Owner is ToolDock owner)
+            ApplyChangesFloor(owner);
+    }
+
+    private static void ApplyChangesFloor(ToolDock dock)
+    {
+        var holds = dock.VisibleDockables?.OfType<RepositoryTool>().Any(tool => tool.ToolId == DockIds.Changes) == true;
+        if (holds)
+            dock.MinHeight = ChangesPaneMinHeight;
+        else if (dock.MinHeight == ChangesPaneMinHeight)
+            dock.MinHeight = 0;
     }
 
     private void BringForward(string id)

@@ -1,5 +1,10 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using Dock.Avalonia.Controls;
+using Dock.Model.Mvvm.Controls;
 using Sextant.Docking;
 using Sextant.Git.Repo;
 using Sextant.Git.Workspace;
@@ -506,6 +511,100 @@ public class DockLayoutTests
             if (Directory.Exists(directory))
                 Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task Changes_pane_stays_tall_enough_for_the_commit_box()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("readme.txt", "hello\n");
+        repo.CommitAll("first");
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-changes-min-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var store = new WorkspaceStore(directory);
+                var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner())
+                {
+                    GitExecutable = repo.Git,
+                    GitReady = true,
+                };
+                var host = ChangesHost(vm);
+                Assert.Equal(RepositoryDock.ChangesPaneMinHeight, host.MinHeight);
+
+                vm.Dock.SetOpen(DockIds.Changes, false);
+                vm.Dock.SetOpen(DockIds.Changes, true);
+                host = ChangesHost(vm);
+                Assert.Equal(RepositoryDock.ChangesPaneMinHeight, host.MinHeight);
+
+                var tab = new RepositoryViewModel(vm, repo.Directory);
+                vm.Tabs.Add(tab);
+                var window = new MainWindow { DataContext = vm, Width = 1400, Height = 1000 };
+                window.Show();
+                await vm.Activate(tab);
+
+                ChangesToolView? changes = null;
+                for (var i = 0; i < 40 && changes is null; i++)
+                {
+                    window.UpdateLayout();
+                    Dispatcher.UIThread.RunJobs();
+                    changes = window.GetVisualDescendants().OfType<ChangesToolView>().FirstOrDefault();
+                    if (changes is null)
+                        await Task.Delay(25);
+                }
+
+                Assert.NotNull(changes);
+                host.Proportion = 0.001;
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                var box = changes.FindControl<TextBox>("CommitMessageInput")!;
+                var commit = changes.GetVisualDescendants().OfType<SplitButton>().Single();
+                var committer = changes.GetVisualDescendants().OfType<Button>().First(button => button.Classes.Contains("flat"));
+                var pane = window.GetVisualDescendants().OfType<ToolDockControl>().Single(control => ReferenceEquals(control.DataContext, host));
+                var tool = changes.FindAncestorOfType<ToolControl>();
+                var chrome = changes.FindAncestorOfType<ToolChromeControl>();
+                Assert.NotNull(tool);
+                Assert.NotNull(chrome);
+                Assert.Equal(0, tool.MinHeight);
+                Assert.Equal(0, chrome.MinHeight);
+                Assert.True(pane.Bounds.Height + 1 >= host.MinHeight, $"pane {pane.Bounds.Height} min {host.MinHeight}");
+                Assert.True(box.Bounds.Height + 0.5 >= box.MinHeight, $"box {box.Bounds.Height}");
+                AssertInside(pane, box);
+                AssertInside(pane, committer);
+                AssertInside(pane, commit);
+
+                var slack = box.Bounds.Height - box.MinHeight;
+                var floor = pane.Bounds.Height - slack;
+                Assert.InRange(host.MinHeight, floor - 1, floor + 8);
+
+                await vm.Shutdown();
+                window.Close();
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static ToolDock ChangesHost(MainViewModel vm)
+    {
+        var tool = SextantDockFactory.Collect(vm.Dock.Root).OfType<RepositoryTool>().Single(item => item.ToolId == DockIds.Changes);
+        return Assert.IsType<ToolDock>(tool.Owner);
+    }
+
+    private static void AssertInside(Control pane, Control item)
+    {
+        var origin = item.TranslatePoint(default, pane);
+        Assert.NotNull(origin);
+        Assert.True(origin.Value.Y >= -0.5, $"{item.GetType().Name} top {origin.Value.Y}");
+        var bottom = origin.Value.Y + item.Bounds.Height;
+        Assert.True(bottom <= pane.Bounds.Height + 1, $"{item.GetType().Name} bottom {bottom} pane {pane.Bounds.Height}");
     }
 
     private static Host Open(WorkspaceState state)

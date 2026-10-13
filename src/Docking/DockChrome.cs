@@ -1,10 +1,10 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Layout;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Controls.Shapes;
 using Avalonia.Controls.Templates;
 using Avalonia.Data;
-using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Dock.Avalonia.Controls;
@@ -29,10 +29,21 @@ public static class DockChrome
         var tabs = new Style(selector => selector.OfType<DocumentControl>());
         tabs.Add(new Setter(DocumentControl.HeaderTemplateProperty, Header()));
         app.Styles.Add(tabs);
+        // The tool dock's minimum is also applied to the grip and the tool body. Leaving those set
+        // counts the grip twice and clips the commit box, so only the dock slot keeps the floor.
+        app.Styles.Add(ZeroMinHeight<ToolChromeControl>());
+        app.Styles.Add(ZeroMinHeight<ToolControl>());
         app.DataTemplates.Insert(0, new FuncDataTemplate<RepositoryDocument>((document, _) =>
             new DiffDocumentView { DataContext = document?.Repository }));
         app.DataTemplates.Insert(0, new FuncDataTemplate<RepositoryTool>((tool, _) =>
             tool is null ? new Panel() : new ToolViewHost(tool)));
+    }
+
+    private static Style ZeroMinHeight<TControl>() where TControl : Control
+    {
+        var style = new Style(selector => selector.OfType<TControl>());
+        style.Add(new Setter(Layoutable.MinHeightProperty, 0d));
+        return style;
     }
 
     private static FuncDataTemplate<RepositoryDocument> Header() => new((document, _) =>
