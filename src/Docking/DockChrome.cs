@@ -21,11 +21,22 @@ public static class DockChrome
     {
         if (app.Styles.OfType<DockFluentTheme>().Any())
             return;
+        
         app.Styles.Add(new DockFluentTheme
         {
             DensityStyle = DockDensityStyle.Compact,
             CacheDocumentTabContent = false,
         });
+        
+        app.Resources["DockFontSizeNormal"] = 14d;
+        app.Resources["DockDragPreviewFontSize"] = 12d;
+        app.Resources["DockSelectorOverlayBadgeFontSize"] = 12d;
+        app.Resources["DockOverlayMessageFontSize"] = 15d;
+        app.Resources["DockDialogTitleFontSize"] = 16d;
+        
+        var toolTitle = new Style(selector => selector.OfType<ToolChromeControl>().Template().OfType<TextBlock>().Name("PART_Title"));
+        toolTitle.Add(new Setter(TextBlock.FontWeightProperty, FontWeight.SemiBold));
+        app.Styles.Add(toolTitle);
         var tabs = new Style(selector => selector.OfType<DocumentControl>());
         tabs.Add(new Setter(DocumentControl.HeaderTemplateProperty, Header()));
         app.Styles.Add(tabs);
