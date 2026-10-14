@@ -14,7 +14,7 @@ public partial class MainViewModel
     /// <summary>Asks GitHub and always reports the result.</summary>
     internal Task CheckForReleaseAsync(bool announceWhenCurrent) => RunReleaseCheckAsync(announceWhenCurrent);
 
-    /// <summary>Startup check. It stays quiet when this copy is current, and when that release was already offered.</summary>
+    /// <summary>Startup check. It stays quiet when this copy is current, and when prompts are turned off.</summary>
     internal async Task WatchForReleaseAsync()
     {
         if (ReleaseCheck.IsTestProcess)
@@ -34,6 +34,9 @@ public partial class MainViewModel
 
     private async Task RunReleaseCheckAsync(bool announceWhenCurrent)
     {
+        if (!announceWhenCurrent && _settings.SkipUpdatePrompt)
+            return;
+
         var acquired = false;
         string? previousStatus = null;
         try
@@ -110,13 +113,14 @@ public partial class MainViewModel
                     return;
                 }
 
-                if (!announceWhenCurrent
-                    && string.Equals(_settings.UpdateNotice, release.Version, StringComparison.Ordinal))
-                    return;
+                var choice = await Dialogs.OfferUpdateAsync(offer.Message, offer.Confirm, _settings.SkipUpdatePrompt);
+                if (choice.SkipFuturePrompts != _settings.SkipUpdatePrompt)
+                {
+                    _settings.SkipUpdatePrompt = choice.SkipFuturePrompts;
+                    _store.SaveSettings(_settings);
+                }
 
-                _settings.UpdateNotice = release.Version;
-                _store.SaveSettings(_settings);
-                if (await Dialogs.ConfirmAsync("Update available", offer.Message, offer.Confirm))
+                if (choice.Accepted)
                     OpenReleaseLink(offer.Url);
             });
         }

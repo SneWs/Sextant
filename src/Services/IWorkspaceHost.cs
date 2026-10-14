@@ -62,6 +62,21 @@ public interface IDialogService
         return ConfirmAsync(title, message);
     }
 
+    /// <summary>
+    /// The update offer, including "Do not prompt me for new updates again".
+    /// Closing the dialog keeps the checkbox. The default has no checkbox.
+    /// </summary>
+    Task<UpdateChoice> OfferUpdateAsync(string message, string confirm, bool skipPrompts)
+    {
+        return OfferWithoutCheck(message, confirm, skipPrompts);
+
+        async Task<UpdateChoice> OfferWithoutCheck(string offerMessage, string offerConfirm, bool skip)
+        {
+            var accepted = await ConfirmAsync("Update available", offerMessage, offerConfirm).ConfigureAwait(false);
+            return new UpdateChoice(accepted, skip);
+        }
+    }
+
     Task CopyAsync(string text);
 }
 
@@ -77,6 +92,8 @@ public sealed record SettingsDraft(
     double DiffFontSize = DiffFontPreference.DefaultSize);
 
 public sealed record SecretPrompt(string? Value, bool RememberForSession);
+
+public sealed record UpdateChoice(bool Accepted, bool SkipFuturePrompts);
 
 public sealed record CloneRequest(string Url, string Destination);
 

@@ -18,7 +18,7 @@ There is no Intel macOS build. You can also build Linux from source, described a
 
 Installing a release from that page is free, and so is a build you make from source. The terms are in the [license](../LICENSE).
 
-Check for update asks GitHub which release is current. On macOS the item is in the Sextant menu. On Windows and Linux it is under Help. A check also runs when Sextant starts, and a newer release is offered once. Download is the file for this computer. Quit Sextant and install that file. Settings and open tabs stay on disk.
+Check for update asks GitHub which release is current. On macOS the item is in the Sextant menu. On Windows and Linux it is under Help. A check also runs when Sextant starts, and a newer release is offered each time until you choose Do not prompt me for new updates again. That choice is saved, and the startup check stays quiet while it is set. Check for update still looks. Download is the file for this computer. Quit Sextant and install that file. Settings and open tabs stay on disk.
 
 ## macOS
 

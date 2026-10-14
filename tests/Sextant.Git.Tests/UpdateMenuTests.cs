@@ -1,6 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Interactivity;
+using Avalonia.LogicalTree;
+using Avalonia.Threading;
 using Sextant.Git;
 using Sextant.Git.Models;
 using Sextant.Git.Workspace;
@@ -89,24 +92,24 @@ public class UpdateMenuTests
                 vm.StatusText = "Ready";
                 await vm.CheckForUpdateCommand.ExecuteAsync(null);
                 Assert.Equal("Ready", vm.StatusText);
-                var confirm = Assert.Single(dialogs.Confirms);
-                Assert.Equal("Update available", confirm.Title);
+                var confirm = Assert.Single(dialogs.Offers);
                 Assert.Equal(expected.Confirm, confirm.Confirm);
                 Assert.Equal(expected.Message, confirm.Message);
+                Assert.False(confirm.SkipPrompts);
                 Assert.Equal(expected.Url, opened);
-                Assert.Equal("99.0.0", store.LoadSettings().UpdateNotice);
+                Assert.False(store.LoadSettings().SkipUpdatePrompt);
                 Assert.Empty(dialogs.Notices);
 
                 opened = null;
-                dialogs.Confirms.Clear();
+                dialogs.Offers.Clear();
                 dialogs.Accept = false;
                 await vm.CheckForReleaseAsync(announceWhenCurrent: true);
                 Assert.Null(opened);
-                Assert.Single(dialogs.Confirms);
+                Assert.Single(dialogs.Offers);
 
-                dialogs.Confirms.Clear();
+                dialogs.Offers.Clear();
                 await vm.CheckForReleaseAsync(announceWhenCurrent: false);
-                Assert.Empty(dialogs.Confirms);
+                Assert.Single(dialogs.Offers);
                 Assert.Empty(dialogs.Notices);
             }, CancellationToken.None);
         }
@@ -117,7 +120,7 @@ public class UpdateMenuTests
     }
 
     [Fact]
-    public async Task The_startup_check_stays_quiet_when_this_copy_is_current_or_the_release_was_already_offered()
+    public async Task The_startup_check_stays_quiet_when_this_copy_is_current()
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
         var directory = Path.Combine(Path.GetTempPath(), "sextant-update-quiet-" + Guid.NewGuid().ToString("N"));
@@ -128,22 +131,23 @@ public class UpdateMenuTests
             {
                 var dialogs = new RecordingDialogs();
                 var store = new WorkspaceStore(directory);
-                var settings = new AppSettings { UpdateNotice = "99.0.0" };
-                var vm = new MainViewModel(store, store.LoadWorkspace(), settings, new GitProcessRunner(), new FakeReleases { Release = Full("99.0.0") });
+                var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner(), new FakeReleases { Release = Full("99.0.0") });
                 vm.Attach(dialogs);
                 vm.StatusText = "Ready";
                 await vm.WatchForReleaseAsync();
-                Assert.Empty(dialogs.Confirms);
+                Assert.Empty(dialogs.Offers);
                 Assert.Empty(dialogs.Notices);
                 await vm.CheckForReleaseAsync(announceWhenCurrent: false);
-                Assert.Empty(dialogs.Confirms);
+                Assert.Single(dialogs.Offers);
                 Assert.Empty(dialogs.Notices);
                 Assert.Equal("Ready", vm.StatusText);
 
+                dialogs.Offers.Clear();
                 var current = new PublishedRelease("v" + AppInfo.Version, AppInfo.Version, ReleaseCheck.ReleasesPage, []);
                 var same = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner(), new FakeReleases { Release = current });
                 same.Attach(dialogs);
                 await same.CheckForReleaseAsync(announceWhenCurrent: false);
+                Assert.Empty(dialogs.Offers);
                 Assert.Empty(dialogs.Notices);
                 await same.CheckForReleaseAsync(announceWhenCurrent: true);
                 var notice = Assert.Single(dialogs.Notices);
@@ -164,6 +168,7 @@ public class UpdateMenuTests
                     new FakeReleases { Error = new HttpRequestException("offline") });
                 failed.Attach(dialogs);
                 await failed.CheckForReleaseAsync(announceWhenCurrent: false);
+                Assert.Empty(dialogs.Offers);
                 Assert.Empty(dialogs.Notices);
                 await failed.CheckForReleaseAsync(announceWhenCurrent: true);
                 Assert.Contains("could not check", Assert.Single(dialogs.Notices).Message, StringComparison.Ordinal);
@@ -179,6 +184,101 @@ public class UpdateMenuTests
         {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task Do_not_prompt_again_is_saved_and_the_startup_check_stays_quiet()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-update-skip-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var dialogs = new RecordingDialogs { Accept = false, SkipPrompts = true };
+                var store = new WorkspaceStore(directory);
+                var settings = new AppSettings();
+                var catalog = new FakeReleases { Release = Full("99.0.0") };
+                var vm = new MainViewModel(store, store.LoadWorkspace(), settings, new GitProcessRunner(), catalog);
+                vm.Attach(dialogs);
+                await vm.CheckForReleaseAsync(announceWhenCurrent: true);
+                Assert.True(store.LoadSettings().SkipUpdatePrompt);
+                Assert.False(Assert.Single(dialogs.Offers).SkipPrompts);
+
+                dialogs.Offers.Clear();
+                var calls = catalog.Calls;
+                var saved = store.LoadSettings();
+                var later = new MainViewModel(store, store.LoadWorkspace(), saved, new GitProcessRunner(), catalog);
+                later.Attach(dialogs);
+                await later.CheckForReleaseAsync(announceWhenCurrent: false);
+                Assert.Equal(calls, catalog.Calls);
+                Assert.Empty(dialogs.Offers);
+
+                dialogs.SkipPrompts = false;
+                await later.CheckForReleaseAsync(announceWhenCurrent: true);
+                Assert.True(Assert.Single(dialogs.Offers).SkipPrompts);
+                Assert.False(store.LoadSettings().SkipUpdatePrompt);
+
+                dialogs.Offers.Clear();
+                catalog.Release = Full("100.0.0");
+                await later.CheckForReleaseAsync(announceWhenCurrent: false);
+                Assert.False(Assert.Single(dialogs.Offers).SkipPrompts);
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task The_update_dialog_offers_to_stop_later_prompts()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        await session.Dispatch(async () =>
+        {
+            var owner = new Window { Width = 800, Height = 600 };
+            owner.Show();
+            var service = new AvaloniaDialogService(owner);
+            try
+            {
+                Dispatcher.UIThread.Post(KeepQuiet, DispatcherPriority.SystemIdle);
+                var declined = await service.OfferUpdateAsync("Sextant 2.0.0 is available.", "Download", skipPrompts: false);
+                Assert.False(declined.Accepted);
+                Assert.True(declined.SkipFuturePrompts);
+
+                Dispatcher.UIThread.Post(DownloadAnyway, DispatcherPriority.SystemIdle);
+                var accepted = await service.OfferUpdateAsync("Sextant 2.0.0 is available.", "Download", skipPrompts: true);
+                Assert.True(accepted.Accepted);
+                Assert.True(accepted.SkipFuturePrompts);
+            }
+            finally
+            {
+                owner.Close();
+            }
+
+            void KeepQuiet()
+            {
+                var dialog = Assert.Single(owner.OwnedWindows);
+                Assert.Equal("Update available", dialog.Title);
+                var box = Assert.Single(dialog.GetLogicalDescendants().OfType<CheckBox>());
+                Assert.Equal("Do not prompt me for new updates again", box.Content);
+                Assert.NotEqual(true, box.IsChecked);
+                box.IsChecked = true;
+                var cancel = dialog.GetLogicalDescendants().OfType<Button>().Single(button => button.Content as string == "Cancel");
+                cancel.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            }
+
+            void DownloadAnyway()
+            {
+                var dialog = Assert.Single(owner.OwnedWindows);
+                var box = Assert.Single(dialog.GetLogicalDescendants().OfType<CheckBox>());
+                Assert.Equal(true, box.IsChecked);
+                var download = dialog.GetLogicalDescendants().OfType<Button>().Single(button => button.Content as string == "Download");
+                download.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            }
+        }, CancellationToken.None);
     }
 
     private static PublishedRelease Full(string version)
@@ -202,12 +302,15 @@ public class UpdateMenuTests
 
     private sealed class FakeReleases : IReleaseCatalog
     {
-        public PublishedRelease? Release { get; init; }
+        public PublishedRelease? Release { get; set; }
 
         public Exception? Error { get; init; }
 
+        public int Calls { get; private set; }
+
         public Task<PublishedRelease?> LatestAsync(CancellationToken cancellationToken)
         {
+            Calls++;
             if (Error is not null)
                 return Task.FromException<PublishedRelease?>(Error);
             return Task.FromResult(Release);
@@ -216,16 +319,21 @@ public class UpdateMenuTests
 
     private sealed class RecordingDialogs : IDialogService
     {
-        public List<(string Title, string Message, string Confirm)> Confirms { get; } = [];
+        public List<(string Message, string Confirm, bool SkipPrompts)> Offers { get; } = [];
 
         public List<(string Title, string Message)> Notices { get; } = [];
 
         public bool Accept { get; set; }
 
-        public Task<bool> ConfirmAsync(string title, string message, string confirm = "OK")
+        public bool SkipPrompts { get; set; }
+
+        public Task<bool> ConfirmAsync(string title, string message, string confirm = "OK") =>
+            Task.FromResult(Accept);
+
+        public Task<UpdateChoice> OfferUpdateAsync(string message, string confirm, bool skipPrompts)
         {
-            Confirms.Add((title, message, confirm));
-            return Task.FromResult(Accept);
+            Offers.Add((message, confirm, skipPrompts));
+            return Task.FromResult(new UpdateChoice(Accept, SkipPrompts));
         }
 
         public Task ShowNoticeAsync(string title, string message)

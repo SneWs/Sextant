@@ -506,6 +506,28 @@ public sealed class AvaloniaDialogService : IDialogService
         await window.ShowDialog(_owner);
     }
 
+    public async Task<UpdateChoice> OfferUpdateAsync(string message, string confirm, bool skipPrompts)
+    {
+        var window = Create("Update available");
+        var skip = new CheckBox
+        {
+            Content = "Do not prompt me for new updates again",
+            IsChecked = skipPrompts,
+        };
+        var accepted = false;
+        var ok = new Button { Content = confirm, IsDefault = true, HorizontalAlignment = HorizontalAlignment.Right };
+        var cancel = new Button { Content = "Cancel", IsCancel = true };
+        ok.Click += (_, _) =>
+        {
+            accepted = true;
+            window.Close();
+        };
+        cancel.Click += (_, _) => window.Close();
+        window.Content = Column(Message(message), skip, Buttons(cancel, ok));
+        await window.ShowDialog(_owner);
+        return new UpdateChoice(accepted, skip.IsChecked == true);
+    }
+
     public async Task CopyAsync(string text)
     {
         var clipboard = _owner.Clipboard;
