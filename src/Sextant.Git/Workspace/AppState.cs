@@ -46,6 +46,9 @@ public sealed class RepoLayout
 
     /// <summary>Branch refs and stash tokens left out of the commit graph. Missing values in older files show every branch and stash.</summary>
     public List<string> HiddenBranches { get; set; } = [];
+
+    /// <summary>Location rows left collapsed. Missing values in older files leave every row expanded.</summary>
+    public List<string> CollapsedLocations { get; set; } = [];
 }
 
 public static class RepoLayouts
@@ -71,6 +74,7 @@ public static class RepoLayouts
                 FilesHeight = pair.Value.FilesHeight,
                 ShowLocations = pair.Value.ShowLocations,
                 HiddenBranches = CopyHidden(pair.Value.HiddenBranches),
+                CollapsedLocations = CopyCollapsed(pair.Value.CollapsedLocations),
             };
         }
 
@@ -84,12 +88,16 @@ public static class RepoLayouts
         double graph,
         double files,
         bool showLocations = true,
-        IReadOnlyList<string>? hiddenBranches = null)
+        IReadOnlyList<string>? hiddenBranches = null,
+        IReadOnlyList<string>? collapsedLocations = null)
     {
         var match = FindKey(state, path);
         var hidden = hiddenBranches is null
             ? CopyHidden(match is null ? null : state.RepoLayouts[match].HiddenBranches)
             : CopyHidden(hiddenBranches);
+        var collapsed = collapsedLocations is null
+            ? CopyCollapsed(match is null ? null : state.RepoLayouts[match].CollapsedLocations)
+            : CopyCollapsed(collapsedLocations);
         if (match is not null && !string.Equals(match, path, StringComparison.Ordinal))
             state.RepoLayouts.Remove(match);
         state.RepoLayouts[path] = new RepoLayout
@@ -99,7 +107,19 @@ public static class RepoLayouts
             FilesHeight = files,
             ShowLocations = showLocations,
             HiddenBranches = hidden,
+            CollapsedLocations = collapsed,
         };
+    }
+
+    private static List<string> CopyCollapsed(IEnumerable<string>? keys)
+    {
+        if (keys is null)
+            return [];
+        return keys.Where(key => !string.IsNullOrWhiteSpace(key))
+            .Select(key => key.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(key => key, StringComparer.Ordinal)
+            .ToList();
     }
 
     private static List<string> CopyHidden(IEnumerable<string>? names)

@@ -258,7 +258,15 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             var path = tab.Toplevel ?? tab.RequestedPath;
             if (string.IsNullOrWhiteSpace(path))
                 continue;
-            RepoLayouts.Remember(_workspace, path, tab.LocationsWidth, tab.GraphWidth, tab.FilesHeight, tab.ShowLocations, tab.HiddenBranchNames);
+            RepoLayouts.Remember(
+                _workspace,
+                path,
+                tab.LocationsWidth,
+                tab.GraphWidth,
+                tab.FilesHeight,
+                tab.ShowLocations,
+                tab.HiddenBranchNames,
+                tab.CollapsedLocationNames);
             if (tab.Toplevel is { Length: > 0 } top && !RepoPath.Same(tab.RequestedPath, top))
                 RepoLayouts.Forget(_workspace, tab.RequestedPath);
         }
@@ -1048,6 +1056,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         tab.FilesHeight = layout.FilesHeight;
         tab.ShowLocations = layout.ShowLocations;
         tab.UseHiddenBranches(layout.HiddenBranches);
+        tab.UseCollapsedLocations(layout.CollapsedLocations);
         tab.SideBySide = _settings.SideBySide;
         tab.IgnoreWhitespace = _settings.IgnoreWhitespace;
         return tab;

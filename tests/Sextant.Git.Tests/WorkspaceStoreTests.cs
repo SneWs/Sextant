@@ -155,6 +155,7 @@ public class WorkspaceStoreTests
             Assert.Equal(250, older.LocationsWidth);
             Assert.True(older.ShowLocations);
             Assert.Empty(older.HiddenBranches);
+            Assert.Empty(older.CollapsedLocations);
         }
         finally
         {
@@ -191,6 +192,42 @@ public class WorkspaceStoreTests
 
             RepoLayouts.Remember(loaded, @"C:\repos\sextant", 310, 520, 180, hiddenBranches: []);
             Assert.Empty(RepoLayouts.Resolve(loaded, @"C:\repos\sextant").HiddenBranches);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Collapsed_locations_are_stored_per_repository()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-ws-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new WorkspaceStore(directory);
+            var state = store.LoadWorkspace();
+            RepoLayouts.Remember(
+                state,
+                @"C:\repos\sextant",
+                220,
+                520,
+                180,
+                collapsedLocations: [" h:tags ", "b:feature", "h:tags", ""]);
+            RepoLayouts.Remember(state, @"C:\repos\sextant", 310, 520, 180);
+            RepoLayouts.Remember(state, @"C:\repos\other", 180, 640, 220, collapsedLocations: []);
+            store.SaveWorkspace(state);
+
+            var loaded = store.LoadWorkspace();
+            var sextant = RepoLayouts.Resolve(loaded, @"C:\repos\sextant");
+            var other = RepoLayouts.Resolve(loaded, @"C:\repos\other");
+            Assert.Equal(["b:feature", "h:tags"], sextant.CollapsedLocations);
+            Assert.Empty(other.CollapsedLocations);
+            Assert.Empty(RepoLayouts.Resolve(loaded, @"C:\repos\missing").CollapsedLocations);
+
+            RepoLayouts.Remember(loaded, @"C:\repos\sextant", 310, 520, 180, collapsedLocations: []);
+            Assert.Empty(RepoLayouts.Resolve(loaded, @"C:\repos\sextant").CollapsedLocations);
         }
         finally
         {
