@@ -58,4 +58,10 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime { MainWindow.DataContext: MainViewModel vm })
             await vm.OpenSettingsCommand.ExecuteAsync(null);
     }
+
+    private async void OnCheckForUpdate(object? sender, EventArgs e)
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime { MainWindow.DataContext: MainViewModel vm })
+            await vm.CheckForUpdateCommand.ExecuteAsync(null);
+    }
 }

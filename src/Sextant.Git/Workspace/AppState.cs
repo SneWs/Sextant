@@ -206,6 +206,9 @@ public sealed class AppSettings
 
     /// <summary>Extension tools that convert a file before a diff and restore it when a merge is saved.</summary>
     public List<DiffFormatRule> DiffFormats { get; set; } = [];
+
+    /// <summary>When set, the startup check does not offer a newer release. Check for update still asks.</summary>
+    public bool SkipUpdatePrompt { get; set; }
 }
 
 public static class AppPaths

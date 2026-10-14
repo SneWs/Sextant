@@ -18,7 +18,7 @@ There is no Intel macOS build. You can also build Linux from source, described a
 
 Installing a release from that page is free, and so is a build you make from source. The terms are in the [license](../LICENSE).
 
-Sextant has no updater. A newer release is a new download. Settings and open tabs stay on disk when you replace the app.
+Check for update asks GitHub which release is current. On macOS the item is in the Sextant menu. On Windows and Linux it is under Help. A check also runs when Sextant starts, and a newer release is offered each time until you choose Do not prompt me for new updates again. That choice is saved, and the startup check stays quiet while it is set. Check for update still looks. Download is the file for this computer. Quit Sextant and install that file. Settings and open tabs stay on disk.
 
 ## macOS
 
@@ -46,7 +46,7 @@ xattr -dr com.apple.quarantine /Applications/Sextant.app
 open /Applications/Sextant.app
 ```
 
-To update, quit Sextant, download the new tar, extract it, and replace `/Applications/Sextant.app`. Settings stay in `~/Library/Application Support/Sextant`.
+To update, choose Check for update in the Sextant menu, or quit Sextant, download the new tar, extract it, and replace `/Applications/Sextant.app`. Settings stay in `~/Library/Application Support/Sextant`.
 
 ## Windows
 
@@ -61,7 +61,7 @@ If `git lfs` is not a command, install [Git LFS](https://git-lfs.com/) and run `
 
 Download `Sextant-win-x64.zip` on 64-bit Windows, or `Sextant-win-arm64.zip` on Windows on Arm. Extract the whole zip and run `Sextant.exe`. Keep the extracted files together. The executable expects the libraries that sit beside it.
 
-To update, quit Sextant, download the new zip, and replace that folder. Settings stay in `%APPDATA%\Sextant`, which is `C:\Users\<you>\AppData\Roaming\Sextant`.
+To update, choose Check for update under Help, or quit Sextant, download the new zip, and replace that folder. Settings stay in `%APPDATA%\Sextant`, which is `C:\Users\<you>\AppData\Roaming\Sextant`.
 
 A WSL or Windows git command can ask for the SSH key passphrase in a window. A checkbox on that window keeps it for later prompts in that repository, including Git LFS, until Sextant closes. It is not written to disk.
 
@@ -90,7 +90,7 @@ sudo dnf install ./Sextant-linux-x64.rpm
 
 On aarch64 Fedora, use `Sextant-linux-arm64.rpm` instead.
 
-To update, install the new package the same way. Settings stay in `$XDG_CONFIG_HOME/sextant`, or `~/.config/sextant` when `XDG_CONFIG_HOME` is unset.
+To update, choose Check for update under Help, or install the new package the same way. Settings stay in `$XDG_CONFIG_HOME/sextant`, or `~/.config/sextant` when `XDG_CONFIG_HOME` is unset.
 
 You can also build from source. From a clone of this repository, with the [.NET 10 SDK](https://dotnet.microsoft.com/download) installed:
 

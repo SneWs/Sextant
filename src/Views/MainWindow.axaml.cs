@@ -85,6 +85,7 @@ public partial class MainWindow : Window
         vm.Dock.Screens = WorkAreas;
         vm.Dock.RehomeOffScreenFloats();
         await vm.InitializeAsync();
+        _ = vm.WatchForReleaseAsync();
     }
 
     private IReadOnlyList<(int X, int Y, int Width, int Height)> WorkAreas()

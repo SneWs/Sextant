@@ -28,10 +28,21 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     private bool _started;
 
     public MainViewModel(WorkspaceStore store, WorkspaceState workspace, AppSettings settings, GitProcessRunner runner)
+        : this(store, workspace, settings, runner, null)
+    {
+    }
+
+    internal MainViewModel(
+        WorkspaceStore store,
+        WorkspaceState workspace,
+        AppSettings settings,
+        GitProcessRunner runner,
+        IReleaseCatalog? releases)
     {
         _store = store;
         _workspace = workspace;
         _settings = settings;
+        _releases = releases ?? new GitHubReleaseCatalog();
         Runner = runner;
         WindowWidth = workspace.WindowWidth;
         WindowHeight = workspace.WindowHeight;

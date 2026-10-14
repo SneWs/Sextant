@@ -37,6 +37,7 @@ public class WorkspaceStoreTests
                 MergeTool = "meld \"$LOCAL\" \"$MERGED\" \"$REMOTE\"",
                 DiffFont = "JetBrains Mono",
                 DiffFontSize = 16,
+                SkipUpdatePrompt = true,
             });
 
             var loaded = store.LoadWorkspace();
@@ -60,6 +61,7 @@ public class WorkspaceStoreTests
             Assert.Equal("meld \"$LOCAL\" \"$MERGED\" \"$REMOTE\"", settings.MergeTool);
             Assert.Equal("JetBrains Mono", settings.DiffFont);
             Assert.Equal(16, settings.DiffFontSize);
+            Assert.True(settings.SkipUpdatePrompt);
             Assert.Equal(ThemePreference.System, ThemePreference.Normalize(null));
             Assert.Equal(ThemePreference.Light, ThemePreference.Normalize(" Light "));
             Assert.Equal(ThemePreference.System, ThemePreference.Normalize("nope"));
@@ -75,6 +77,7 @@ public class WorkspaceStoreTests
             Assert.Null(older.MergeTool);
             Assert.Null(older.DiffFont);
             Assert.Equal(DiffFontPreference.DefaultSize, older.DiffFontSize);
+            Assert.False(older.SkipUpdatePrompt);
 
             File.WriteAllText(Path.Combine(directory, "workspace.json"), """
                 {
