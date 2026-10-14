@@ -1082,27 +1082,40 @@ public partial class RepositoryViewModel : ViewModelBase
         try
         {
             await _session.RefreshStatusAsync(_lifetime.Token);
-            if (_lifetime.IsCancellationRequested)
+            if (_lifetime.IsCancellationRequested || _session is null)
                 return;
-            Apply(_session.Snapshot());
-            await LoadDetailsAsync();
-            if (RepositoryFilesTabOn)
-                await LoadRepositoryFilesAsync(_lifetime.Token, refreshLocks: false);
+            // The await above resumes on a pool thread. Menus and bindings belong to the UI thread.
+            await OnUi(async () =>
+            {
+                if (_session is null || _lifetime.IsCancellationRequested)
+                    return;
+                Apply(_session.Snapshot());
+                await LoadDetailsAsync();
+                if (RepositoryFilesTabOn && _session is not null && !_lifetime.IsCancellationRequested)
+                    await LoadRepositoryFilesAsync(_lifetime.Token, refreshLocks: false);
+            });
         }
         catch (OperationCanceledException)
         {
         }
+        catch (GitCommandFailedException exception) when (exception.IsMissingWorkTree)
+        {
+            // The folder can disappear while this refresh is waiting to start git.
+            // A background refresh stays quiet. Opening the repository still reports it.
+        }
         catch (GitCommandFailedException exception)
         {
-            Fail(exception.Message);
-            if (_session is not null)
-                Apply(_session.Snapshot());
+            var message = exception.Message;
+            await OnUi(() =>
+            {
+                Fail(message);
+                if (_session is not null && !_lifetime.IsCancellationRequested)
+                    Apply(_session.Snapshot());
+            });
         }
         catch (Win32Exception)
         {
-            // The folder can be removed while a debounced refresh is still waiting to start git.
-            // Process.Start then fails with "No such file or directory", and the command posts that
-            // exception back onto the UI thread. A background refresh must not tear the app down.
+            // Windows can still fail CreateProcess with a missing directory before the check above.
         }
     }
 

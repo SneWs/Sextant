@@ -176,5 +176,6 @@ public class GitCommandTests
                 WorkingDirectory = missing,
             }, CancellationToken.None));
         Assert.Equal("The repository folder is not there.", exception.Message);
+        Assert.True(exception.IsMissingWorkTree);
     }
 }

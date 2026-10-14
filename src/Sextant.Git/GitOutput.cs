@@ -55,12 +55,14 @@ public sealed class GitCommandFailedException : Exception
             || StandardError.Contains("safe.directory", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>The working directory was already gone, so git was not started.</summary>
     public GitCommandFailedException(string message)
         : base(message)
     {
         ExitCode = -1;
         StandardError = message;
         Arguments = [];
+        IsMissingWorkTree = true;
     }
 
     public int ExitCode { get; }
@@ -70,6 +72,8 @@ public sealed class GitCommandFailedException : Exception
     public IReadOnlyList<string> Arguments { get; }
 
     public bool IsDubiousOwnership { get; }
+
+    public bool IsMissingWorkTree { get; }
 
     private static string Describe(GitOutput output)
     {
