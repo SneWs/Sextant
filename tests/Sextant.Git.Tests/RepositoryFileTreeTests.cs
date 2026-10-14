@@ -157,6 +157,56 @@ public class RepositoryFileTreeTests
     }
 
     [Fact]
+    public async Task Startup_survives_when_lfs_locks_cannot_be_resolved()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.Run("config", "lfs.url", "file://" + repo.Directory.Replace('\\', '/'));
+        repo.WriteFile(".gitattributes", "*.bin filter=lfs diff=lfs merge=lfs -text\n");
+        repo.WriteFile("asset.bin", "version https://git-lfs.github.com/spec/v1\noid sha256:" + new string('a', 64) + "\nsize 4\n");
+        repo.WriteFile("plain.txt", "plain\n");
+        repo.CommitAll("first");
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-files-startup-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var store = new WorkspaceStore(directory);
+                var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner())
+                {
+                    GitExecutable = repo.Git,
+                    GitReady = true,
+                };
+                var tab = new RepositoryViewModel(vm, repo.Directory);
+                vm.Tabs.Add(tab);
+                await vm.Activate(tab);
+
+                Assert.True(vm.Dock.IsOpen(DockIds.Files));
+                Assert.True(tab.RepositoryFilesTabOn);
+                var file = tab.RepositoryFileTree.Single(item => item.Path == "asset.bin");
+                Assert.True(file.LfsTracked);
+                Assert.Equal("", file.LockText);
+                Assert.False(file.LocksKnown);
+                Assert.False(file.ShowLock);
+                Assert.False(file.ShowUnlock);
+                Assert.True(tab.HasBanner);
+                Assert.Contains("git exited", tab.Banner, StringComparison.Ordinal);
+                Assert.Contains(tab.RepositoryFileTree, item => item.Path == "plain.txt");
+                Assert.False(tab.IsBusy);
+                Assert.Equal("", tab.BusyText);
+
+                await vm.Shutdown();
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Unavailable_lfs_locks_leave_files_visible_and_do_not_claim_they_are_unlocked()
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));

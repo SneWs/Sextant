@@ -932,8 +932,33 @@ public partial class RepositoryViewModel : ViewModelBase
             await LoadDetailsAsync();
             // The files pane can already be open when this session is created. The
             // refresh started then finds no session and does not run again.
+            // Lock lookup talks to the LFS server. A missing or unauthorized
+            // endpoint must not escape this startup load and tear the process down.
             if (RepositoryFilesTabOn)
-                await LoadRepositoryFilesAsync(_lifetime.Token, refreshLocks: true);
+            {
+                try
+                {
+                    await LoadRepositoryFilesAsync(_lifetime.Token, refreshLocks: true);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (GitCommandFailedException exception)
+                {
+                    Fail(exception.Message);
+                }
+                catch (RepositoryActionException exception)
+                {
+                    Fail(exception.Message);
+                }
+                finally
+                {
+                    if (BusyText == "Loading LFS locks…")
+                        BusyText = "";
+                }
+            }
+
             await MaybeSuggestAsync();
         }
     }
