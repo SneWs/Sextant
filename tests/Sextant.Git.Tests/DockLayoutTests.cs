@@ -1,9 +1,13 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Dock.Avalonia.Controls;
+using Dock.Model.Core;
+using Dock.Model.Mvvm;
 using Dock.Model.Mvvm.Controls;
 using Sextant.Docking;
 using Sextant.Git.Repo;
@@ -593,6 +597,52 @@ public class DockLayoutTests
             if (Directory.Exists(directory))
                 Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task Tool_headers_are_semibold_and_dock_type_is_larger()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        await session.Dispatch(() =>
+        {
+            var app = Application.Current;
+            Assert.NotNull(app);
+            DockChrome.Ensure(app);
+            var factory = new Factory();
+            var tool = new Tool { Id = "locations", Title = "Locations" };
+            var host = new ToolDock
+            {
+                VisibleDockables = factory.CreateList<IDockable>(tool),
+                ActiveDockable = tool,
+            };
+            tool.Owner = host;
+            var chrome = new ToolChromeControl { DataContext = host, Width = 320, Height = 180 };
+            var tab = new ToolTabStripItem { DataContext = tool, Width = 140, Height = 28 };
+            var window = new Window
+            {
+                Width = 420,
+                Height = 320,
+                Content = new StackPanel { Children = { chrome, tab } },
+            };
+            window.Show();
+            try
+            {
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                var title = chrome.GetVisualDescendants().OfType<TextBlock>().Single(block => block.Name == "PART_Title");
+                Assert.Equal("Locations", title.Text);
+                Assert.Equal(14, title.FontSize);
+                Assert.Equal(FontWeight.SemiBold, title.FontWeight);
+                Assert.Equal(14, tab.FontSize);
+                Assert.Equal(FontWeight.Normal, tab.FontWeight);
+            }
+            finally
+            {
+                window.Close();
+            }
+
+            return 0;
+        }, CancellationToken.None);
     }
 
     private static ToolDock ChangesHost(MainViewModel vm)
