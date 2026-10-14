@@ -40,8 +40,9 @@
                 </ListBox.ItemsPanel>
                 <ListBox.Styles>
                     <Style Selector="ListBoxItem">
-                        <Setter Property="Padding" Value="0"/>
-                        <Setter Property="MinHeight" Value="0"/>
+                        <Setter Property="Padding" Value="0,2"/>
+                        <Setter Property="Margin" Value="0,1"/>
+                        <Setter Property="MinHeight" Value="26"/>
                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                         <Setter Property="VerticalContentAlignment" Value="Stretch"/>
                     </Style>
@@ -74,7 +75,7 @@
                                     <MenuItem Header="Drop" Command="{Binding DropCommand}" IsVisible="{Binding ShowDrop}"/>
                                 </ContextMenu>
                             </Border.ContextMenu>
-                            <Grid ColumnDefinitions="16,*,Auto" Margin="{Binding Indent}">
+                            <Grid ColumnDefinitions="16,18,*,Auto" Margin="{Binding Indent}">
                                 <Button Grid.Column="0" Classes="flat" Width="16" Height="16" Padding="0" MinWidth="0"
                                         IsVisible="{Binding HasChildren}"
                                         Click="OnLocationExpand" DoubleTapped="OnLocationExpandDoubleTapped"
@@ -87,8 +88,14 @@
                                         </Path.RenderTransform>
                                     </Path>
                                 </Button>
-                                <TextBlock Grid.Column="1" Text="{Binding Label}" FontWeight="{Binding Weight}" Opacity="{Binding LabelOpacity}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                                <Button Grid.Column="2" Classes="flat eye" Width="18" Height="18" Padding="0" MinWidth="0" Margin="4,0,2,0"
+                                <Path Grid.Column="1" Data="{Binding Icon}" IsVisible="{Binding ShowIcon}"
+                                      AutomationProperties.Name="{Binding IconName}"
+                                      Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.15"
+                                      StrokeLineCap="Round" StrokeJoin="Round" Fill="Transparent"
+                                      Stretch="None" VerticalAlignment="Center" Opacity="0.8"/>
+                                <TextBlock Grid.Column="2" Text="{Binding Label}" FontWeight="{Binding Weight}" Opacity="{Binding LabelOpacity}"
+                                           Margin="4,0,0,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                <Button Grid.Column="3" Classes="flat eye" Width="18" Height="18" Padding="0" MinWidth="0" Margin="4,0,2,0"
                                         IsVisible="{Binding ShowEye}"
                                         Command="{Binding HideCommand}"
                                         ToolTip.Tip="{Binding HideLabel}"

@@ -117,6 +117,21 @@ public partial class RepositoryViewModel : ViewModelBase
     public IReadOnlyList<string> HiddenBranchNames =>
         _hiddenBranches.OrderBy(name => name, StringComparer.Ordinal).ToArray();
 
+    public void UseCollapsedLocations(IEnumerable<string>? keys)
+    {
+        _collapsedLocations.Clear();
+        if (keys is null)
+            return;
+        foreach (var key in keys)
+        {
+            if (!string.IsNullOrWhiteSpace(key))
+                _collapsedLocations.Add(key.Trim());
+        }
+    }
+
+    public IReadOnlyList<string> CollapsedLocationNames =>
+        _collapsedLocations.OrderBy(name => name, StringComparer.Ordinal).ToArray();
+
     private double _locationsWidth = 220;
 
     private double _graphWidth = 520;
@@ -1986,6 +2001,7 @@ public partial class RepositoryViewModel : ViewModelBase
         }
 
         PublishLocations(SelectedLocation?.Key);
+        _host.Save();
     }
 
     private void PublishLocations(string? selectedKey)
@@ -2099,7 +2115,11 @@ public partial class RepositoryViewModel : ViewModelBase
                 foreach (var child in children)
                     leaf.Children.Add(child);
                 if (children.Count > 0)
+                {
                     ApplyFold(leaf, scope + ":" + node.FullName);
+                    leaf.IconName = LocationIcons.Folder;
+                }
+
                 list.Add(leaf);
                 continue;
             }
@@ -2108,6 +2128,7 @@ public partial class RepositoryViewModel : ViewModelBase
             {
                 Key = "g:" + scope + ":" + node.FullName,
                 Label = label,
+                IconName = children.Count > 0 ? LocationIcons.Folder : "",
             };
             ApplyFold(folder, scope + ":" + node.FullName);
             foreach (var child in children)
@@ -2137,6 +2158,7 @@ public partial class RepositoryViewModel : ViewModelBase
             SearchText = title,
             IsExpanded = !_collapsedLocations.Contains(key),
             CollapseKey = key,
+            IconName = LocationIcons.ForSection(key),
         };
         foreach (var child in children)
             section.Children.Add(child);

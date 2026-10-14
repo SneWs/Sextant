@@ -138,6 +138,13 @@ public partial class LocationItem : ObservableObject
 
     public bool HasChildren => Children.Count > 0;
 
+    /// <summary>Named group or folder. Empty when this row does not open onto other rows.</summary>
+    public string IconName { get; set; } = "";
+
+    public bool ShowIcon => IconName.Length > 0;
+
+    public Geometry? Icon => LocationIcons.GeometryFor(IconName);
+
     public Thickness Indent => new(Depth * 14, 0, 0, 0);
 
     public double ExpandAngle => IsExpanded ? 90 : 0;

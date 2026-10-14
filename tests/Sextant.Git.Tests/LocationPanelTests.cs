@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
@@ -153,6 +155,97 @@ public class LocationPanelTests
         }, CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Location_groups_show_icons_with_space_between_rows_and_keep_their_fold()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "root\n");
+        repo.CommitAll("root");
+        var trunk = repo.CurrentBranch();
+        repo.Run("switch", "-c", "feature/a");
+        repo.WriteFile("a.txt", "feature a\n");
+        repo.CommitAll("feature a");
+        repo.Run("switch", "-c", "feature/b");
+        repo.WriteFile("a.txt", "feature b\n");
+        repo.CommitAll("feature b");
+        repo.Run("tag", "v1");
+        repo.Run("update-ref", "refs/remotes/origin/side", "HEAD");
+        repo.Run("switch", trunk);
+        repo.WriteFile("a.txt", "wip\n");
+        repo.Run("stash", "push", "-m", "wip note");
+
+        await session.Dispatch(async () =>
+        {
+            var host = new LocationsHost(repo.Git);
+            var vm = new RepositoryViewModel(host, repo.Directory);
+            IReadOnlyList<string>? saved = null;
+            host.OnSave = () => saved = vm.CollapsedLocationNames.ToArray();
+            vm.UseCollapsedLocations(["h:tags", "b:feature"]);
+            await vm.EnsureLoadedAsync();
+
+            Assert.Equal(LocationIcons.Branches, Header(vm, "h:branches").IconName);
+            Assert.True(Header(vm, "h:branches").ShowIcon);
+            Assert.NotNull(Header(vm, "h:branches").Icon);
+            Assert.Equal(LocationIcons.Folder, vm.Locations.Single(item => item.Key == "g:b:feature").IconName);
+            Assert.Equal(LocationIcons.Stashes, Header(vm, "h:stashes").IconName);
+            Assert.Equal(LocationIcons.Submodules, Header(vm, "h:submodules").IconName);
+            Assert.Equal(LocationIcons.Remotes, Header(vm, "h:remotes").IconName);
+            Assert.Equal(LocationIcons.Remote, Header(vm, "h:remote:origin").IconName);
+            Assert.Equal(LocationIcons.Tags, Header(vm, "h:tags").IconName);
+            Assert.Equal("", vm.Locations.Single(item => item.Key == "b:" + trunk).IconName);
+            Assert.False(Header(vm, "h:tags").IsExpanded);
+            Assert.DoesNotContain(vm.Locations, item => item.Key == "t:v1");
+            Assert.False(vm.Locations.Single(item => item.Key == "g:b:feature").IsExpanded);
+            Assert.DoesNotContain(vm.Locations, item => item.Key == "b:feature/a");
+
+            await vm.Refresh();
+            Assert.False(Header(vm, "h:tags").IsExpanded);
+            Assert.DoesNotContain(vm.Locations, item => item.Key == "b:feature/b");
+
+            var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 700 };
+            var window = new Window { Content = view, Width = 1100, Height = 700 };
+            window.Show();
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            var names = view.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Path>()
+                .Where(path => path.IsEffectivelyVisible)
+                .Select(path => AutomationProperties.GetName(path))
+                .Where(name => name is { Length: > 0 })
+                .ToArray();
+            Assert.Contains(LocationIcons.Branches, names);
+            Assert.Contains(LocationIcons.Folder, names);
+            Assert.Contains(LocationIcons.Stashes, names);
+            Assert.Contains(LocationIcons.Remote, names);
+            Assert.Contains(LocationIcons.Tags, names);
+
+            var list = view.FindControl<ListBox>("LocationList")!;
+            var rows = list.GetVisualDescendants().OfType<ListBoxItem>().Where(item => item.IsVisible).Take(2).ToArray();
+            Assert.Equal(2, rows.Length);
+            var first = rows[0].TranslatePoint(default, list);
+            var second = rows[1].TranslatePoint(default, list);
+            Assert.NotNull(first);
+            Assert.NotNull(second);
+            var gap = second.Value.Y - (first.Value.Y + rows[0].Bounds.Height);
+            Assert.True(rows[0].Bounds.Height >= 26, $"row height {rows[0].Bounds.Height}");
+            Assert.True(gap >= 1, $"gap {gap}");
+
+            vm.ToggleLocation(Header(vm, "h:branches"));
+            Assert.Equal(["b:feature", "h:branches", "h:tags"], saved);
+            var again = new RepositoryViewModel(host, repo.Directory);
+            again.UseCollapsedLocations(saved);
+            await again.EnsureLoadedAsync();
+            Assert.False(Header(again, "h:branches").IsExpanded);
+            Assert.DoesNotContain(again.Locations, item => item.Key is "g:b:feature" or "b:feature/a" or "t:v1");
+            Assert.Contains(again.Locations, item => item.Key == "h:stashes");
+
+            window.Close();
+            await vm.DisposeAsync();
+            await again.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
     private static LocationItem Header(RepositoryViewModel vm, string key) =>
         vm.Locations.Single(item => item.Key == key);
 
@@ -176,9 +269,9 @@ public class LocationPanelTests
         {
         }
 
-        public void Save()
-        {
-        }
+        public Action? OnSave { get; set; }
+
+        public void Save() => OnSave?.Invoke();
 
         public Task OpenRepositoryAsync(string path) => Task.CompletedTask;
     }
