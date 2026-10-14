@@ -9,27 +9,12 @@
              mc:Ignorable="d"
              x:Class="Sextant.Views.LocationsToolView"
              x:DataType="vm:RepositoryViewModel">
-    <Grid RowDefinitions="Auto,Auto,*">
-                <Grid ColumnDefinitions="*,Auto" Margin="8,2,4,2">
-                    <TextBlock Text="Locations" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                    <Button x:Name="LocationSearchButton" Grid.Column="1" Classes="flat locationsearch"
-                            Classes.pressed="{Binding LocationFilterOpen}"
-                            Width="22" Height="22" Padding="0" MinWidth="0"
-                            Command="{Binding ToggleLocationFilterCommand}"
-                            ToolTip.Tip="Filter locations"
-                            Background="Transparent" VerticalAlignment="Center">
-                        <Canvas Width="14" Height="14">
-                            <Ellipse Width="8" Height="8" Canvas.Left="1" Canvas.Top="1"
-                                     Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"/>
-                            <Line StartPoint="7.6,7.6" EndPoint="12.2,12.2"
-                                  Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1.4"
-                                  StrokeLineCap="Round"/>
-                        </Canvas>
-                    </Button>
+            <Grid RowDefinitions="Auto,Auto,*">
+                <Grid ColumnDefinitions="*" Margin="8,2,4,2">
+                    <TextBox x:Name="LocationFilterBox" Grid.Row="0" Margin="4,0,4,4"
+                             PlaceholderText="Filter" Text="{Binding LocationFilter}"
+                             IsVisible="True" KeyDown="OnLocationFilterKeyDown"/>
                 </Grid>
-                <TextBox x:Name="LocationFilterBox" Grid.Row="1" Margin="4,0,4,4"
-                         PlaceholderText="Filter" Text="{Binding LocationFilter}"
-                         IsVisible="{Binding LocationFilterOpen}" KeyDown="OnLocationFilterKeyDown"/>
             <ListBox x:Name="LocationList" Grid.Row="2" ItemsSource="{Binding Locations}" SelectedItem="{Binding SelectedLocation}"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      Tapped="OnLocationTapped" DoubleTapped="OnLocationDoubleTapped">
