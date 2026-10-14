@@ -162,4 +162,19 @@ public class GitCommandTests
         Assert.DoesNotContain("--no-optional-locks", GitCommands.CatFileFiltered("repo", "HEAD:./a"));
         Assert.Equal(["-C", "wt", "checkout"], GitCommands.CheckoutCurrent("wt"));
     }
+
+    [Fact]
+    public async Task Missing_work_tree_is_a_failed_git_command()
+    {
+        var git = GitLocator.FindOnPath() ?? throw new InvalidOperationException("git was not found on PATH.");
+        var missing = Path.Combine(Path.GetTempPath(), "sextant-missing-" + Guid.NewGuid().ToString("N"));
+        var exception = await Assert.ThrowsAsync<GitCommandFailedException>(() =>
+            new GitProcessRunner().RunAsync(new GitRequest
+            {
+                Executable = git,
+                Arguments = ["--version"],
+                WorkingDirectory = missing,
+            }, CancellationToken.None));
+        Assert.Equal("The repository folder is not there.", exception.Message);
+    }
 }

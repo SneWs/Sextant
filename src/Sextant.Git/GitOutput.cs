@@ -55,6 +55,14 @@ public sealed class GitCommandFailedException : Exception
             || StandardError.Contains("safe.directory", StringComparison.OrdinalIgnoreCase);
     }
 
+    public GitCommandFailedException(string message)
+        : base(message)
+    {
+        ExitCode = -1;
+        StandardError = message;
+        Arguments = [];
+    }
+
     public int ExitCode { get; }
 
     public string StandardError { get; }
