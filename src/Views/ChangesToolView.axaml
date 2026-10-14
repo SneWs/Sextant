@@ -10,7 +10,7 @@
         <Border IsVisible="{Binding ShowingWorkingCopy}" Padding="8,6,8,4">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
-                    <TextBlock Text="Nothing staged." IsVisible="{Binding NothingStaged}" VerticalAlignment="Center" Opacity="0.7"/>
+                    <TextBlock Text="{Binding NothingStagedText}" IsVisible="{Binding NothingStaged}" VerticalAlignment="Center" Opacity="0.7"/>
                     <SplitButton Classes="commit" Content="Commit" Command="{Binding CommitCommand}" IsEnabled="{Binding CanCommitOrAmend}">
                         <SplitButton.Flyout>
                             <MenuFlyout>
