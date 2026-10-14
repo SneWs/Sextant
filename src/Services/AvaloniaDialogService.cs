@@ -491,6 +491,21 @@ public sealed class AvaloniaDialogService : IDialogService
         await window.ShowDialog(_owner);
     }
 
+    public async Task ShowNoticeAsync(string title, string message)
+    {
+        var window = Create(title);
+        var ok = new Button
+        {
+            Content = "OK",
+            IsDefault = true,
+            IsCancel = true,
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        ok.Click += (_, _) => window.Close();
+        window.Content = Column(Message(message), Buttons(ok));
+        await window.ShowDialog(_owner);
+    }
+
     public async Task CopyAsync(string text)
     {
         var clipboard = _owner.Clipboard;

@@ -56,6 +56,12 @@ public interface IDialogService
 
     Task ShowAboutAsync();
 
+    /// <summary>A short message with one button. The default uses a confirmation.</summary>
+    Task ShowNoticeAsync(string title, string message)
+    {
+        return ConfirmAsync(title, message);
+    }
+
     Task CopyAsync(string text);
 }
 
