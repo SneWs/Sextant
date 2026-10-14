@@ -538,6 +538,17 @@ public partial class RepositoryViewModel
         await Dispatcher.UIThread.InvokeAsync(action);
     }
 
+    private async Task OnUi(Func<Task> action)
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            await action();
+            return;
+        }
+
+        await Dispatcher.UIThread.InvokeAsync(action);
+    }
+
     private List<(string Path, string? BeforePath, FileRowViewModel? StagingFile)> ImageTargets(FileRowViewModel? file)
     {
         var targets = new List<(string Path, string? BeforePath, FileRowViewModel? StagingFile)>();

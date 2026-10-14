@@ -59,8 +59,19 @@ public sealed class GitProcessRunner
         }
 
         using var process = new Process { StartInfo = info, EnableRaisingEvents = true };
-        if (!process.Start())
-            throw new InvalidOperationException("Failed to start git.");
+        // Windows fails CreateProcess with ERROR_DIRECTORY when the working directory is gone.
+        // That has to stay a failed command. An unhandled Win32Exception tears the window down.
+        if (WorkTreeMissing(launched.WorkingDirectory))
+            throw new GitCommandFailedException("The repository folder is not there.");
+        try
+        {
+            if (!process.Start())
+                throw new InvalidOperationException("Failed to start git.");
+        }
+        catch (Win32Exception) when (WorkTreeMissing(launched.WorkingDirectory))
+        {
+            throw new GitCommandFailedException("The repository folder is not there.");
+        }
 
         using var registration = cancellationToken.Register(() => TryKill(process));
         var stdoutTask = ReadAllAsync(process.StandardOutput.BaseStream);
@@ -225,6 +236,9 @@ public sealed class GitProcessRunner
             return directory;
         return directory.Replace(alternate, separator);
     }
+
+    private static bool WorkTreeMissing(string? directory) =>
+        !string.IsNullOrEmpty(directory) && !Directory.Exists(directory);
 
     private static void TryKill(Process process)
     {

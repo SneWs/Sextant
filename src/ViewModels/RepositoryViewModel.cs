@@ -81,6 +81,7 @@ public partial class RepositoryViewModel : ViewModelBase
     /// <summary>The all-files diff should move this file's header to the top of the diff.</summary>
     public event Action<string, string?>? JumpToFile;
     private bool _wasMerge;
+    private SequencerKind _sequencer = SequencerKind.None;
     private string? _shownSha;
 
     private readonly WslGit? _wsl;
@@ -386,7 +387,20 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public bool IsReady => _session is not null;
 
-    public bool CanCommit => !IsBusy && ShowingWorkingCopy && !NothingStaged && !string.IsNullOrWhiteSpace(CommitMessage) && HasCommitter;
+    public bool CanCommit =>
+        !IsBusy && ShowingWorkingCopy && HasCommitter && !string.IsNullOrWhiteSpace(CommitMessage)
+        && (!NothingStaged || StageAllOnCommit);
+
+    /// <summary>
+    /// An empty index on an ordinary commit. Commit then stages every change.
+    /// A rebase, merge, cherry-pick, or revert keeps the index as it is.
+    /// </summary>
+    private bool StageAllOnCommit =>
+        NothingStaged && _hasUnstagedWork && _sequencer == SequencerKind.None && !_hasUnmergedFiles;
+
+    /// <summary>Shown beside Commit while the index is empty.</summary>
+    public string NothingStagedText =>
+        StageAllOnCommit ? "Commit stages all changes." : "Nothing staged.";
 
     public bool CanStageAll => !IsBusy && ShowingWorkingCopy && _hasUnstagedWork;
 
@@ -569,7 +583,10 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private async Task CommitCoreAsync(bool noVerify)
     {
-        if (_session is null || IsBusy || !ShowingWorkingCopy || NothingStaged)
+        if (_session is null || IsBusy || !ShowingWorkingCopy)
+            return;
+        // Staged files commit as they are. An empty index stages everything only for an ordinary commit.
+        if (NothingStaged && !StageAllOnCommit)
             return;
         if (!HasCommitter)
         {
@@ -581,9 +598,17 @@ public partial class RepositoryViewModel : ViewModelBase
             Fail("Enter a commit message. Amend, in the commit menu, can keep the current message.");
             return;
         }
+
+        var session = _session;
+        var stageAll = StageAllOnCommit;
         var message = CommitMessage;
         var label = noVerify ? "Committing without hooks…" : "Committing…";
-        var ok = await RunAsync(label, ct => _session.CommitAsync(message, ct, noVerify));
+        var ok = await RunAsync(label, async ct =>
+        {
+            if (stageAll)
+                await session.StageAllAsync(ct);
+            await session.CommitAsync(message, ct, noVerify);
+        });
         if (ok)
             CommitMessage = "";
     }
@@ -774,6 +799,7 @@ public partial class RepositoryViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanCommit));
         OnPropertyChanged(nameof(CanAmend));
         OnPropertyChanged(nameof(CanCommitOrAmend));
+        OnPropertyChanged(nameof(NothingStagedText));
     }
 
     partial void OnIsDirtyChanged(bool value)
@@ -1056,27 +1082,40 @@ public partial class RepositoryViewModel : ViewModelBase
         try
         {
             await _session.RefreshStatusAsync(_lifetime.Token);
-            if (_lifetime.IsCancellationRequested)
+            if (_lifetime.IsCancellationRequested || _session is null)
                 return;
-            Apply(_session.Snapshot());
-            await LoadDetailsAsync();
-            if (RepositoryFilesTabOn)
-                await LoadRepositoryFilesAsync(_lifetime.Token, refreshLocks: false);
+            // The await above resumes on a pool thread. Menus and bindings belong to the UI thread.
+            await OnUi(async () =>
+            {
+                if (_session is null || _lifetime.IsCancellationRequested)
+                    return;
+                Apply(_session.Snapshot());
+                await LoadDetailsAsync();
+                if (RepositoryFilesTabOn && _session is not null && !_lifetime.IsCancellationRequested)
+                    await LoadRepositoryFilesAsync(_lifetime.Token, refreshLocks: false);
+            });
         }
         catch (OperationCanceledException)
         {
         }
+        catch (GitCommandFailedException exception) when (exception.IsMissingWorkTree)
+        {
+            // The folder can disappear while this refresh is waiting to start git.
+            // A background refresh stays quiet. Opening the repository still reports it.
+        }
         catch (GitCommandFailedException exception)
         {
-            Fail(exception.Message);
-            if (_session is not null)
-                Apply(_session.Snapshot());
+            var message = exception.Message;
+            await OnUi(() =>
+            {
+                Fail(message);
+                if (_session is not null && !_lifetime.IsCancellationRequested)
+                    Apply(_session.Snapshot());
+            });
         }
         catch (Win32Exception)
         {
-            // The folder can be removed while a debounced refresh is still waiting to start git.
-            // Process.Start then fails with "No such file or directory", and the command posts that
-            // exception back onto the UI thread. A background refresh must not tear the app down.
+            // Windows can still fail CreateProcess with a missing directory before the check above.
         }
     }
 
@@ -1413,7 +1452,7 @@ public partial class RepositoryViewModel : ViewModelBase
             if (state.Sequencer != SequencerKind.None && !_wasMerge && string.IsNullOrWhiteSpace(CommitMessage) && !string.IsNullOrWhiteSpace(state.MergeMessage))
                 CommitMessage = state.MergeMessage.Trim();
             _wasMerge = state.Sequencer != SequencerKind.None;
-            NothingStaged = !state.Entries.Any(entry => entry.Staged);
+            _sequencer = state.Sequencer;
             var hasUnstaged = state.Entries.Any(entry => entry.Kind != ChangeKind.Unmerged && (entry.Unstaged || entry.Kind == ChangeKind.Untracked));
             var hasStaged = state.Entries.Any(entry => entry.Staged && entry.Kind != ChangeKind.Unmerged);
             if (hasUnstaged != _hasUnstagedWork || hasStaged != _hasStagedWork)
@@ -1422,6 +1461,8 @@ public partial class RepositoryViewModel : ViewModelBase
                 _hasStagedWork = hasStaged;
                 NotifyBulkStage();
             }
+
+            NothingStaged = !state.Entries.Any(entry => entry.Staged);
             ShowLoadMore = !state.HistoryEnded;
             LoadMoreText = state.HistoryCapped ? "Load more (past 50,000)" : "Load more";
 
@@ -1475,6 +1516,7 @@ public partial class RepositoryViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanCommit));
         OnPropertyChanged(nameof(CanAmend));
         OnPropertyChanged(nameof(CanCommitOrAmend));
+        OnPropertyChanged(nameof(NothingStagedText));
     }
 
     private void RememberSelection(bool wantWork, string? wantSha, string? wantPath, bool wantStaged)
