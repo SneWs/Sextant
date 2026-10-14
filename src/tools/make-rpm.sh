@@ -70,7 +70,7 @@ Requires: openssl-libs, zlib, libicu
 %global __requires_exclude ^liblttng-ust[.]so[.]0[(][)][(]64bit[)]$
 
 %description
-Sextant is a desktop Git client for large repositories, built with Avalonia.
+Sextant is a desktop Git client for large repositories.
 
 %install
 rm -rf %{buildroot}

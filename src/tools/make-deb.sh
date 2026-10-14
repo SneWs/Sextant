@@ -66,8 +66,7 @@ Maintainer: Marcus Grenängen <marcus@grenangen.se>
 Homepage: https://github.com/SneWs/Sextant
 Depends: libc6 (>= 2.38), libssl3 | libssl1.1, zlib1g, libstdc++6, libgcc-s1, libfontconfig1, libicu78 | libicu76 | libicu74
 Description: A Git client for large repositories
- Sextant is a desktop Git client for large repositories,
- built with Avalonia.
+ Sextant is a desktop Git client for large repositories.
 EOF
 
 mkdir -p "$(dirname "$output")"
