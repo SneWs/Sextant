@@ -35,6 +35,7 @@ public partial class RepositoryDock : ObservableObject
             [DockIds.Changes] = new RepositoryTool(this, DockIds.Changes, "Commit"),
             [DockIds.Staging] = new RepositoryTool(this, DockIds.Staging, "Changes"),
             [DockIds.Files] = new RepositoryTool(this, DockIds.Files, "Repository files"),
+            [DockIds.Locks] = new RepositoryTool(this, DockIds.Locks, "LFS locks"),
             [DockIds.Commands] = new RepositoryTool(this, DockIds.Commands, "Command log"),
             [DockIds.Diff] = new RepositoryTool(this, DockIds.Diff, "Diff"),
             [DockIds.Blame] = new RepositoryTool(this, DockIds.Blame, "Blame"),
@@ -237,6 +238,8 @@ public partial class RepositoryDock : ObservableObject
                 tab.CommandsOpen = false;
             else if (tool.ToolId == DockIds.Files)
                 tab.RepositoryFilesTabOn = false;
+            else if (tool.ToolId == DockIds.Locks)
+                tab.LfsLocksVisible = false;
         }
         finally
         {
@@ -253,6 +256,17 @@ public partial class RepositoryDock : ObservableObject
     {
         if (dockable is RepositoryTool tool && tool.ToolId is DockIds.Diff or DockIds.Blame)
             Present(tool.ToolId);
+    }
+
+    /// <summary>Selecting the locks tool asks the server. Selecting another tool leaves that list alone.</summary>
+    public void NoteLocks(IDockable? dockable)
+    {
+        if (Rebuilding || dockable is not RepositoryTool tool || Model.ActiveTab is not { } tab)
+            return;
+        var selected = tool.ToolId == DockIds.Locks;
+        tab.LfsLocksVisible = selected;
+        if (selected)
+            _ = tab.RefreshLfsLocksCommand.ExecuteAsync(null);
     }
 
     public bool SharesHost(string left, string right)
@@ -308,6 +322,10 @@ public partial class RepositoryDock : ObservableObject
         value.PropertyChanged += OnFocusedProperty;
         if (loadFiles)
             _ = value.RefreshRepositoryFilesCommand.ExecuteAsync(null);
+        var locksSelected = IsSelected(DockIds.Locks);
+        value.LfsLocksVisible = locksSelected;
+        if (locksSelected)
+            _ = value.RefreshLfsLocksCommand.ExecuteAsync(null);
         Present(ActiveReview());
     }
 
@@ -609,6 +627,8 @@ public partial class RepositoryDock : ObservableObject
             return;
         if (id == DockIds.Files && TryJoinHistory(layout.Root))
             return;
+        if (id == DockIds.Locks && TryJoinLocks(layout.Root))
+            return;
         if (id == DockIds.Staging && DockLayouts.TryInsertStaging(layout.Root))
             return;
         if (id == DockIds.Changes && DockLayouts.TryInsertChanges(layout.Root))
@@ -659,6 +679,42 @@ public partial class RepositoryDock : ObservableObject
         return false;
     }
 
+    /// <summary>Puts the locks list on the diff and blame tab group and selects it.</summary>
+    private static bool TryJoinLocks(DockSplit split)
+    {
+        for (var i = 0; i < split.Slots.Count; i++)
+        {
+            var slot = split.Slots[i];
+            if (slot.Split is not null)
+            {
+                if (TryJoinLocks(slot.Split))
+                    return true;
+                continue;
+            }
+
+            var ids = Members(slot);
+            if (ids.Count == 0 || ids.Contains(DockIds.Locks))
+                continue;
+            if (!ids.Contains(DockIds.Diff) && !ids.Contains(DockIds.Blame))
+                continue;
+            if (ids.Any(item => item is not (DockIds.Diff or DockIds.Blame)))
+                continue;
+
+            var tabs = new List<string>();
+            if (ids.Contains(DockIds.Diff))
+                tabs.Add(DockIds.Diff);
+            if (ids.Contains(DockIds.Blame))
+                tabs.Add(DockIds.Blame);
+            tabs.Add(DockIds.Locks);
+            slot.Id = "";
+            slot.Tabs = tabs;
+            slot.Active = DockIds.Locks;
+            return true;
+        }
+
+        return false;
+    }
+
     private static bool TryJoinReview(DockSplit split, string id)
     {
         var partner = id == DockIds.Diff ? DockIds.Blame : DockIds.Diff;
@@ -673,11 +729,14 @@ public partial class RepositoryDock : ObservableObject
             }
 
             var ids = Members(slot);
-            if (!ids.Contains(partner) || ids.Any(item => item is not (DockIds.Diff or DockIds.Blame)))
+            if (!ids.Contains(partner) || ids.Any(item => item is not (DockIds.Diff or DockIds.Blame or DockIds.Locks)))
                 continue;
             slot.Id = "";
             slot.Split = null;
-            slot.Tabs = [DockIds.Diff, DockIds.Blame];
+            var tabs = new List<string> { DockIds.Diff, DockIds.Blame };
+            if (ids.Contains(DockIds.Locks))
+                tabs.Add(DockIds.Locks);
+            slot.Tabs = tabs;
             slot.Active = id;
             return true;
         }

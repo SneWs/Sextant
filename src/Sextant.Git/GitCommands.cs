@@ -796,6 +796,16 @@ public static class GitCommands
     public static IReadOnlyList<string> LfsLocksCached(string toplevel) =>
         ["-C", toplevel, "--no-optional-locks", "lfs", "locks", "--cached", "--json"];
 
+    /// <summary>
+    /// Asks the server which locks are ours. The text command reports a failure that JSON mode can hide,
+    /// and it fills the verifiable cache the JSON read uses.
+    /// </summary>
+    public static IReadOnlyList<string> LfsLocksVerify(string toplevel) =>
+        ["-C", toplevel, "--no-optional-locks", "lfs", "locks", "--verify"];
+
+    public static IReadOnlyList<string> LfsLocksVerifyCached(string toplevel) =>
+        ["-C", toplevel, "--no-optional-locks", "lfs", "locks", "--verify", "--cached", "--json"];
+
     public static IReadOnlyList<string> LfsLock(string toplevel, string path) =>
         ["-C", toplevel, "lfs", "lock", "--json", "--", path];
 

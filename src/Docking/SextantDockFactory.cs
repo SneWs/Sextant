@@ -45,6 +45,7 @@ public sealed class SextantDockFactory : Factory
             return;
         _dock.NoteVisibility();
         _dock.NoteReview(dockable);
+        _dock.NoteLocks(dockable);
     }
 
     public override void OnDockableAdded(IDockable? dockable)

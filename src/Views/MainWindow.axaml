@@ -123,6 +123,7 @@
                             <NativeMenuItem Header="_Diff" Command="{Binding ShowDiffCommand}"/>
                             <NativeMenuItem Header="_Blame" Command="{Binding ShowBlameCommand}"/>
                             <NativeMenuItem Header="_Repository files" Command="{Binding ShowFilesCommand}"/>
+                            <NativeMenuItem Header="_LFS locks" Command="{Binding ShowLfsLocksCommand}"/>
                             <NativeMenuItem Header="Command _log" Command="{Binding ShowCommandsCommand}"/>
                         </NativeMenu>
                     </NativeMenuItem>
