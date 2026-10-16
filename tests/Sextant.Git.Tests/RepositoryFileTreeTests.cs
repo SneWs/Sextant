@@ -487,7 +487,7 @@ public class RepositoryFileTreeTests
     }
 
     [Fact]
-    public async Task Returning_to_repository_files_or_the_window_refreshes_files_and_remote_locks()
+    public async Task Returning_to_a_repository_refreshes_files_without_asking_the_lock_server()
     {
         if (!await GitLfsAvailability.IsInstalledAsync())
             return;
@@ -527,19 +527,22 @@ public class RepositoryFileTreeTests
                 await main.Activate(first);
                 await WaitUntilIdle(first);
                 Assert.False(first.HasBanner, first.Banner);
-                Assert.True(server.Requests.Count(request => request.Method == "GET") > requests);
-                Assert.Equal("Locked by Test", first.RepositoryFileTree.Single(item => item.Path == "docs/plain.txt").LockText);
+                Assert.Equal(requests, server.Requests.Count(request => request.Method == "GET"));
+                Assert.False(first.RepositoryFileTree.Single(item => item.Path == "docs/plain.txt").HasLockInfo);
                 Assert.Contains(first.RepositoryFileTree, item => item.Path == "docs/new.txt");
                 Assert.True(first.RepositoryFileTree.Single(item => item.Path == "docs").IsExpanded);
                 Assert.Equal("docs/plain.txt", first.SelectedRepositoryFile?.Path);
 
+                await first.Refresh();
+                await WaitUntilIdle(first);
+                Assert.Equal(requests, server.Requests.Count(request => request.Method == "GET"));
+                Assert.False(first.RepositoryFileTree.Single(item => item.Path == "docs/plain.txt").HasLockInfo);
+
                 await external.UnlockLfsFileAsync("docs/plain.txt", force: false, CancellationToken.None);
-                requests = server.Requests.Count(request => request.Method == "GET");
                 await main.OnWindowActivated();
                 await WaitUntilIdle(first);
                 Assert.False(first.HasBanner, first.Banner);
-                Assert.True(server.Requests.Count(request => request.Method == "GET") > requests);
-                Assert.False(first.RepositoryFileTree.Single(item => item.Path == "docs/plain.txt").HasLockInfo);
+                Assert.Equal(requests, server.Requests.Count(request => request.Method == "GET"));
                 Assert.Equal("docs/plain.txt", first.SelectedRepositoryFile?.Path);
 
                 first.ShowHistoryTabCommand.Execute(null);

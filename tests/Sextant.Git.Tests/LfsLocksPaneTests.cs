@@ -154,6 +154,11 @@ public class LfsLocksPaneTests
                 ["My Locks", "mine-a.bin", "mine-b.bin", "Locks", "other.bin"],
                 Labels(vm));
             Assert.Contains("lfs locks --verify", vm.CommandLog, StringComparison.Ordinal);
+            vm.LfsLocksVisible = true;
+            var verifies = server.Requests.Count(request => request.Route == "locks/verify");
+            await vm.Refresh();
+            Assert.Equal(verifies, server.Requests.Count(request => request.Route == "locks/verify"));
+            Assert.Equal(["My Locks", "mine-a.bin", "mine-b.bin", "Locks", "other.bin"], Labels(vm));
 
             server.VerifyStatus = 500;
             await vm.RefreshLfsLocksCommand.ExecuteAsync(null);

@@ -491,10 +491,9 @@ public partial class RepositoryViewModel : ViewModelBase
     public Task Refresh() => RunAsync("Refreshing…", async ct =>
     {
         await Session.RefreshRefsAndStatusAsync(ct);
+        // Opening Files or LFS locks asks the lock server. A refresh does not.
         if (RepositoryFilesTabOn)
-            await LoadRepositoryFilesAsync(ct, refreshLocks: true);
-        if (LfsLocksVisible)
-            await LoadLfsLocksGuardedAsync(ct);
+            await LoadRepositoryFilesAsync(ct, refreshLocks: false);
     }, refreshRepositoryFiles: false);
 
     public Task RefreshFromFocusAsync()
