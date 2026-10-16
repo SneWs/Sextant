@@ -144,6 +144,8 @@ On 2026-10-13 `Busy_formatter_reports_the_system_error` runs on Linux only. macO
 
 On 2026-10-13 a tagged release builds and packages without the unit tests. `release.yml` calls `dotnet-desktop.yml` with `run_tests` false, so each platform skips `dotnet test` and still publishes. A push, a pull request, and a manual run of that workflow still test. The desktop window was not launched.
 
+On 2026-10-16 Pull, including the default button and Ctrl+Shift+U, runs `pull --rebase --autostash` unless Settings → Git → When pulling is Merge, which runs `pull --no-rebase --autostash`. Rebase is the default. Tracked staged and unstaged changes are stashed and applied again when the pull finishes. Untracked files stay in the worktree. Pull with rebase always rebases. The choice is `pullMode` in settings.json and is not written into Git config. `Git_page_saves_rebase_or_merge`, `Merge_setting_merges_on_pull_and_pull_with_rebase_still_rebases`, and `Pull_merge_autostashes_dirty_worktree_and_merges_local_commit` passed. A headless window confirmed the Git page radios and that OK saves the choice. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
@@ -296,7 +298,7 @@ Reads add `--no-optional-locks`. Writes do not.
 | Rebase onto | `rebase <branch>`. The locations menu shows this on a local branch that is not checked out. It rebases the current branch onto that one. A remote-tracking branch, including one under origin, does not show merge or rebase. `GIT_EDITOR` and `GIT_SEQUENCE_EDITOR` are `true`, so git does not open an editor |
 | Abort merge | `merge --abort` |
 | Fetch | `fetch --progress` |
-| Pull | `pull --rebase --progress --no-edit` |
+| Pull | `pull --rebase --autostash --progress --no-edit` when Settings → Git → When pulling is Rebase, which is the default. Merge uses `pull --no-rebase --autostash --progress --no-edit`. Pull with rebase always uses the rebase command. Tracked local changes are stashed and applied again when the pull finishes |
 | Push | `push --progress`. The split button's other action is `push --no-verify --progress`, which skips the pre-push hook for that push only |
 | Push with upstream | `push --progress -u <remote> <branch>`. The other action adds `--no-verify` |
 | Amend | `commit --amend -F <file>` when the message box has text. An empty box runs `commit --amend -C HEAD`, which keeps the current message. Neither opens an editor |

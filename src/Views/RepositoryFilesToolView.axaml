@@ -10,8 +10,6 @@
              x:Class="Sextant.Views.RepositoryFilesToolView"
              x:DataType="vm:RepositoryViewModel">
     <Grid RowDefinitions="Auto,*">
-                    <TextBlock Text="Repository files" FontWeight="SemiBold" Margin="8,0,4,4"
-                               VerticalAlignment="Center"/>
                     <TextBlock Grid.Row="1" Text="No repository files." Margin="8"
                                IsVisible="{Binding RepositoryTreeEmpty}" Opacity="0.65"/>
                     <ListBox x:Name="RepositoryFileList" Grid.Row="1" ItemsSource="{Binding RepositoryFileTree}"

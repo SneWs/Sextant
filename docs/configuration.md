@@ -102,6 +102,8 @@ The command palette can flip the last two without opening Settings: Toggle side-
 
 Sextant still uses that Git's config, hooks, attributes, and credential helper. An SSH key, a GPG signer, and a credential manager keep working because Sextant does not replace them.
 
+**When pulling** chooses rebase or merge for Pull. Rebase is the default. The saved field is `pullMode` (`rebase` or `merge`). Pull with rebase always rebases. Both pass `--autostash`, so tracked local changes are stashed and applied again when the pull finishes. Untracked files stay in the worktree. Sextant does not write this choice into Git config.
+
 ## Merging
 
 **External merge command** is optional.

@@ -544,7 +544,8 @@ public partial class RepositoryViewModel : ViewModelBase
     public Task Pull()
     {
         var progress = Progress();
-        return RunAsync("Pulling…", ct => Session.PullAsync(progress, ct));
+        var rebase = !PullPreference.IsMerge(_host.PullMode);
+        return RunAsync(rebase ? "Pulling…" : "Pulling with merge…", ct => Session.PullAsync(progress, ct, rebase));
     }
 
     [RelayCommand]

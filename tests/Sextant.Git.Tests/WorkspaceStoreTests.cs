@@ -38,6 +38,7 @@ public class WorkspaceStoreTests
                 DiffFont = "JetBrains Mono",
                 DiffFontSize = 16,
                 SkipUpdatePrompt = true,
+                PullMode = PullPreference.Merge,
             });
 
             var loaded = store.LoadWorkspace();
@@ -62,6 +63,10 @@ public class WorkspaceStoreTests
             Assert.Equal("JetBrains Mono", settings.DiffFont);
             Assert.Equal(16, settings.DiffFontSize);
             Assert.True(settings.SkipUpdatePrompt);
+            Assert.Equal(PullPreference.Merge, settings.PullMode);
+            Assert.Equal(PullPreference.Rebase, PullPreference.Normalize(null));
+            Assert.Equal(PullPreference.Rebase, PullPreference.Normalize("nope"));
+            Assert.Equal(PullPreference.Merge, PullPreference.Normalize(" Merge "));
             Assert.Equal(ThemePreference.System, ThemePreference.Normalize(null));
             Assert.Equal(ThemePreference.Light, ThemePreference.Normalize(" Light "));
             Assert.Equal(ThemePreference.System, ThemePreference.Normalize("nope"));
@@ -78,6 +83,7 @@ public class WorkspaceStoreTests
             Assert.Null(older.DiffFont);
             Assert.Equal(DiffFontPreference.DefaultSize, older.DiffFontSize);
             Assert.False(older.SkipUpdatePrompt);
+            Assert.Equal(PullPreference.Rebase, older.PullMode);
 
             File.WriteAllText(Path.Combine(directory, "workspace.json"), """
                 {

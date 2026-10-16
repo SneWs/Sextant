@@ -5,7 +5,20 @@ namespace Sextant.Git.Tests;
 public class PullRebaseTests
 {
     [Fact]
-    public async Task Pull_rebase_autostashes_dirty_worktree_and_rebases_local_commit()
+    public Task Pull_autostashes_dirty_worktree_and_rebases_local_commit() =>
+        PullRestoresDirtyWorktree((session, cancellationToken) => session.PullAsync(null, cancellationToken), rebase: true);
+
+    [Fact]
+    public Task Pull_merge_autostashes_dirty_worktree_and_merges_local_commit() =>
+        PullRestoresDirtyWorktree((session, cancellationToken) => session.PullAsync(null, cancellationToken, rebase: false), rebase: false);
+
+    [Fact]
+    public Task Pull_rebase_autostashes_dirty_worktree_and_rebases_local_commit() =>
+        PullRestoresDirtyWorktree((session, cancellationToken) => session.PullRebaseAsync(null, cancellationToken), rebase: true);
+
+    private static async Task PullRestoresDirtyWorktree(
+        Func<RepositorySession, CancellationToken, Task> pull,
+        bool rebase)
     {
         using var origin = new TempRepo();
         origin.WriteFile("a.txt", "one\n");
@@ -25,15 +38,27 @@ public class PullRebaseTests
 
             await using var session = await RepositorySession.OpenAsync(
                 new GitProcessRunner(), origin.Git, clone, CancellationToken.None);
-            await session.PullRebaseAsync(null, CancellationToken.None);
+            await pull(session, CancellationToken.None);
 
             Assert.Contains(session.Snapshot().Commands, command =>
                 command.Arguments.Contains("pull")
-                && command.Arguments.Contains("--rebase")
-                && command.Arguments.Contains("--autostash"));
+                && command.Arguments.Contains("--autostash")
+                && command.Arguments.Contains(rebase ? "--rebase" : "--no-rebase")
+                && !command.Arguments.Contains(rebase ? "--no-rebase" : "--rebase"));
             Assert.Equal("note edited\n", File.ReadAllText(Path.Combine(clone, "notes.txt")).Replace("\r\n", "\n"));
-            var log = GitInCapture(origin, clone, "log", "--format=%s", "-2");
-            Assert.Equal(new[] { "local", "second" }, log.Split('\n', StringSplitOptions.RemoveEmptyEntries));
+            if (rebase)
+            {
+                var log = GitInCapture(origin, clone, "log", "--format=%s", "-2");
+                Assert.Equal(new[] { "local", "second" }, log.Split('\n', StringSplitOptions.RemoveEmptyEntries));
+            }
+            else
+            {
+                var parents = GitInCapture(origin, clone, "rev-list", "--parents", "-n", "1", "HEAD").Trim();
+                Assert.Equal(3, parents.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length);
+                var subjects = GitInCapture(origin, clone, "log", "--format=%s");
+                Assert.Contains("local", subjects);
+                Assert.Contains("second", subjects);
+            }
         }
         finally
         {

@@ -209,6 +209,9 @@ public sealed class AppSettings
 
     /// <summary>When set, the startup check does not offer a newer release. Check for update still asks.</summary>
     public bool SkipUpdatePrompt { get; set; }
+
+    /// <summary><see cref="PullPreference.Rebase"/> or <see cref="PullPreference.Merge"/>. Missing means rebase.</summary>
+    public string PullMode { get; set; } = PullPreference.Rebase;
 }
 
 public static class AppPaths
