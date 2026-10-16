@@ -535,7 +535,24 @@ public partial class RepositoryViewModel
             return;
         }
 
-        await Dispatcher.UIThread.InvokeAsync(action);
+        // Completing inline would resume a pool caller on the dispatcher, so image decode and
+        // tree building would land back on the UI thread.
+        // Background is below render. Normal is above it, and a burst of those posts used to
+        // keep the tab strip from presenting until the whole load had finished.
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Dispatcher.UIThread.Post(() =>
+        {
+            try
+            {
+                action();
+                done.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                done.TrySetException(exception);
+            }
+        }, DispatcherPriority.Background);
+        await done.Task.ConfigureAwait(false);
     }
 
     private async Task OnUi(Func<Task> action)
@@ -546,7 +563,23 @@ public partial class RepositoryViewModel
             return;
         }
 
-        await Dispatcher.UIThread.InvokeAsync(action);
+        await Dispatcher.UIThread.InvokeAsync(action, DispatcherPriority.Background).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Returns to the platform so the current frame can present before more UI work.
+    /// </summary>
+    private async Task LetPaintAsync()
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            await OnUi(LetPaintAsync).ConfigureAwait(false);
+            return;
+        }
+
+        if (_lifetime.IsCancellationRequested)
+            return;
+        await Dispatcher.Yield(DispatcherPriority.Background);
     }
 
     private List<(string Path, string? BeforePath, FileRowViewModel? StagingFile)> ImageTargets(FileRowViewModel? file)

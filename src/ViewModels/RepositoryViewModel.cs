@@ -29,6 +29,7 @@ public partial class RepositoryViewModel : ViewModelBase
     private Task? _load;
     private Task? _dispose;
     private readonly HashSet<Task> _pendingRepositoryWork = [];
+    private readonly object _pendingGate = new();
     private bool _applying;
     private bool _askedPerformance;
     private int _holdFocusRefresh;
@@ -65,6 +66,9 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private bool AllDiffFiles => AllFiles || (!ShowingBlame && ShowingWorkingCopy);
 
+    /// <summary>Rows for the diff that is being built. Published with one reset instead of one notification per line.</summary>
+    private List<DiffRow>? _deferredDiffRows;
+
     public bool ShowSectionFolds => AllDiffFiles && ShowingDiff && _sections.Count > 0;
 
     /// <summary>The diff command bar holds working-copy actions on the left and fold actions on the right.</summary>
@@ -84,19 +88,35 @@ public partial class RepositoryViewModel : ViewModelBase
     private SequencerKind _sequencer = SequencerKind.None;
     private string? _shownSha;
 
-    private readonly WslGit? _wsl;
+    private WslGit? _wsl;
 
     public RepositoryViewModel(IWorkspaceHost host, string requestedPath, WslGit? wsl = null)
     {
         _host = host;
         RequestedPath = requestedPath;
         _wsl = wsl is { Distribution.Length: > 0 } ? wsl : null;
-        Title = TabTitle(System.IO.Path.GetFileName(requestedPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar)));
-        if (string.IsNullOrWhiteSpace(Title))
-            Title = TabTitle(requestedPath);
+        Title = TabTitle(FolderName(requestedPath));
     }
 
     public WslGit? Wsl => _wsl;
+
+    /// <summary>
+    /// Binds a saved UNC tab once its distribution is known. A session that has
+    /// already opened keeps the git it started with.
+    /// </summary>
+    internal void UseWsl(WslGit wsl)
+    {
+        if (_session is not null || _wsl is not null || wsl.Distribution.Length == 0)
+            return;
+        _wsl = wsl;
+        Title = TabTitle(FolderName(RequestedPath));
+    }
+
+    private static string FolderName(string path)
+    {
+        var name = System.IO.Path.GetFileName(path.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar));
+        return string.IsNullOrWhiteSpace(name) ? path : name;
+    }
 
     private string TabTitle(string name) =>
         _wsl is null || string.IsNullOrWhiteSpace(name) ? name : name + " (" + _wsl.Distribution + ")";
@@ -214,7 +234,7 @@ public partial class RepositoryViewModel : ViewModelBase
 
     partial void OnLocationFilterChanged(string value) => PublishLocations(SelectedLocation?.Key);
 
-    public ObservableCollection<GraphRowViewModel> Rows { get; } = [];
+    public ResetCollection<GraphRowViewModel> Rows { get; } = new();
 
     public ResetCollection<LocationItem> Locations { get; } = [];
 
@@ -226,7 +246,7 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public ResetCollection<FileRowViewModel> Files { get; } = [];
 
-    public ObservableCollection<DiffRow> DiffRows { get; } = [];
+    public ResetCollection<DiffRow> DiffRows { get; } = new();
 
     [ObservableProperty]
     public partial string Title { get; set; }
@@ -454,8 +474,18 @@ public partial class RepositoryViewModel : ViewModelBase
         finally
         {
             // Canceled reads must leave the scheduler before its semaphores are disposed.
-            while (_pendingRepositoryWork.Count > 0)
-                await Task.WhenAll(_pendingRepositoryWork.ToArray());
+            while (true)
+            {
+                Task[] pending;
+                lock (_pendingGate)
+                {
+                    if (_pendingRepositoryWork.Count == 0)
+                        break;
+                    pending = _pendingRepositoryWork.ToArray();
+                }
+
+                await Task.WhenAll(pending);
+            }
             ClearPreview();
             var session = _session;
             _session = null;
@@ -957,68 +987,192 @@ public partial class RepositoryViewModel : ViewModelBase
 
         BusyText = "Opening…";
         IsBusy = true;
+        // Status fills the shell. History, tags, and the other ref queries keep running,
+        // and the diff and file tree overlap that remainder. Callers of EnsureLoaded
+        // still wait until the finished snapshot, the diff, and the file tree are in.
+        var shell = new TaskCompletionSource<RepositorySession>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var openTask = OpenSessionAsync(RequestedPath, shell);
+        var publishEarly = false;
         try
         {
-            _session = await OpenSessionAsync(RequestedPath);
-            if (_session is null || _lifetime.IsCancellationRequested)
+            await Task.WhenAny((Task)shell.Task, openTask);
+            ObserveShell(shell);
+            if (_lifetime.IsCancellationRequested)
+            {
+                await ObserveOpen(openTask);
                 return;
-            _session.UseDiffFormats(_host.DiffFormats);
-            Toplevel = _session.Toplevel;
-            Title = TabTitle(_session.DisplayName);
-            Apply(_session.Snapshot());
-            _host.NoteLoaded(this);
-            StartWatcher();
+            }
+
+            if (!openTask.IsCompleted && shell.Task.IsCompletedSuccessfully)
+            {
+                publishEarly = true;
+                _session = shell.Task.Result;
+                PublishOpened(_session);
+            }
+            else
+            {
+                _session = await openTask;
+                if (_session is null || _lifetime.IsCancellationRequested)
+                    return;
+                PublishOpened(_session);
+            }
         }
-        catch (OperationCanceledException)
+        catch (Exception exception)
         {
-            return;
+            await ObserveOpen(openTask);
+            if (exception is OperationCanceledException)
+                return;
+            throw;
         }
         finally
         {
-            IsBusy = false;
-            BusyText = "";
+            // Stay busy until the open writes history. A command in that gap would
+            // refresh the session, and the late snapshot would paint over it.
+            if (!publishEarly)
+            {
+                IsBusy = false;
+                BusyText = "";
+            }
         }
 
-        if (_session is not null && !_lifetime.IsCancellationRequested)
+        if (_session is null || _lifetime.IsCancellationRequested)
         {
-            await LoadDetailsAsync();
-            // The files pane can already be open when this session is created. The
-            // refresh started then finds no session and does not run again.
-            // Lock lookup talks to the LFS server. A missing or unauthorized
-            // endpoint must not escape this startup load and tear the process down.
-            if (RepositoryFilesTabOn)
+            IsBusy = false;
+            BusyText = "";
+            await ObserveOpen(openTask);
+            return;
+        }
+
+        // The branch and the file list are published. Present them before the diff
+        // render. The watcher stays off until this load finishes: git status touches
+        // the index, and a tick during this load used to start a second diff that
+        // cancelled the first and kept the dispatcher busy.
+        await LetPaintAsync();
+        if (_lifetime.IsCancellationRequested)
+        {
+            IsBusy = false;
+            BusyText = "";
+            await ObserveOpen(openTask);
+            return;
+        }
+
+        try
+        {
+            if (!publishEarly)
             {
+                await LoadDetailsAsync();
+                if (!await LoadStartupFilesAsync())
+                    return;
+            }
+            else
+            {
+                var details = LoadDetailsAsync();
+                var files = LoadStartupFilesAsync();
                 try
                 {
-                    await LoadRepositoryFilesAsync(_lifetime.Token, refreshLocks: true);
+                    var opened = await openTask;
+                    if (opened is not null && ReferenceEquals(opened, _session) && !_lifetime.IsCancellationRequested)
+                        Apply(opened.Snapshot());
                 }
                 catch (OperationCanceledException)
                 {
-                    return;
-                }
-                catch (GitCommandFailedException exception)
-                {
-                    Fail(exception.Message);
-                }
-                catch (RepositoryActionException exception)
-                {
-                    Fail(exception.Message);
                 }
                 finally
                 {
-                    if (BusyText == "Loading LFS locks…")
-                        BusyText = "";
+                    IsBusy = false;
+                    BusyText = "";
+                    await Drain(details, files);
                 }
+
+                if (_lifetime.IsCancellationRequested)
+                    return;
             }
+        }
+        finally
+        {
+            if (_session is not null && _watcher is null && !_lifetime.IsCancellationRequested)
+                StartWatcher();
+        }
 
-            if (LfsLocksVisible && _session is not null && !_lifetime.IsCancellationRequested)
-                await RefreshLfsLocks();
+        await MaybeSuggestAsync();
+    }
 
-            await MaybeSuggestAsync();
+    private void PublishOpened(RepositorySession session)
+    {
+        session.UseDiffFormats(_host.DiffFormats);
+        Toplevel = session.Toplevel;
+        Title = TabTitle(session.DisplayName);
+        Apply(session.Snapshot());
+        _host.NoteLoaded(this);
+    }
+
+    private static void ObserveShell(TaskCompletionSource<RepositorySession> shell)
+    {
+        if (shell.Task.IsFaulted)
+            _ = shell.Task.Exception;
+    }
+
+    private static async Task ObserveOpen(Task openTask)
+    {
+        try
+        {
+            await openTask.ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
         }
     }
 
-    private async Task<RepositorySession?> OpenSessionAsync(string path)
+    private static async Task Drain(Task details, Task files)
+    {
+        try
+        {
+            await Task.WhenAll(details, files);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task<bool> LoadStartupFilesAsync()
+    {
+        // The files pane can already be open when this session is created. The
+        // refresh started then finds no session and does not run again.
+        // Lock lookup talks to the LFS server. A missing or unauthorized
+        // endpoint must not escape this startup load and tear the process down.
+        if (RepositoryFilesTabOn)
+        {
+            try
+            {
+                await LoadRepositoryFilesAsync(_lifetime.Token, refreshLocks: true);
+            }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
+            catch (GitCommandFailedException exception)
+            {
+                Fail(exception.Message);
+            }
+            catch (RepositoryActionException exception)
+            {
+                Fail(exception.Message);
+            }
+            finally
+            {
+                if (BusyText == "Loading LFS locks…")
+                    BusyText = "";
+            }
+        }
+
+        if (_lifetime.IsCancellationRequested || _session is null)
+            return false;
+        if (LfsLocksVisible)
+            await RefreshLfsLocks();
+        return !_lifetime.IsCancellationRequested;
+    }
+
+    private async Task<RepositorySession?> OpenSessionAsync(string path, TaskCompletionSource<RepositorySession>? shell = null)
     {
         var executable = _wsl?.Launcher ?? _host.GitExecutable;
         if (string.IsNullOrEmpty(executable))
@@ -1030,7 +1184,7 @@ public partial class RepositoryViewModel : ViewModelBase
 
         try
         {
-            return await RepositorySession.OpenAsync(_host.Runner, executable, path, _lifetime.Token, _hiddenBranches, _wsl);
+            return await RepositorySession.OpenAsync(_host.Runner, executable, path, _lifetime.Token, _hiddenBranches, _wsl, shell);
         }
         catch (GitCommandFailedException exception) when (exception.IsDubiousOwnership)
         {
@@ -1095,19 +1249,22 @@ public partial class RepositoryViewModel : ViewModelBase
         using var pending = new PendingRepositoryWork(this);
         try
         {
-            await _session.RefreshStatusAsync(_lifetime.Token);
+            await _session.RefreshStatusAsync(_lifetime.Token).ConfigureAwait(false);
             if (_lifetime.IsCancellationRequested || _session is null)
                 return;
-            // The await above resumes on a pool thread. Menus and bindings belong to the UI thread.
-            await OnUi(async () =>
+            // Status ran on a pool thread. Bindings are published on the UI thread.
+            // Diff parsing and the file tree stay off this hop so a watcher tick cannot freeze the window.
+            await OnUi(() =>
             {
                 if (_session is null || _lifetime.IsCancellationRequested)
                     return;
                 Apply(_session.Snapshot());
-                await LoadDetailsAsync();
-                if (RepositoryFilesTabOn && _session is not null && !_lifetime.IsCancellationRequested)
-                    await LoadRepositoryFilesAsync(_lifetime.Token, refreshLocks: false);
-            });
+            }).ConfigureAwait(false);
+            if (_lifetime.IsCancellationRequested || _session is null)
+                return;
+            await LoadDetailsAsync().ConfigureAwait(false);
+            if (RepositoryFilesTabOn && _session is not null && !_lifetime.IsCancellationRequested)
+                await LoadRepositoryFilesAsync(_lifetime.Token, refreshLocks: false).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -1550,11 +1707,12 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private void RebuildGraph(SessionState state)
     {
-        Rows.Clear();
-        _fileCountsLoaded.Clear();
-        Rows.Add(WorkingRow(state));
+        var index = RefIndex.Build(state.Refs);
+        var rows = new List<GraphRowViewModel>(state.Commits.Count + 1) { WorkingRow(state) };
         foreach (var commit in state.Commits)
-            Rows.Add(CommitRow(commit, state));
+            rows.Add(CommitRow(commit, state, index));
+        _fileCountsLoaded.Clear();
+        Rows.Reset(rows);
     }
 
     private void AppendGraph(SessionState state)
@@ -1565,8 +1723,9 @@ public partial class RepositoryViewModel : ViewModelBase
             return;
         }
 
+        var index = RefIndex.Build(state.Refs);
         for (var i = _seenCommits; i < state.Commits.Count; i++)
-            Rows.Add(CommitRow(state.Commits[i], state));
+            Rows.Add(CommitRow(state.Commits[i], state, index));
     }
 
     // Row file counts load on demand, one batched git log per set of rows. A sha is asked for once
@@ -1633,11 +1792,49 @@ public partial class RepositoryViewModel : ViewModelBase
         CreateBranchCommand = CreateBranchCommand,
     };
 
-    private GraphRowViewModel CommitRow(GraphCommit commit, SessionState state)
+    /// <summary>Refs grouped by commit id so a history page does not scan every ref for every row.</summary>
+    private sealed class RefIndex
     {
-        var locals = state.Refs.Where(reference =>
-            reference.Name.StartsWith("refs/heads/", StringComparison.Ordinal)
-            && string.Equals(reference.Oid, commit.Commit.Sha, StringComparison.OrdinalIgnoreCase)).ToList();
+        private readonly Dictionary<string, GitRef[]> _byOid;
+
+        private RefIndex(Dictionary<string, GitRef[]> byOid) => _byOid = byOid;
+
+        public static RefIndex Build(IReadOnlyList<GitRef> refs)
+        {
+            var groups = new Dictionary<string, List<GitRef>>(refs.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var reference in refs)
+            {
+                if (reference.Oid.Length == 0)
+                    continue;
+                if (!groups.TryGetValue(reference.Oid, out var list))
+                {
+                    list = [];
+                    groups.Add(reference.Oid, list);
+                }
+
+                list.Add(reference);
+            }
+
+            var byOid = new Dictionary<string, GitRef[]>(groups.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var (oid, list) in groups)
+                byOid.Add(oid, list.ToArray());
+            return new RefIndex(byOid);
+        }
+
+        public IReadOnlyList<GitRef> For(string sha) =>
+            sha.Length > 0 && _byOid.TryGetValue(sha, out var list) ? list : [];
+    }
+
+    private GraphRowViewModel CommitRow(GraphCommit commit, SessionState state, RefIndex index)
+    {
+        var mine = index.For(commit.Commit.Sha);
+        var locals = new List<GitRef>();
+        foreach (var reference in mine)
+        {
+            if (reference.Name.StartsWith("refs/heads/", StringComparison.Ordinal))
+                locals.Add(reference);
+        }
+
         var checkout = locals.Count == 1 && !locals[0].IsHead;
         var name = checkout ? ShortHead(locals[0].Name) : "";
         var head = !string.IsNullOrEmpty(state.Branch.Oid)
@@ -1654,8 +1851,8 @@ public partial class RepositoryViewModel : ViewModelBase
             When = Relative(commit.Commit.AuthorUnixSeconds),
             IsHead = head,
             Detail = CommitDetail(commit.Commit),
-            Refs = RefNames(commit.Commit.Sha, state.Refs, state.HiddenBranches, head),
-            Tags = TagNames(commit.Commit.Sha, state.Refs, state.HiddenBranches),
+            Refs = RefNames(mine, state.HiddenBranches, head),
+            Tags = TagNames(mine, state.HiddenBranches),
             ShowCheckout = checkout,
             ShowRewrite = true,
             CheckoutCommand = checkout
@@ -2466,6 +2663,12 @@ public partial class RepositoryViewModel : ViewModelBase
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task LoadDetailsAsync()
     {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            await OnUi(LoadDetailsAsync).ConfigureAwait(false);
+            return;
+        }
+
         if (_applying || _lifetime.IsCancellationRequested)
             return;
         using var pending = new PendingRepositoryWork(this);
@@ -2614,6 +2817,12 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private async Task LoadDiffAsync()
     {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            await OnUi(LoadDiffAsync).ConfigureAwait(false);
+            return;
+        }
+
         if (_lifetime.IsCancellationRequested)
             return;
         using var pending = new PendingRepositoryWork(this);
@@ -2668,43 +2877,51 @@ public partial class RepositoryViewModel : ViewModelBase
                     AllDiffFiles ? null : file!.Path,
                     allowLarge,
                     ignoreWhitespace,
-                    token);
+                    token).ConfigureAwait(false);
             }
             else if (workingCopy)
             {
-                stagedDocument = await _session.WorktreeDiffAsync(true, allowLarge, ignoreWhitespace, token);
+                stagedDocument = await _session.WorktreeDiffAsync(true, allowLarge, ignoreWhitespace, token).ConfigureAwait(false);
                 if (stagedDocument is null || token.IsCancellationRequested)
                     return;
-                document = await _session.WorktreeDiffAsync(false, allowLarge, ignoreWhitespace, token);
+                document = await _session.WorktreeDiffAsync(false, allowLarge, ignoreWhitespace, token).ConfigureAwait(false);
             }
             else
             {
                 var parent = _diffParent ?? (row?.Commit?.Parents.Count > 0 ? row.Commit.Parents[0] : null);
-                document = await _session.CommitDiffAsync(row!.Sha!, parent, AllDiffFiles ? null : file!.Path, allowLarge, token, ignoreWhitespace);
+                document = await _session.CommitDiffAsync(row!.Sha!, parent, AllDiffFiles ? null : file!.Path, allowLarge, token, ignoreWhitespace).ConfigureAwait(false);
             }
 
             if (document is null || token.IsCancellationRequested)
                 return;
-            RememberObjects(range, workingCopy);
-            RenderDiff(document, file, workingCopy, stagedDocument);
-            if (armJump && AllDiffFiles && jumpPath is { Length: > 0 })
+            await OnUi(async () =>
             {
-                var opening = OpenForJump(jumpPath, jumpOriginal);
-                JumpToFile?.Invoke(jumpPath, jumpOriginal);
-                await opening;
-            }
-            await LoadImageAsync(file, workingCopy, range, token);
+                if (token.IsCancellationRequested || _session is null)
+                    return;
+                RememberObjects(range, workingCopy);
+                RenderDiff(document, file, workingCopy, stagedDocument);
+                if (armJump && AllDiffFiles && jumpPath is { Length: > 0 })
+                {
+                    var opening = OpenForJump(jumpPath, jumpOriginal);
+                    JumpToFile?.Invoke(jumpPath, jumpOriginal);
+                    await opening;
+                }
+
+                await LoadImageAsync(file, workingCopy, range, token);
+            }).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
         }
         catch (GitCommandFailedException exception)
         {
-            Fail(exception.Message);
+            var message = exception.Message;
+            await OnUi(() => Fail(message)).ConfigureAwait(false);
         }
         catch (RepositoryActionException exception)
         {
-            Fail(exception.Message);
+            var message = exception.Message;
+            await OnUi(() => Fail(message)).ConfigureAwait(false);
         }
     }
 
@@ -2758,7 +2975,6 @@ public partial class RepositoryViewModel : ViewModelBase
         ClearSections();
         ClearMerge();
         ClearPreview();
-        DiffRows.Clear();
         _rawPatch = (stagedDocument?.RawPatch ?? "") + document.RawPatch;
         NoteLfs(stagedDocument is null ? document : document with
         {
@@ -2767,6 +2983,7 @@ public partial class RepositoryViewModel : ViewModelBase
         ShowLoadDiff = document.IsTooLarge || stagedDocument?.IsTooLarge == true;
         if (ShowLoadDiff)
         {
+            DiffRows.Reset([]);
             HasDiffNotice = true;
             DiffNotice = "This diff is large. Load it only if you need the whole file.";
             _allFilesShown = false;
@@ -2774,13 +2991,39 @@ public partial class RepositoryViewModel : ViewModelBase
             return;
         }
 
+        var rows = new List<DiffRow>();
+        _deferredDiffRows = rows;
+        try
+        {
+            if (AllDiffFiles)
+            {
+                NoteChangelist();
+                _allFilesShown = true;
+                if (stagedDocument is not null)
+                    AppendDiffSections(stagedDocument, workingCopy, staged: true);
+                AppendDiffSections(document, workingCopy, staged: false);
+            }
+            else
+            {
+                _allFilesShown = false;
+                AppendFileDiff(
+                    document,
+                    workingCopy,
+                    file?.Kind ?? ChangeKind.Modified,
+                    notice: true,
+                    path: file?.Path,
+                    notes: document.LfsFiles,
+                    formatted: IsFormatted(document, file?.Path));
+            }
+        }
+        finally
+        {
+            _deferredDiffRows = null;
+        }
+
+        DiffRows.Reset(rows);
         if (AllDiffFiles)
         {
-            NoteChangelist();
-            _allFilesShown = true;
-            if (stagedDocument is not null)
-                AppendDiffSections(stagedDocument, workingCopy, staged: true);
-            AppendDiffSections(document, workingCopy, staged: false);
             if (_sections.Count == 0)
             {
                 HasDiffNotice = true;
@@ -2796,23 +3039,13 @@ public partial class RepositoryViewModel : ViewModelBase
             return;
         }
 
-        _allFilesShown = false;
-        AppendFileDiff(
-            document,
-            workingCopy,
-            file?.Kind ?? ChangeKind.Modified,
-            notice: true,
-            path: file?.Path,
-            notes: document.LfsFiles,
-            formatted: IsFormatted(document, file?.Path));
         NoteFormat(document, file?.Path, banner: true);
         _diffReady = true;
     }
 
     private void AppendDiffSections(DiffDocument document, bool workingCopy, bool staged)
     {
-        var files = string.IsNullOrEmpty(document.RawPatch) ? [] : DiffParser.ParseFiles(document.RawPatch);
-        foreach (var entry in files)
+        foreach (var entry in DiffParser.Slices(document))
         {
             var label = string.IsNullOrEmpty(entry.Path) ? "Diff" : entry.Path;
             var stagingFile = workingCopy ? StagingFileForDiff(entry.Path, staged) : null;
@@ -2849,11 +3082,20 @@ public partial class RepositoryViewModel : ViewModelBase
             }
 
             _sections.Add(section);
-            DiffRows.Add(header);
-            if (header.Expanded)
+            if (_deferredDiffRows is not null)
             {
-                foreach (var bodyRow in section.Body)
-                    DiffRows.Add(bodyRow);
+                _deferredDiffRows.Add(header);
+                if (header.Expanded)
+                    _deferredDiffRows.AddRange(section.Body);
+            }
+            else
+            {
+                DiffRows.Add(header);
+                if (header.Expanded)
+                {
+                    foreach (var bodyRow in section.Body)
+                        DiffRows.Add(bodyRow);
+                }
             }
         }
     }
@@ -3147,6 +3389,8 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         if (_rowSink is not null)
             _rowSink.Add(row);
+        else if (_deferredDiffRows is not null)
+            _deferredDiffRows.Add(row);
         else
             DiffRows.Add(row);
     }
@@ -3563,7 +3807,7 @@ public partial class RepositoryViewModel : ViewModelBase
         _host.Save();
     }
 
-    private static IReadOnlyList<string> RefNames(string sha, IReadOnlyList<GitRef> refs, IReadOnlySet<string> hidden, bool head)
+    private static IReadOnlyList<string> RefNames(IReadOnlyList<GitRef> refs, IReadOnlySet<string> hidden, bool head)
     {
         var names = new List<string>();
         if (head)
@@ -3571,8 +3815,6 @@ public partial class RepositoryViewModel : ViewModelBase
         foreach (var reference in refs)
         {
             if (hidden.Contains(reference.Name))
-                continue;
-            if (!string.Equals(reference.Oid, sha, StringComparison.OrdinalIgnoreCase))
                 continue;
             if (reference.Name.StartsWith("refs/tags/", StringComparison.Ordinal))
                 continue;
@@ -3589,7 +3831,7 @@ public partial class RepositoryViewModel : ViewModelBase
         return shown;
     }
 
-    private static IReadOnlyList<string> TagNames(string sha, IReadOnlyList<GitRef> refs, IReadOnlySet<string> hidden)
+    private static IReadOnlyList<string> TagNames(IReadOnlyList<GitRef> refs, IReadOnlySet<string> hidden)
     {
         var names = new List<string>();
         foreach (var reference in refs)
@@ -3597,8 +3839,6 @@ public partial class RepositoryViewModel : ViewModelBase
             if (!reference.Name.StartsWith("refs/tags/", StringComparison.Ordinal))
                 continue;
             if (hidden.Contains(reference.Name))
-                continue;
-            if (!string.Equals(reference.Oid, sha, StringComparison.OrdinalIgnoreCase))
                 continue;
             names.Add(reference.Name["refs/tags/".Length..]);
         }
@@ -3813,12 +4053,14 @@ public partial class RepositoryViewModel : ViewModelBase
         public PendingRepositoryWork(RepositoryViewModel owner)
         {
             _owner = owner;
-            owner._pendingRepositoryWork.Add(_completion.Task);
+            lock (owner._pendingGate)
+                owner._pendingRepositoryWork.Add(_completion.Task);
         }
 
         public void Dispose()
         {
-            _owner._pendingRepositoryWork.Remove(_completion.Task);
+            lock (_owner._pendingGate)
+                _owner._pendingRepositoryWork.Remove(_completion.Task);
             _completion.TrySetResult();
         }
     }

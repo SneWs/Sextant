@@ -23,4 +23,13 @@ public sealed record DiffDocument(
     public IReadOnlyList<string> FormattedPaths { get; init; } = [];
 
     public IReadOnlyList<DiffFormatNote> FormatNotes { get; init; } = [];
+
+    /// <summary>
+    /// Per-file slices from the same parse that produced this patch.
+    /// The diff view reads these so a multi-file patch is not parsed again on the UI thread.
+    /// </summary>
+    public IReadOnlyList<DiffFileSlice> Parts { get; init; } = [];
 }
+
+/// <summary>One file inside a patch, already parsed.</summary>
+public readonly record struct DiffFileSlice(string Path, DiffDocument Document);

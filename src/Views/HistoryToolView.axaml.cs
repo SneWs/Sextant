@@ -51,8 +51,7 @@ public partial class HistoryToolView : UserControl
             return;
         _watched.PropertyChanged += OnViewModelPropertyChanged;
         _watched.Rows.CollectionChanged += OnGraphRowsChanged;
-        var watched = _watched;
-        Dispatcher.UIThread.Post(() => RequestRowFileCounts(watched), DispatcherPriority.Loaded);
+        QueueFileCounts(_watched);
     }
 
     private void Unwatch()
@@ -69,15 +68,30 @@ public partial class HistoryToolView : UserControl
         if (sender is not RepositoryViewModel vm)
             return;
         if (e.PropertyName == nameof(RepositoryViewModel.RepositoryFilesTabOn) && vm.HistoryTabOn)
-            RequestRowFileCounts(vm);
+            QueueFileCounts(vm);
     }
+
+    private int _fileCountsQueued;
 
     private void OnGraphRowsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         if (_watched is null)
             return;
-        var vm = _watched;
-        Dispatcher.UIThread.Post(() => RequestRowFileCounts(vm), DispatcherPriority.Loaded);
+        QueueFileCounts(_watched);
+    }
+
+    /// <summary>One layout pass asks for the visible rows. A graph rebuild used to post once per commit.</summary>
+    private void QueueFileCounts(RepositoryViewModel vm)
+    {
+        if (Interlocked.Exchange(ref _fileCountsQueued, 1) == 1)
+            return;
+        Dispatcher.UIThread.Post(() =>
+        {
+            Interlocked.Exchange(ref _fileCountsQueued, 0);
+            if (!ReferenceEquals(_watched, vm))
+                return;
+            RequestRowFileCounts(vm);
+        }, DispatcherPriority.Loaded);
     }
 
     private void AttachGraphScroll()

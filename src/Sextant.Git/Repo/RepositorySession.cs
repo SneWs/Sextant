@@ -31,7 +31,9 @@ public sealed partial class RepositorySession : IAsyncDisposable
     private Dictionary<string, string> _config = new(StringComparer.OrdinalIgnoreCase);
     private bool _historyEnded;
     private bool _historyCapped;
-    private int _historyGeneration = 1;
+    // Zero until the first history page is stored. A status-only snapshot then
+    // leaves the graph alone, and the finished open rebuilds it once.
+    private int _historyGeneration;
     private bool _merge;
     private SequencerKind _sequencer;
     private string? _mergeMessage;
@@ -72,7 +74,8 @@ public sealed partial class RepositorySession : IAsyncDisposable
         string path,
         CancellationToken cancellationToken,
         IReadOnlyCollection<string>? hiddenBranches = null,
-        WslGit? wsl = null)
+        WslGit? wsl = null,
+        TaskCompletionSource<RepositorySession>? shell = null)
     {
         var session = new RepositorySession(runner, executable, wsl);
         if (hiddenBranches is not null)
@@ -84,8 +87,16 @@ public sealed partial class RepositorySession : IAsyncDisposable
             }
         }
 
-        await session.OpenCoreAsync(path, cancellationToken).ConfigureAwait(false);
-        return session;
+        try
+        {
+            await session.OpenCoreAsync(path, cancellationToken, shell).ConfigureAwait(false);
+            return session;
+        }
+        catch (Exception exception)
+        {
+            CompleteShell(shell, exception);
+            throw;
+        }
     }
 
     public SessionState Snapshot()
@@ -1109,7 +1120,10 @@ public sealed partial class RepositorySession : IAsyncDisposable
         await Task.CompletedTask;
     }
 
-    private async Task OpenCoreAsync(string path, CancellationToken cancellationToken)
+    private async Task OpenCoreAsync(
+        string path,
+        CancellationToken cancellationToken,
+        TaskCompletionSource<RepositorySession>? shell)
     {
         await RunAsync(async ct =>
         {
@@ -1118,17 +1132,22 @@ public sealed partial class RepositorySession : IAsyncDisposable
             _toplevel = RepoPath.Normalize(HostPath(Encoding.UTF8.GetString(top.Stdout).Trim()));
             _gitDirectory = RepoPath.Normalize(HostPath(Encoding.UTF8.GetString(dir.Stdout).Trim()));
             await ReloadConfigAsync(ct).ConfigureAwait(false);
+            // Status, tags, and history share the read slots. The file list can paint
+            // as soon as status exists. The other two keep running.
             var statusTask = QueryStatusAsync(ct);
             var refsTask = QueryRefsAsync(ct);
             var logTask = QueryLogAsync(0, HistoryLimits.FirstPage, ct);
-            await Task.WhenAll(statusTask, refsTask, logTask).ConfigureAwait(false);
             var status = await statusTask.ConfigureAwait(false);
+            lock (_stateLock)
+                ApplyStatus(status);
+            shell?.TrySetResult(this);
+
+            await WhenAll(refsTask, logTask).ConfigureAwait(false);
             var refs = await refsTask.ConfigureAwait(false);
             var log = await logTask.ConfigureAwait(false);
             var includeStash = refs.Refs.Any(reference => reference.Name == "refs/stash");
             lock (_stateLock)
             {
-                ApplyStatus(status);
                 _refs = refs.Refs.ToList();
                 _remotes = refs.Remotes.ToList();
                 _stashes = refs.Stashes.ToList();
@@ -1146,6 +1165,34 @@ public sealed partial class RepositorySession : IAsyncDisposable
             if (includeStash)
                 await ReloadHistoryCoreAsync(ct).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static void CompleteShell(TaskCompletionSource<RepositorySession>? shell, Exception exception)
+    {
+        if (shell is null || shell.Task.IsCompleted)
+            return;
+        if (exception is OperationCanceledException)
+            shell.TrySetCanceled();
+        else
+            shell.TrySetException(exception);
+    }
+
+    private static async Task WhenAll(params Task[] tasks)
+    {
+        try
+        {
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+        }
+        catch
+        {
+            foreach (var task in tasks)
+            {
+                if (task.IsFaulted)
+                    _ = task.Exception;
+            }
+
+            throw;
+        }
     }
 
     private async Task LoadRefsAndMaybeHistoryAsync(CancellationToken cancellationToken, bool statusAlreadyApplied)
@@ -1236,34 +1283,69 @@ public sealed partial class RepositorySession : IAsyncDisposable
 
     private async Task<RefLoad> QueryRefsAsync(CancellationToken cancellationToken)
     {
-        return await _scheduler.ReadAsync(async token =>
-        {
-            var refsOutput = Checked(await ExecuteAsync(GitCommands.Refs(_toplevel), null, token).ConfigureAwait(false));
-            var remoteOutput = Checked(await ExecuteAsync(GitCommands.Remotes(_toplevel), null, token).ConfigureAwait(false));
-            var names = Encoding.UTF8.GetString(remoteOutput.Stdout)
-                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-            var parsed = RefParser.Parse(refsOutput.Stdout, _encoding);
-            IReadOnlyList<StashEntry> stashes = [];
-            if (parsed.Any(reference => reference.Name == "refs/stash"))
-            {
-                var stashOutput = Checked(await ExecuteAsync(GitCommands.StashList(_toplevel), null, token).ConfigureAwait(false));
-                stashes = StashParser.Parse(stashOutput.Stdout, _encoding);
-            }
-
-            var submoduleOutput = await ExecuteAsync(GitCommands.SubmoduleStatus(_toplevel), null, token).ConfigureAwait(false);
-            Track(submoduleOutput);
-            var submodules = submoduleOutput.ExitCode == 0
-                ? SubmoduleParser.Parse(Encoding.UTF8.GetString(submoduleOutput.Stdout))
-                : Array.Empty<SubmoduleEntry>();
-            var worktreeOutput = await ExecuteAsync(GitCommands.WorktreeList(_toplevel), null, token).ConfigureAwait(false);
-            Track(worktreeOutput);
-            var worktrees = worktreeOutput.ExitCode == 0
-                ? HostWorktrees(WorktreeParser.Parse(Encoding.UTF8.GetString(worktreeOutput.Stdout)))
-                : Array.Empty<WorktreeEntry>();
-            parsed = await ApplyLocalUpstreamAsync(parsed, token).ConfigureAwait(false);
-            return new RefLoad(parsed, names, stashes, submodules, worktrees);
-        }, cancellationToken).ConfigureAwait(false);
+        // Each command takes its own read slot. One slot used to run the whole chain,
+        // so tags waited behind remotes, submodules, and worktrees.
+        var refsTask = ReadRefListAsync(cancellationToken);
+        var remotesTask = ReadRemotesAsync(cancellationToken);
+        var submodulesTask = ReadSubmodulesAsync(cancellationToken);
+        var worktreesTask = ReadWorktreesAsync(cancellationToken);
+        await WhenAll(refsTask, remotesTask, submodulesTask, worktreesTask).ConfigureAwait(false);
+        var parsed = await refsTask.ConfigureAwait(false);
+        var stashesTask = parsed.Any(reference => reference.Name == "refs/stash")
+            ? ReadStashesAsync(cancellationToken)
+            : Task.FromResult<IReadOnlyList<StashEntry>>([]);
+        var upstreamTask = ApplyLocalUpstreamAsync(parsed, cancellationToken);
+        await WhenAll(stashesTask, upstreamTask).ConfigureAwait(false);
+        return new RefLoad(
+            await upstreamTask.ConfigureAwait(false),
+            await remotesTask.ConfigureAwait(false),
+            await stashesTask.ConfigureAwait(false),
+            await submodulesTask.ConfigureAwait(false),
+            await worktreesTask.ConfigureAwait(false));
     }
+
+    private Task<IReadOnlyList<GitRef>> ReadRefListAsync(CancellationToken cancellationToken) =>
+        _scheduler.ReadAsync(async token =>
+        {
+            var output = Checked(await ExecuteAsync(GitCommands.Refs(_toplevel), null, token).ConfigureAwait(false));
+            return RefParser.Parse(output.Stdout, _encoding);
+        }, cancellationToken);
+
+    private Task<IReadOnlyList<string>> ReadRemotesAsync(CancellationToken cancellationToken) =>
+        _scheduler.ReadAsync(async token =>
+        {
+            var output = Checked(await ExecuteAsync(GitCommands.Remotes(_toplevel), null, token).ConfigureAwait(false));
+            IReadOnlyList<string> names = Encoding.UTF8.GetString(output.Stdout)
+                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+            return names;
+        }, cancellationToken);
+
+    private Task<IReadOnlyList<StashEntry>> ReadStashesAsync(CancellationToken cancellationToken) =>
+        _scheduler.ReadAsync(async token =>
+        {
+            var output = Checked(await ExecuteAsync(GitCommands.StashList(_toplevel), null, token).ConfigureAwait(false));
+            return StashParser.Parse(output.Stdout, _encoding);
+        }, cancellationToken);
+
+    private Task<IReadOnlyList<SubmoduleEntry>> ReadSubmodulesAsync(CancellationToken cancellationToken) =>
+        _scheduler.ReadAsync(async token =>
+        {
+            var output = await ExecuteAsync(GitCommands.SubmoduleStatus(_toplevel), null, token).ConfigureAwait(false);
+            Track(output);
+            return output.ExitCode == 0
+                ? SubmoduleParser.Parse(Encoding.UTF8.GetString(output.Stdout))
+                : Array.Empty<SubmoduleEntry>();
+        }, cancellationToken);
+
+    private Task<IReadOnlyList<WorktreeEntry>> ReadWorktreesAsync(CancellationToken cancellationToken) =>
+        _scheduler.ReadAsync(async token =>
+        {
+            var output = await ExecuteAsync(GitCommands.WorktreeList(_toplevel), null, token).ConfigureAwait(false);
+            Track(output);
+            return output.ExitCode == 0
+                ? HostWorktrees(WorktreeParser.Parse(Encoding.UTF8.GetString(output.Stdout)))
+                : Array.Empty<WorktreeEntry>();
+        }, cancellationToken);
 
     private async Task<IReadOnlyList<GitRef>> ApplyLocalUpstreamAsync(
         IReadOnlyList<GitRef> refs,
@@ -1272,20 +1354,23 @@ public sealed partial class RepositorySession : IAsyncDisposable
         if (!refs.Any(reference => reference.Name.StartsWith("refs/heads/", StringComparison.Ordinal)))
             return refs;
 
-        var output = Checked(await ExecuteAsync(GitCommands.LocalUpstream(_toplevel), null, cancellationToken).ConfigureAwait(false));
-        var tracking = UpstreamTrackParser.Parse(_encoding.GetString(output.Stdout));
-        if (tracking.Count == 0)
-            return refs;
-
-        var annotated = new List<GitRef>(refs.Count);
-        foreach (var reference in refs)
+        return await _scheduler.ReadAsync(async token =>
         {
-            annotated.Add(tracking.TryGetValue(reference.Name, out var counts)
-                ? reference with { Ahead = counts.Ahead, Behind = counts.Behind }
-                : reference);
-        }
+            var output = Checked(await ExecuteAsync(GitCommands.LocalUpstream(_toplevel), null, token).ConfigureAwait(false));
+            var tracking = UpstreamTrackParser.Parse(_encoding.GetString(output.Stdout));
+            if (tracking.Count == 0)
+                return refs;
 
-        return annotated;
+            var annotated = new List<GitRef>(refs.Count);
+            foreach (var reference in refs)
+            {
+                annotated.Add(tracking.TryGetValue(reference.Name, out var counts)
+                    ? reference with { Ahead = counts.Ahead, Behind = counts.Behind }
+                    : reference);
+            }
+
+            return (IReadOnlyList<GitRef>)annotated;
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<LogLoad> QueryLogAsync(int skip, int count, CancellationToken cancellationToken)
@@ -1765,10 +1850,13 @@ public sealed partial class RepositorySession : IAsyncDisposable
             lines += file.Document.LineCount;
         if (!allowLarge && lines > HistoryLimits.MaxDiffLines)
             return DiffDocument.TooLarge;
+        var parts = new DiffFileSlice[files.Count];
+        for (var i = 0; i < files.Count; i++)
+            parts[i] = new DiffFileSlice(files[i].Path, files[i].Document);
         if (files.Count == 1)
-            return files[0].Document;
+            return files[0].Document with { Parts = parts };
         var normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
-        return new DiffDocument(false, false, false, false, false, [], normalized);
+        return new DiffDocument(false, false, false, false, false, [], normalized) { Parts = parts };
     }
 
     private static List<GraphCommit> Build(LaneAssigner lanes, IReadOnlyList<CommitRecord> commits)

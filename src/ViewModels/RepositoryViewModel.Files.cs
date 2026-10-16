@@ -50,61 +50,138 @@ public partial class RepositoryViewModel
 
     private async Task LoadRepositoryFilesAsync(CancellationToken token, bool refreshLocks)
     {
-        if (_session is null)
+        var session = _session;
+        if (session is null)
             return;
-        var generation = ++_repositoryFilesGeneration;
-        var files = await _session.RepositoryFilesAsync(token);
+        var generation = Interlocked.Increment(ref _repositoryFilesGeneration);
+        var files = await session.RepositoryFilesAsync(token).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
-        if (generation != _repositoryFilesGeneration)
+        if (generation != Volatile.Read(ref _repositoryFilesGeneration))
             return;
-        _repositoryFiles = files;
-        var needsLocks = _repositoryFiles.Count > 0 || _repositoryLocks.Count > 0;
-        if (refreshLocks)
-            _repositoryLocksKnown = false;
-        BuildRepositoryFileTree();
-        if (!refreshLocks)
+
+        var inputs = await ReadTreeInputsAsync(refreshLocks).ConfigureAwait(false);
+        if (generation != Volatile.Read(ref _repositoryFilesGeneration))
             return;
+        // Directory nodes for the whole work tree are built away from the dispatcher.
+        // The UI thread only swaps the visible list.
+        var tree = ComposeRepositoryTree(files, inputs.Expanded, inputs.Locks, inputs.LocksKnown);
+        await InstallRepositoryTreeAsync(generation, files, tree).ConfigureAwait(false);
+        if (!refreshLocks || generation != Volatile.Read(ref _repositoryFilesGeneration))
+            return;
+
+        var announced = false;
         try
         {
             // git lfs locks asks the server. A repository that does not use Git LFS has no server,
             // and the command fails with an empty remote address.
+            var needsLocks = files.Count > 0 || inputs.Locks.Count > 0;
             var usesLfs = needsLocks && (files.Any(file => file.LfsTracked)
-                || await _session.UsesLfsAsync(files.Select(file => file.Path).ToArray(), token));
+                || await session.UsesLfsAsync(files.Select(file => file.Path).ToArray(), token).ConfigureAwait(false));
             token.ThrowIfCancellationRequested();
-            if (generation != _repositoryFilesGeneration)
+            if (generation != Volatile.Read(ref _repositoryFilesGeneration))
                 return;
             if (!usesLfs)
             {
-                _repositoryLocks.Clear();
-                _repositoryLocksKnown = false;
+                await OnUi(() =>
+                {
+                    if (generation != _repositoryFilesGeneration)
+                        return;
+                    _repositoryLocks.Clear();
+                    _repositoryLocksKnown = false;
+                }).ConfigureAwait(false);
                 return;
             }
 
-            BusyText = "Loading LFS locks…";
-            var locks = await _session.LfsLocksAsync(token);
-            token.ThrowIfCancellationRequested();
-            if (generation != _repositoryFilesGeneration)
+            await OnUi(() =>
+            {
+                if (generation != _repositoryFilesGeneration)
+                    return;
+                BusyText = "Loading LFS locks…";
+                announced = true;
+            }).ConfigureAwait(false);
+            if (!announced)
                 return;
-            _repositoryLocks.Clear();
+            var locks = await session.LfsLocksAsync(token).ConfigureAwait(false);
+            token.ThrowIfCancellationRequested();
+            if (generation != Volatile.Read(ref _repositoryFilesGeneration))
+                return;
+            var locked = new Dictionary<string, LfsLock>(locks.Count, StringComparer.Ordinal);
             foreach (var item in locks)
-                _repositoryLocks[item.Path] = item;
-            _repositoryLocksKnown = true;
+                locked[item.Path] = item;
+            var expanded = await ReadTreeInputsAsync(clearLockKnowledge: false).ConfigureAwait(false);
+            var withLocks = ComposeRepositoryTree(files, expanded.Expanded, locked, locksKnown: true);
+            await OnUi(() =>
+            {
+                if (generation != _repositoryFilesGeneration)
+                    return;
+                _repositoryLocks.Clear();
+                foreach (var item in locks)
+                    _repositoryLocks[item.Path] = item;
+                _repositoryLocksKnown = true;
+                InstallRepositoryTree(files, withLocks);
+            }).ConfigureAwait(false);
         }
         finally
         {
-            if (generation == _repositoryFilesGeneration)
-                BuildRepositoryFileTree();
+            if (announced)
+            {
+                await OnUi(() =>
+                {
+                    if (BusyText == "Loading LFS locks…")
+                        BusyText = "";
+                }).ConfigureAwait(false);
+            }
         }
     }
 
-    private void BuildRepositoryFileTree()
+    private readonly record struct TreeInputs(HashSet<string> Expanded, Dictionary<string, LfsLock> Locks, bool LocksKnown);
+
+    private async Task<TreeInputs> ReadTreeInputsAsync(bool clearLockKnowledge)
     {
+        var inputs = default(TreeInputs);
+        await OnUi(() =>
+        {
+            if (clearLockKnowledge)
+                _repositoryLocksKnown = false;
+            inputs = new TreeInputs(
+                new HashSet<string>(_expandedRepositoryDirectories, StringComparer.Ordinal),
+                new Dictionary<string, LfsLock>(_repositoryLocks, StringComparer.Ordinal),
+                _repositoryLocksKnown);
+        }).ConfigureAwait(false);
+        return inputs;
+    }
+
+    private async Task InstallRepositoryTreeAsync(int generation, IReadOnlyList<RepositoryFile> files, List<RepositoryFileTreeItem> roots)
+    {
+        await OnUi(() =>
+        {
+            if (generation != _repositoryFilesGeneration)
+                return;
+            InstallRepositoryTree(files, roots);
+        }).ConfigureAwait(false);
+    }
+
+    private void InstallRepositoryTree(IReadOnlyList<RepositoryFile> files, List<RepositoryFileTreeItem> roots)
+    {
+        _repositoryFiles = files;
         _repositoryFileRoots.Clear();
+        _repositoryFileRoots.AddRange(roots);
+        PublishRepositoryFileTree();
+        OnPropertyChanged(nameof(RepositoryTreeEmpty));
+    }
+
+    private List<RepositoryFileTreeItem> ComposeRepositoryTree(
+        IReadOnlyList<RepositoryFile> files,
+        HashSet<string> expanded,
+        IReadOnlyDictionary<string, LfsLock> locks,
+        bool locksKnown)
+    {
+        var roots = new List<RepositoryFileTreeItem>();
         var directories = new Dictionary<string, RepositoryFileTreeItem>(StringComparer.Ordinal);
-        foreach (var file in _repositoryFiles)
+        foreach (var file in files)
         {
             var parts = file.Path.Split('/');
-            var children = _repositoryFileRoots;
+            var children = roots;
             var prefix = "";
             for (var depth = 0; depth < parts.Length - 1; depth++)
             {
@@ -117,36 +194,38 @@ public partial class RepositoryViewModel
                         Label = parts[depth],
                         Depth = depth,
                         IsDirectory = true,
-                        IsExpanded = _expandedRepositoryDirectories.Contains(prefix),
+                        IsExpanded = expanded.Contains(prefix),
                     };
                     directories.Add(prefix, directory);
                     children.Add(directory);
                 }
+
                 children = directory.Children;
             }
 
-            _repositoryLocks.TryGetValue(file.Path, out var fileLock);
+            locks.TryGetValue(file.Path, out var fileLock);
+            var path = file.Path;
+            var tracked = file.LfsTracked;
             children.Add(new RepositoryFileTreeItem
             {
-                Path = file.Path,
+                Path = path,
                 Label = parts[^1],
                 Depth = parts.Length - 1,
-                LfsTracked = file.LfsTracked,
-                LocksKnown = _repositoryLocksKnown,
+                LfsTracked = tracked,
+                LocksKnown = locksKnown,
                 Lock = fileLock,
                 CanRun = () => !IsBusy && !_lifetime.IsCancellationRequested,
-                LockAction = () => ChangeRepositoryLockAsync(file.Path, unlock: false, force: false),
-                UnlockAction = () => ChangeRepositoryLockAsync(file.Path, unlock: true, force: false),
-                ForceUnlockAction = () => ChangeRepositoryLockAsync(file.Path, unlock: true, force: true),
-                HistoryAction = () => ShowFileHistoryAsync(file.Path),
-                RemoveAction = () => RemoveRepositoryFileAsync(file.Path),
-                FileMenuFactory = () => FileMenuFor(file.Path, file.LfsTracked),
+                LockAction = () => ChangeRepositoryLockAsync(path, unlock: false, force: false),
+                UnlockAction = () => ChangeRepositoryLockAsync(path, unlock: true, force: false),
+                ForceUnlockAction = () => ChangeRepositoryLockAsync(path, unlock: true, force: true),
+                HistoryAction = () => ShowFileHistoryAsync(path),
+                RemoveAction = () => RemoveRepositoryFileAsync(path),
+                FileMenuFactory = () => FileMenuFor(path, tracked),
             });
         }
 
-        SortRepositoryDirectories(_repositoryFileRoots);
-        PublishRepositoryFileTree();
-        OnPropertyChanged(nameof(RepositoryTreeEmpty));
+        SortRepositoryDirectories(roots);
+        return roots;
     }
 
     private static void SortRepositoryDirectories(List<RepositoryFileTreeItem> items)
@@ -252,7 +331,12 @@ public partial class RepositoryViewModel
         if (!ok && !_lifetime.IsCancellationRequested)
         {
             _repositoryLocksKnown = false;
-            BuildRepositoryFileTree();
+            var roots = ComposeRepositoryTree(
+                _repositoryFiles,
+                _expandedRepositoryDirectories,
+                _repositoryLocks,
+                locksKnown: false);
+            InstallRepositoryTree(_repositoryFiles, roots);
         }
     }
 
