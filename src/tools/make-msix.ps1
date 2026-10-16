@@ -5,6 +5,10 @@
 #   pwsh src/tools/make-msix.ps1 <publish-dir> <version> <output.msix> [win-x64|win-arm64]
 #   pwsh src/tools/make-msix.ps1 -SelfTest
 #
+# A local Windows build of both architectures is publish-windows.ps1 in this
+# folder. It publishes, then calls this script. pack-store-release.ps1
+# downloads a GitHub release and calls this script. This file only packs.
+#
 # The runtime defaults to win-x64 so an existing caller keeps an x64 package.
 # win-arm64 writes ProcessorArchitecture arm64. The SDK tools that pack and
 # sign are the host tools: arm64 on Windows on Arm, and x64 otherwise. An
