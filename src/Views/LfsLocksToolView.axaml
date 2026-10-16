@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Sextant.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="Sextant.Views.LfsLocksToolView"
+             x:DataType="vm:RepositoryViewModel">
+    <Grid>
+        <TextBlock Text="{Binding LocksMessage}" Margin="8" Opacity="0.65" IsVisible="{Binding ShowLocksMessage}"/>
+        <ListBox x:Name="LfsLockList" ItemsSource="{Binding LfsLocks}"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="MinHeight" Value="0"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                </Style>
+            </ListBox.Styles>
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <VirtualizingStackPanel/>
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:LfsLockRow">
+                    <Panel>
+                        <Border Classes="filehead" IsVisible="{Binding IsHeader}"
+                                Margin="4,8,4,2" Padding="8,4" CornerRadius="4" BorderThickness="1"
+                                Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+                            <Grid ColumnDefinitions="28,*,Auto">
+                                <CheckBox IsVisible="{Binding ShowCheck}" IsThreeState="True"
+                                          IsChecked="{Binding HeaderChecked, Mode=OneWay}"
+                                          Command="{Binding ToggleChecksCommand}"
+                                          VerticalAlignment="Center"
+                                          AutomationProperties.Name="Select my locks"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Label}" FontWeight="SemiBold"
+                                           VerticalAlignment="Center" Margin="4,0,0,0"/>
+                                <Button Grid.Column="2" Classes="flat" Content="Unlock all"
+                                        Command="{Binding UnlockAllCommand}"
+                                        IsVisible="{Binding ShowUnlockAll}" Padding="6,0"/>
+                            </Grid>
+                        </Border>
+                        <Border Background="Transparent" Padding="8,2" IsVisible="{Binding IsLock}">
+                            <Grid ColumnDefinitions="28,*,Auto,Auto">
+                                <CheckBox Grid.Column="0" IsVisible="{Binding ShowCheck}"
+                                          IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                                          VerticalAlignment="Center"
+                                          AutomationProperties.Name="Select lock"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Path}" Margin="4,0,0,0"/>
+                                <TextBlock Grid.Column="2" Text="{Binding Owner}" VerticalAlignment="Center"
+                                           Opacity="0.75" Margin="8,0" MaxWidth="160" TextTrimming="CharacterEllipsis"/>
+                                <Button Grid.Column="3" Classes="flat" Content="Unlock"
+                                        Command="{Binding UnlockCommand}"
+                                        IsVisible="{Binding ShowUnlock}" Padding="6,0"/>
+                                <Button Grid.Column="3" Classes="flat" Content="Force unlock"
+                                        Command="{Binding UnlockCommand}"
+                                        IsVisible="{Binding ShowForceUnlock}" Padding="6,0"/>
+                            </Grid>
+                        </Border>
+                    </Panel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </Grid>
+</UserControl>

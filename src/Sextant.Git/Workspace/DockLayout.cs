@@ -12,6 +12,8 @@ public static class DockIds
 
     public const string Files = "files";
 
+    public const string Locks = "locks";
+
     public const string Commands = "commands";
 
     public const string Diff = "diff";
@@ -21,10 +23,10 @@ public static class DockIds
     /// <summary>Older layouts used this id for the repository document dock. It is read as <see cref="Diff"/>.</summary>
     public const string Documents = "documents";
 
-    public static readonly string[] Tools = [Locations, History, Changes, Staging, Files, Commands, Diff, Blame];
+    public static readonly string[] Tools = [Locations, History, Changes, Staging, Files, Locks, Commands, Diff, Blame];
 
     public static bool IsKnown(string id) =>
-        id is Locations or History or Changes or Staging or Files or Commands or Diff or Blame;
+        id is Locations or History or Changes or Staging or Files or Locks or Commands or Diff or Blame;
 }
 
 /// <summary>Sextant's own layout record. It is not Dock's object graph.</summary>
@@ -164,7 +166,7 @@ public static class DockLayouts
                     new DockSlot
                     {
                         Proportion = Math.Max(0.34, (1 - fileShare) * 0.82),
-                        Tabs = [DockIds.Diff, DockIds.Blame],
+                        Tabs = [DockIds.Diff, DockIds.Blame, DockIds.Locks],
                         Active = DockIds.Diff,
                     },
                 ],

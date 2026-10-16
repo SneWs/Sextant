@@ -431,6 +431,9 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     private void ShowFiles() => Dock.Show(DockIds.Files);
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
+    private void ShowLfsLocks() => Dock.Show(DockIds.Locks);
+
+    [RelayCommand(CanExecute = nameof(HasActiveTab))]
     private void ShowCommands() => Dock.Show(DockIds.Commands);
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
@@ -592,6 +595,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         ShowDiffCommand.NotifyCanExecuteChanged();
         ShowBlameCommand.NotifyCanExecuteChanged();
         ShowFilesCommand.NotifyCanExecuteChanged();
+        ShowLfsLocksCommand.NotifyCanExecuteChanged();
         ShowCommandsCommand.NotifyCanExecuteChanged();
         ResetLayoutCommand.NotifyCanExecuteChanged();
     }
@@ -1142,6 +1146,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
                 _palette.Add(new PaletteItem { Title = "Abort", Run = tab.AbortMerge });
                 _palette.Add(new PaletteItem { Title = "Save conflict resolution", Run = tab.SaveConflict });
             }
+            _palette.Add(new PaletteItem { Title = "LFS locks", Run = () => { ShowLfsLocks(); return Task.CompletedTask; } });
             _palette.Add(new PaletteItem { Title = "Command log", Run = () => { ShowCommands(); return Task.CompletedTask; } });
         }
 

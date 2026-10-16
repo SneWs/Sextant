@@ -21,6 +21,12 @@ public class LfsLockTests
             ["-C", "repo", "--no-optional-locks", "lfs", "locks", "--cached", "--json"],
             GitCommands.LfsLocksCached("repo"));
         Assert.Equal(
+            ["-C", "repo", "--no-optional-locks", "lfs", "locks", "--verify"],
+            GitCommands.LfsLocksVerify("repo"));
+        Assert.Equal(
+            ["-C", "repo", "--no-optional-locks", "lfs", "locks", "--verify", "--cached", "--json"],
+            GitCommands.LfsLocksVerifyCached("repo"));
+        Assert.Equal(
             ["-C", "repo", "lfs", "lock", "--json", "--", path],
             GitCommands.LfsLock("repo", path));
         Assert.Equal(
@@ -53,6 +59,36 @@ public class LfsLockTests
             ],
             LfsLockParser.Parse(bytes));
         Assert.Empty(LfsLockParser.Parse("[] "u8.ToArray()));
+    }
+
+    [Fact]
+    public void Verifiable_parser_splits_ours_and_theirs_and_rejects_a_flat_list()
+    {
+        var bytes = Encoding.UTF8.GetBytes("""
+            {
+              "ours": [
+                {"id":"own-1","path":"mine.bin","owner":{"name":"Test"}},
+                {"id":"own-2","path":"素材/雪.bin","owner":null}
+              ],
+              "theirs": [
+                {"id":"other-1","path":"other.bin","owner":{"name":"Zoë 雪"}}
+              ],
+              "next_cursor": ""
+            }
+            """);
+        var listing = LfsLockParser.ParseVerifiable(bytes);
+        Assert.True(listing.ForceUnlockSupported);
+        Assert.Equal(
+            [new LfsLock("own-1", "mine.bin", "Test"), new LfsLock("own-2", "素材/雪.bin", "")],
+            listing.Mine);
+        Assert.Equal([new LfsLock("other-1", "other.bin", "Zoë 雪")], listing.Theirs);
+        var nullOurs = LfsLockParser.ParseVerifiable("""{"ours":null,"theirs":[{"id":"only","path":"a.bin"}]}"""u8.ToArray());
+        Assert.Empty(nullOurs.Mine);
+        Assert.Equal([new LfsLock("only", "a.bin", "")], nullOurs.Theirs);
+        Assert.True(nullOurs.ForceUnlockSupported);
+        Assert.Throws<RepositoryActionException>(() => LfsLockParser.ParseVerifiable("[]"u8.ToArray()));
+        Assert.Throws<RepositoryActionException>(() => LfsLockParser.ParseVerifiable("""{"locks":[]}"""u8.ToArray()));
+        Assert.Throws<RepositoryActionException>(() => LfsLockParser.Parse("""{"ours":[],"theirs":[]}"""u8.ToArray()));
     }
 
     [Theory]
@@ -270,6 +306,32 @@ public class LfsLockTests
         Assert.NotEqual(0, error.ExitCode);
         Assert.DoesNotContain("--json", error.Arguments);
         Assert.NotEqual(0, session.Snapshot().Commands.Last().ExitCode);
+    }
+
+    [Fact]
+    public async Task Verifiable_locks_split_ours_from_theirs_and_a_server_error_is_not_an_empty_list()
+    {
+        if (!await GitLfsAvailability.IsInstalledAsync())
+            return;
+        LfsLock[] mine = [new("own-1", "mine.bin", "Test"), new("own-2", "素材/雪.bin", "Test")];
+        LfsLock[] theirs = [new("other-1", "other person's.bin", "Other Person")];
+        await using var server = new LocalLfsLockServer(mine.Concat(theirs), pageSize: 1);
+        using var repo = CreateLfsRepo(server, mine.Concat(theirs).Select(item => item.Path));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+        await using var session = await Open(repo, timeout.Token);
+
+        var listing = await session.LfsLocksVerifiableAsync(timeout.Token);
+        Assert.True(listing.ForceUnlockSupported);
+        Assert.Equal(mine, listing.Mine);
+        Assert.Equal(theirs, listing.Theirs);
+        Assert.Contains(server.Requests, request => request.Method == "POST" && request.Route == "locks/verify" && request.Cursor == "1");
+        Assert.Equal(3, server.Requests.Count(request => request.Route == "locks/verify"));
+
+        server.VerifyStatus = 500;
+        var error = await Assert.ThrowsAsync<GitCommandFailedException>(() => session.LfsLocksVerifiableAsync(timeout.Token));
+        Assert.NotEqual(0, error.ExitCode);
+        Assert.Contains("--verify", error.Arguments);
+        Assert.DoesNotContain("--json", error.Arguments);
     }
 
     private static TempRepo CreateRepo()

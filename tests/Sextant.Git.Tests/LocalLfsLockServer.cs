@@ -32,6 +32,8 @@ internal sealed class LocalLfsLockServer : IAsyncDisposable
 
     public int ListStatus { get; set; } = 200;
 
+    public int VerifyStatus { get; set; } = 200;
+
     public Func<CancellationToken, Task>? BeforeList { get; set; }
 
     public IReadOnlyList<Request> Requests => _requests.ToArray();
@@ -107,15 +109,19 @@ internal sealed class LocalLfsLockServer : IAsyncDisposable
             : uri.AbsolutePath;
         string? path = null;
         var force = false;
+        string? bodyCursor = null;
         if (body.Length > 0)
         {
             using var document = JsonDocument.Parse(body);
-            if (document.RootElement.TryGetProperty("path", out var pathValue))
+            if (document.RootElement.TryGetProperty("path", out var pathValue) && pathValue.ValueKind == JsonValueKind.String)
                 path = pathValue.GetString();
-            if (document.RootElement.TryGetProperty("force", out var forceValue))
-                force = forceValue.GetBoolean();
+            if (document.RootElement.TryGetProperty("force", out var forceValue) && forceValue.ValueKind == JsonValueKind.True)
+                force = true;
+            if (document.RootElement.TryGetProperty("cursor", out var cursorValue) && cursorValue.ValueKind == JsonValueKind.String)
+                bodyCursor = cursorValue.GetString();
         }
         query.TryGetValue("cursor", out var cursor);
+        cursor ??= bodyCursor;
         _requests.Enqueue(new Request(method, route, path, cursor, force));
 
         if (method == "GET" && route == "locks")
@@ -139,6 +145,30 @@ internal sealed class LocalLfsLockServer : IAsyncDisposable
                 ? (offset + page.Length).ToString(CultureInfo.InvariantCulture)
                 : "";
             await RespondAsync(stream, 200, new { locks = page, next_cursor = next }, token);
+            return;
+        }
+
+        if (method == "POST" && route == "locks/verify")
+        {
+            if (VerifyStatus != 200)
+            {
+                await RespondAsync(stream, VerifyStatus, new { message = "Lock verify unavailable" }, token);
+                return;
+            }
+
+            // The fixture has no authenticated user. Locks it created are owned by Test, which is ours.
+            var ordered = _locks.Select(item => (Item: item, Mine: item.Owner == "Test")).ToArray();
+            var offset = string.IsNullOrEmpty(cursor) ? 0 : int.Parse(cursor, CultureInfo.InvariantCulture);
+            var page = ordered.Skip(offset).Take(_pageSize).ToArray();
+            var next = offset + page.Length < ordered.Length
+                ? (offset + page.Length).ToString(CultureInfo.InvariantCulture)
+                : "";
+            await RespondAsync(stream, 200, new
+            {
+                ours = page.Where(item => item.Mine).Select(item => WireLock(item.Item)).ToArray(),
+                theirs = page.Where(item => !item.Mine).Select(item => WireLock(item.Item)).ToArray(),
+                next_cursor = next,
+            }, token);
             return;
         }
 

@@ -17,10 +17,10 @@ A conflict replaces that quiet state with a banner and Continue and Abort. A spa
 Below that, the window is three columns. Drag the splitters to resize them. The widths are remembered.
 
 1. **Locations** lists branches, remotes, tags, stashes, submodules, and worktrees.
-2. **History** and **Repository files** share one dock as tabs. History is the selected tab. Reset layout restores that pair.
-3. **Files and the diff** describe the selected commit, or the working copy.
+2. **History** and **Repository files** share one dock as tabs. History is the selected tab.
+3. **Files and the diff** describe the selected commit, or the working copy. Diff, Blame, and LFS locks share that diff dock. Diff is the selected tab. Reset layout puts LFS locks back with Diff and Blame. A layout saved earlier keeps its own arrangement until then.
 
-View → Window → Locations shows the locations pane and brings it forward. It does not hide it. The command palette has the same action. The other entries in that menu do the same for History, Commit, Changes, Diff, Blame, Repository files, and Command log.
+View → Window → Locations shows the locations pane and brings it forward. It does not hide it. The command palette has the same action. The other entries in that menu do the same for History, Commit, Changes, Diff, Blame, Repository files, LFS locks, and Command log.
 
 ## Locations
 
@@ -122,6 +122,8 @@ On a working-copy file the menu can Track with LFS, Stop tracking with LFS, or D
 Repository, Fetch LFS objects downloads objects for the current commit and leaves the working tree. Repository, Pull LFS files replaces pointer files and leaves files you have changed.
 
 Checkout itself does not ask Git LFS to download. After the branch switch, `git lfs checkout` fills in objects that are already in the local store.
+
+View → Window → LFS locks lists the locks the server currently holds. The pane starts beside Diff and Blame, and Reset layout puts it back there. **My Locks** is the locks you hold. **Locks** is everyone else's. A group with nothing in it is left out. Each of your locks has a checkbox and Unlock. The My Locks bar has a checkbox that checks or clears those rows, and Unlock all while at least one is checked. Unlock all asks, then unlocks the checked rows. Unlock on one of your own locks does not ask. Another person's row shows Force unlock when that server accepted the lock verify call. Force unlock asks before removing the lock. A repository that does not use Git LFS says so and skips the request. When the server has no locks, the pane says No LFS locks. Opening the pane loads the list. F5 reloads it while the pane is selected. The loading and unlocking status appears in the branch bar. A failed lookup clears the list and shows the error banner.
 
 ## Keyboard
 

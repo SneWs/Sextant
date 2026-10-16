@@ -16,6 +16,7 @@ public sealed class ToolViewHost : Panel
             DockIds.Changes => new ChangesToolView(),
             DockIds.Staging => new StagingToolView(),
             DockIds.Files => new RepositoryFilesToolView(),
+            DockIds.Locks => new LfsLocksToolView(),
             DockIds.Commands => new CommandLogToolView(),
             DockIds.Diff or DockIds.Blame => new DiffDocumentView(),
             _ => new Panel(),

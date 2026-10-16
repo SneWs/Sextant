@@ -493,6 +493,8 @@ public partial class RepositoryViewModel : ViewModelBase
         await Session.RefreshRefsAndStatusAsync(ct);
         if (RepositoryFilesTabOn)
             await LoadRepositoryFilesAsync(ct, refreshLocks: true);
+        if (LfsLocksVisible)
+            await LoadLfsLocksGuardedAsync(ct);
     }, refreshRepositoryFiles: false);
 
     public Task RefreshFromFocusAsync()
@@ -779,6 +781,7 @@ public partial class RepositoryViewModel : ViewModelBase
         NotePush();
         NotifyBulkStage();
         NotifyRepositoryFileCommands();
+        NotifyLfsLockCommands();
         NotifyStashCommands();
     }
 
@@ -999,6 +1002,9 @@ public partial class RepositoryViewModel : ViewModelBase
                         BusyText = "";
                 }
             }
+
+            if (LfsLocksVisible && _session is not null && !_lifetime.IsCancellationRequested)
+                await RefreshLfsLocks();
 
             await MaybeSuggestAsync();
         }

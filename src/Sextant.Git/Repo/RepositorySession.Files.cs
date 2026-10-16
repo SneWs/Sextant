@@ -26,11 +26,23 @@ public sealed partial class RepositorySession
         }, ct), cancellationToken);
 
     /// <summary>
+    /// Active locks split into ours and theirs. A server that does not answer the locking API fails this call.
+    /// A successful answer means force unlock is part of that API.
+    /// </summary>
+    public Task<LfsLockListing> LfsLocksVerifiableAsync(CancellationToken cancellationToken) =>
+        RunAsync(ct => _scheduler.ReadAsync(async token =>
+        {
+            Checked(await ExecuteAsync(GitCommands.LfsLocksVerify(_toplevel), null, token).ConfigureAwait(false));
+            var output = Checked(await ExecuteAsync(GitCommands.LfsLocksVerifyCached(_toplevel), null, token).ConfigureAwait(false));
+            return LfsLockParser.ParseVerifiable(output.Stdout);
+        }, ct), cancellationToken);
+
+    /// <summary>
     /// True when this repository has a local LFS address, a local LFS filter command,
     /// or a <c>filter=lfs</c> attribute. Paths come from the repository file list.
     /// A failed probe is false, so a lookup that cannot tell does not call Git LFS.
     /// </summary>
-    public Task<bool> UsesLfsAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken) =>
+    public Task<bool> UsesLfsAsync(IReadOnlyList<string>? paths, CancellationToken cancellationToken) =>
         RunAsync(ct => _scheduler.ReadAsync(token => UsesLfsCoreAsync(paths, token), ct), cancellationToken);
 
     /// <summary>
