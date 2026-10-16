@@ -4,6 +4,7 @@ namespace Sextant;
 
 public static class AppInfo
 {
+    const string DefaultLocalVersion = "1.0.0";
     public const string Copyright = "Copyright © 2026 Marcus Grenängen";
 
     public const string License =
@@ -18,9 +19,25 @@ public static class AppInfo
                 ?.InformationalVersion;
             
             if (string.IsNullOrWhiteSpace(info))
-                return "1.0.0";
+                return DefaultLocalVersion;
 
             return DisplayVersion(info);
+        }
+    }
+    
+    public static bool IsLocalBuild
+    {
+        get
+        {
+            var info = typeof(AppInfo).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion;
+            
+            if (string.IsNullOrWhiteSpace(info))
+                return true;
+
+            return info.Contains('+') || info.StartsWith("v0.0.0", StringComparison.OrdinalIgnoreCase) ||
+                   info.StartsWith($"v{DefaultLocalVersion}", StringComparison.OrdinalIgnoreCase);
         }
     }
 

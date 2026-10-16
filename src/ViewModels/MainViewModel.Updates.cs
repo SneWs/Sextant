@@ -37,6 +37,10 @@ public partial class MainViewModel
         if (!announceWhenCurrent && _settings.SkipUpdatePrompt)
             return;
 
+        // Do not check for updates in a local build. It is not a release, and it is not on GitHub.
+        if (AppInfo.IsLocalBuild)
+            return;
+
         var acquired = false;
         string? previousStatus = null;
         try
@@ -106,6 +110,7 @@ public partial class MainViewModel
                 {
                     if (!announceWhenCurrent)
                         return;
+                    
                     var message = compared == ReleaseCompare.Older
                         ? $"Sextant {AppInfo.Version} is newer than the latest release, {release.Version}."
                         : $"Sextant {AppInfo.Version} is the latest release.";
