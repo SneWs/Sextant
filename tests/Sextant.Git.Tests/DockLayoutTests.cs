@@ -156,7 +156,7 @@ public class DockLayoutTests
         Directory.CreateDirectory(directory);
         try
         {
-            await session.Dispatch(() =>
+            await session.Dispatch(async () =>
             {
                 var state = new WorkspaceState
                 {
@@ -235,10 +235,10 @@ public class DockLayoutTests
                 Assert.True(vm.Dock.IsOpen(DockIds.Diff));
                 AssertVisible(window, DockIds.Diff, "saved-diff");
 
-                vm.Shutdown().GetAwaiter().GetResult();
+                await vm.Shutdown();
                 window.DataContext = null;
                 window.Close();
-                return Task.CompletedTask;
+                return 0;
             }, CancellationToken.None);
         }
         finally
@@ -256,7 +256,7 @@ public class DockLayoutTests
         Directory.CreateDirectory(directory);
         try
         {
-            await session.Dispatch(() =>
+            await session.Dispatch(async () =>
             {
                 var vm = new MainViewModel(new WorkspaceStore(directory), new WorkspaceState(), new AppSettings(), new GitProcessRunner());
                 var tab = new RepositoryViewModel(vm, Path.GetTempPath());
@@ -321,10 +321,10 @@ public class DockLayoutTests
                     $"proportion {floated.Owner?.Proportion}");
                 AssertVisible(window, DockIds.Staging, "floated");
 
-                vm.Shutdown().GetAwaiter().GetResult();
+                await vm.Shutdown();
                 window.DataContext = null;
                 window.Close();
-                return Task.CompletedTask;
+                return 0;
             }, CancellationToken.None);
         }
         finally
