@@ -71,12 +71,194 @@
 # Sextant-win-arm64.msix. Pass win-arm64 as the fourth argument.
 # That identity is not the Store app. Installing one does not update the other.
 #
-# Paste this into the submission's notes for certification:
-#   Sextant is a full-trust desktop Git client. runFullTrust is required
-#   because it launches the system git executable, credential helpers, merge
-#   tools, and WSL. unvirtualizedResources is required so those programs and
-#   Sextant share the user's real AppData, SSH state, and Git config.
-#   Git is not bundled. The app opens without it and asks for an executable.
+# Paste this into the submission's notes for certification, as the
+# unvirtualizedResources business justification.
+#
+# Why Sextant requires unvirtualizedResources
+#
+# Sextant is a full-trust desktop Git client. It does not implement Git
+# itself and it does not ship Git. Every repository operation is the git
+# executable already installed on the machine, or, for a repository opened
+# from WSL, that distribution's git started through wsl.exe. Those processes
+# run hooks, Git LFS, filters, the user's credential helper, SSH, and GPG
+# the same way a terminal does. A commit, push, fetch, merge, or rebase
+# started in Sextant has to read and update the same user state a terminal
+# would.
+#
+# MSIX write virtualization redirects writes under %APPDATA%, %LOCALAPPDATA%,
+# and HKCU into a private per-package store. Processes Sextant starts inherit
+# the package identity, so they are virtualized with it. git.exe in a
+# terminal does not. The first time a helper writes its real configuration,
+# the package gets a private copy that hides the real one. Later Git
+# operations in Sextant and in a terminal then disagree.
+#
+# That state does not live in one folder Sextant owns. It lives wherever the
+# user's existing tools already keep it. Typical cases:
+#
+# - Git Credential Manager keeps configuration and logs under LocalAppData.
+# - Gpg4win keeps the keyring and trust database in %APPDATA%\gnupg. A signed
+#   commit launched from Sextant must use that keyring.
+# - The merge tool, diff tool, and editor named in the user's Git config (for
+#   example Visual Studio Code under %APPDATA%\Code, or Beyond Compare under
+#   its own AppData folder) must see their real settings.
+# - PuTTY, when Git is configured to use plink, keeps sessions in
+#   HKCU\Software\SimonTatham\PuTTY.
+#
+# %USERPROFILE%\.gitconfig and %USERPROFILE%\.ssh are outside AppData, so
+# virtualization does not cover them. Sharing those two paths is not why this
+# capability is declared. The capability is declared so the helpers above
+# stay on the real profile.
+#
+# Sextant's own settings are the other half. The app writes them to
+# %APPDATA%\Sextant (settings.json, workspace.json, and user theme files
+# under themes). That is the same folder the zip build uses, and the
+# published privacy policy says uninstall leaves it in place. With
+# virtualization left on, those files would go into the package store, the
+# Store build and the zip build would keep two copies, and uninstall would
+# delete the Store copy.
+#
+# File-system and registry write virtualization are both set to disabled in
+# the manifest. The package minimum is Windows 10.0.19041.0, so a machine
+# that would ignore that switch cannot install it. The app runs as the
+# current user. It is not elevated. It does not write HKLM, install a
+# service, or change ACLs.
+#
+# Alternatives we considered
+#
+# 1. Leave virtualization on and drop unvirtualizedResources. Sextant
+#    settings would move into the package store and would no longer match the
+#    zip build or the documented path. Helpers started by Sextant would
+#    shadow AppData and HKCU on first write. We would ship a Git client whose
+#    credential helper, GPG keyring, and merge tool disagree with the
+#    terminal.
+# 2. Exclude only %APPDATA%\Sextant (flexible virtualization). That still
+#    requires unvirtualizedResources, and it only fixes our settings file.
+#    On Windows 11 an exclusion list replaces the full disable. The list can
+#    name only paths under %USERPROFILE%\AppData and keys under HKCU, and
+#    only paths known when the package is built. The helper, the GPG home,
+#    the merge tool, and the SSH client are chosen in the user's Git config.
+#    We cannot enumerate them. Windows 10 at our minimum version honors the
+#    desktop6 disable switch rather than a selective list, so an
+#    exclusion-only manifest would leave those systems virtualized there.
+# 3. Declare broadFileSystemAccess instead. That does not turn write
+#    virtualization off. It is a broader grant than this app needs. We do
+#    not declare it.
+# 4. Bundle Git inside the MSIX, or call a library such as libgit2 from the
+#    package. A bundled git.exe would still be a child of the package and
+#    would still be virtualized. It would also ignore the user's installed
+#    Git, including Git LFS, hooks, credential helpers, and a WSL
+#    distribution's Git. libgit2 would not run those either. The product is
+#    a client for the Git the user already has.
+# 5. Copy .gitconfig, .ssh, or the GPG home into the package store. That
+#    copies secrets, and the copy diverges from the terminal the next time
+#    either side writes. .gitconfig and .ssh are not virtualized to begin
+#    with. Copying them does not fix AppData or HKCU.
+# 6. Rely on runFullTrust alone. Full trust is what lets Sextant start
+#    git.exe, a credential helper, a merge tool, and wsl.exe. It does not
+#    disable write virtualization. The desktop6 elements do, and those
+#    elements require unvirtualizedResources.
+#
+# Functionality that needs the capability
+#
+# - Opening a repository and running status, commit, fetch, pull, push,
+#   merge, rebase, and Git LFS through the system git, so the user's
+#   credential helper, SSH, and GPG see the same profile as a terminal.
+# - Opening a repository that lives in a WSL distribution, by starting
+#   wsl.exe so that distribution's Git, config, hooks, and credential
+#   helpers run.
+# - Launching the merge command and the file-type formatter commands the
+#   user set in Settings. Those are arbitrary executables the user named.
+#   They read their own AppData.
+# - Saving Sextant settings, the window layout, and user themes in the real
+#   %APPDATA%\Sextant, shared with the zip build and kept across uninstall.
+#
+# Less privileged package access cannot name those third-party locations
+# ahead of time, and it cannot make a child process share the terminal's
+# profile.
+#
+# Least privilege
+#
+# The manifest declares two restricted capabilities: runFullTrust and
+# unvirtualizedResources. It does not declare broadFileSystemAccess or any
+# library, storage, or device capability.
+#
+# Sextant itself writes no registry values. Registry virtualization is
+# disabled so the programs Git launches see the real HKCU.
+#
+# Sextant's own persistent files are only under %APPDATA%\Sextant:
+#
+# - settings.json (appearance, diff, the path to git.exe, the merge command,
+#   update prompt)
+# - workspace.json (open tabs, layout, hidden branches)
+# - themes\ (theme files the user adds; the app creates this folder when the
+#   user opens it)
+# - a .tmp file beside those JSON files during the save, then replaced over
+#   the destination
+#
+# Settings are not written into Git config. An SSH passphrase can be kept in
+# memory for the current process if the user checks that box. It is not
+# written to disk. The on-screen command log removes a token embedded in an
+# HTTPS URL, is not saved, and is not sent anywhere. The app has no account,
+# no telemetry, and no crash reporting. The only request Sextant makes on
+# its own is the GitHub release check, which the user can turn off.
+#
+# Safeguards
+#
+# - The app runs as the signed-in user and is not elevated.
+# - Adding a repository to the global safe.directory list is a confirmation.
+#   The dialog states that the path is added to the global list. The app
+#   does not add it otherwise.
+# - The committer name and email default to "This repository only"
+#   (.git/config). "Global, all repositories" is a separate choice and writes
+#   %USERPROFILE%\.gitconfig through git config --global.
+# - Commit messages, hunk patches, and formatter inputs are written under
+#   %TEMP% with a sextant- prefix and deleted when the operation finishes,
+#   including on failure.
+# - The app does not install a credential helper, does not read the Windows
+#   credential vault for itself, and does not copy SSH keys or GPG keys.
+#
+# Assurance
+#
+# unvirtualizedResources will be used only so Sextant and the programs it
+# launches share the real user profile with a terminal. Sextant will not use
+# it to collect data, to write unrelated locations, or to store credentials
+# for itself.
+#
+# Writes from Sextant are limited to:
+#
+# 1. %APPDATA%\Sextant\, as listed above.
+# 2. The repository directory the user opened, cloned, or created, including
+#    its .git directory. Those writes are performed by the system git when
+#    the user runs a Git command.
+# 3. %USERPROFILE%\.gitconfig, only when the user saves a global committer
+#    name and email, or confirms a safe.directory entry.
+# 4. %TEMP%\sextant-*, deleted at the end of the operation.
+# 5. A path the user picks in a Save dialog, such as an exported patch.
+#
+# Programs the user has already configured (credential helper, SSH, GPG,
+# merge tool, formatter) continue to write where they already write when Git
+# is run from a terminal. Sextant does not choose those paths and does not
+# add a second copy of them.
+#
+# Uninstall
+#
+# Sextant does not register an uninstall action and does not delete files on
+# uninstall.
+#
+# %APPDATA%\Sextant is left in place on purpose. It holds the settings and
+# layout described above, not credentials and not repository contents. The
+# user can delete that folder. This is the published behavior in the privacy
+# policy (https://github.com/SneWs/Sextant/blob/master/docs/privacy.md):
+# uninstalling Sextant does not delete the folder. Keeping it means a later
+# reinstall, and the GitHub zip build, still see the same settings.
+# Microsoft's description of this capability is that unvirtualized AppData
+# is not removed on uninstall, for data the user expects to keep.
+#
+# Uninstall also does not remove the user's repositories,
+# %USERPROFILE%\.gitconfig, %USERPROFILE%\.ssh, the GPG home, or the
+# credential store. Those are the user's. Leftover %TEMP%\sextant-* files
+# are only possible if the process exits before the normal cleanup. They
+# are a commit message, a patch, or a formatter input.
 
 [CmdletBinding()]
 param(

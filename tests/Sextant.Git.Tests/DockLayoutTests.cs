@@ -128,6 +128,227 @@ public class DockLayoutTests
     }
 
     [Fact]
+    public void Closing_a_tool_from_its_chrome_and_choosing_it_again_shows_it()
+    {
+        using var vm = Open(new WorkspaceState());
+        var dock = vm.View.Dock;
+        foreach (var id in new[]
+        {
+            DockIds.Locations, DockIds.History, DockIds.Files, DockIds.Changes,
+            DockIds.Staging, DockIds.Diff, DockIds.Blame, DockIds.Locks,
+        })
+        {
+            var tool = SextantDockFactory.Collect(dock.Root).OfType<RepositoryTool>().Single(item => item.ToolId == id);
+            dock.Factory.CloseDockable(tool);
+            Assert.False(dock.IsOpen(id));
+
+            dock.Show(id);
+            Assert.True(dock.IsOpen(id), id);
+            Assert.True(dock.IsSelected(id), id);
+        }
+    }
+
+    [Fact]
+    public async Task Saved_layout_without_locks_shows_that_pane_from_the_window_menu()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-dock-saved-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(() =>
+            {
+                var state = new WorkspaceState
+                {
+                    DockLayout = new DockLayout
+                    {
+                        Schema = DockLayouts.CurrentSchema,
+                        Root = new DockSplit
+                        {
+                            Orientation = "horizontal",
+                            Slots =
+                            [
+                                new DockSlot { Id = DockIds.Locations, Proportion = 0.16 },
+                                new DockSlot
+                                {
+                                    Proportion = 0.28,
+                                    Split = new DockSplit
+                                    {
+                                        Orientation = "vertical",
+                                        Slots =
+                                        [
+                                            new DockSlot { Id = DockIds.Changes, Proportion = 0.23 },
+                                            new DockSlot
+                                            {
+                                                Proportion = 0.77,
+                                                Tabs = [DockIds.History, DockIds.Files],
+                                                Active = DockIds.History,
+                                            },
+                                        ],
+                                    },
+                                },
+                                new DockSlot
+                                {
+                                    Proportion = 0.56,
+                                    Split = new DockSplit
+                                    {
+                                        Orientation = "vertical",
+                                        Slots =
+                                        [
+                                            new DockSlot { Id = DockIds.Staging, Proportion = 0.25 },
+                                            new DockSlot
+                                            {
+                                                Proportion = 0.75,
+                                                Tabs = [DockIds.Diff, DockIds.Blame],
+                                                Active = DockIds.Diff,
+                                            },
+                                        ],
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                };
+                var vm = new MainViewModel(new WorkspaceStore(directory), state, new AppSettings(), new GitProcessRunner());
+                vm.Tabs.Add(new RepositoryViewModel(vm, Path.GetTempPath()));
+                vm.ActiveTab = vm.Tabs[0];
+                var window = new MainWindow { DataContext = vm, Width = 1400, Height = 900 };
+                window.Show();
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.False(vm.Dock.IsOpen(DockIds.Locks));
+                vm.ShowLfsLocksCommand.Execute(null);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(vm.Dock.IsOpen(DockIds.Locks));
+                Assert.True(vm.Dock.IsSelected(DockIds.Locks));
+                AssertVisible(window, DockIds.Locks, "saved");
+
+                var diff = SextantDockFactory.Collect(vm.Dock.Root).OfType<RepositoryTool>().Single(item => item.ToolId == DockIds.Diff);
+                vm.Dock.Factory.CloseDockable(diff);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                vm.ShowDiffCommand.Execute(null);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(vm.Dock.IsOpen(DockIds.Diff));
+                AssertVisible(window, DockIds.Diff, "saved-diff");
+
+                vm.Shutdown().GetAwaiter().GetResult();
+                window.DataContext = null;
+                window.Close();
+                return Task.CompletedTask;
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Closed_pane_comes_back_from_the_window_menu()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-dock-reshow-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(() =>
+            {
+                var vm = new MainViewModel(new WorkspaceStore(directory), new WorkspaceState(), new AppSettings(), new GitProcessRunner());
+                var tab = new RepositoryViewModel(vm, Path.GetTempPath());
+                vm.Tabs.Add(tab);
+                vm.ActiveTab = tab;
+                var window = new MainWindow { DataContext = vm, Width = 1400, Height = 900 };
+                window.Show();
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                var menu = NativeMenu.GetMenu(window);
+                var view = menu!.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_View");
+                var panes = view.Menu!.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Window");
+                var blameItem = panes.Menu!.Items.OfType<NativeMenuItem>().Single(item => item.Header == "_Blame");
+                Assert.NotNull(blameItem.Command);
+                Assert.True(blameItem.Command!.CanExecute(blameItem.CommandParameter));
+
+                foreach (var (id, command) in new (string Id, System.Windows.Input.ICommand Command)[]
+                {
+                    (DockIds.Blame, vm.ShowBlameCommand),
+                    (DockIds.Locks, vm.ShowLfsLocksCommand),
+                    (DockIds.Files, vm.ShowFilesCommand),
+                    (DockIds.Locations, vm.ShowLocationsCommand),
+                    (DockIds.History, vm.ShowHistoryCommand),
+                    (DockIds.Changes, vm.ShowChangesCommand),
+                    (DockIds.Staging, vm.ShowStagingCommand),
+                    (DockIds.Diff, vm.ShowDiffCommand),
+                })
+                {
+                    Assert.True(HasTool(window, id), $"before {id}");
+                    var tool = SextantDockFactory.Collect(vm.Dock.Root).OfType<RepositoryTool>().Single(item => item.ToolId == id);
+                    vm.Dock.Factory.CloseDockable(tool);
+                    window.UpdateLayout();
+                    Dispatcher.UIThread.RunJobs();
+                    Assert.False(vm.Dock.IsOpen(id), $"closed {id} dockOpen={tool.IsOpen} state={tool.DockingState} owner={tool.Owner?.GetType().Name}");
+                    Assert.False(HasTool(window, id), $"closed view {id}");
+
+                    Assert.True(command.CanExecute(null), id);
+                    command.Execute(null);
+                    window.UpdateLayout();
+                    Dispatcher.UIThread.RunJobs();
+                    Assert.True(vm.Dock.IsOpen(id), $"menu {id} dockOpen={tool.IsOpen} state={tool.DockingState} hidden={vm.Dock.Root?.HiddenDockables?.Count}");
+                    Assert.True(vm.Dock.IsSelected(id), $"selected {id}");
+                    AssertVisible(window, id, "shown");
+                }
+
+                var floated = SextantDockFactory.Collect(vm.Dock.Root).OfType<RepositoryTool>().Single(item => item.ToolId == DockIds.Staging);
+                vm.Dock.Factory.FloatDockable(floated);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(vm.Dock.IsOpen(DockIds.Staging));
+                var host = vm.Dock.Root?.Windows?.LastOrDefault()?.Host as Window;
+                Assert.NotNull(host);
+                host.Close();
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                vm.ShowStagingCommand.Execute(null);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(vm.Dock.IsOpen(DockIds.Staging));
+                Assert.True(floated.Owner is not null && (double.IsNaN(floated.Owner.Proportion) || floated.Owner.Proportion > 0.02),
+                    $"proportion {floated.Owner?.Proportion}");
+                AssertVisible(window, DockIds.Staging, "floated");
+
+                vm.Shutdown().GetAwaiter().GetResult();
+                window.DataContext = null;
+                window.Close();
+                return Task.CompletedTask;
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static bool HasTool(Window window, string id) =>
+        window.GetVisualDescendants().OfType<Control>().Any(control => control.DataContext is RepositoryTool item && item.ToolId == id);
+
+    private static void AssertVisible(Window window, string id, string when)
+    {
+        var matches = window.GetVisualDescendants().OfType<ContentControl>()
+            .Where(control => control.Content is RepositoryTool item && item.ToolId == id)
+            .Select(control => $"{control.GetType().Name} vis={control.IsEffectivelyVisible} {control.Bounds.Width:0.#}x{control.Bounds.Height:0.#}")
+            .ToList();
+        Assert.True(
+            matches.Any(match => match.Contains("vis=True") && !match.Contains("x0") && !match.Contains(" 0x")),
+            $"{when} {id} :: {(matches.Count == 0 ? "none" : string.Join(" | ", matches))}");
+    }
+
+    [Fact]
     public void Closing_blame_and_opening_it_again_puts_it_back_with_the_diff()
     {
         using var vm = Open(new WorkspaceState());

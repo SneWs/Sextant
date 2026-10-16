@@ -20,7 +20,7 @@ Below that, the window is three columns. Drag the splitters to resize them. The 
 2. **History** and **Repository files** share one dock as tabs. History is the selected tab.
 3. **Files and the diff** describe the selected commit, or the working copy. Diff, Blame, and LFS locks share that diff dock. Diff is the selected tab. Reset layout puts LFS locks back with Diff and Blame. A layout saved earlier keeps its own arrangement until then.
 
-View → Window → Locations shows the locations pane and brings it forward. It does not hide it. The command palette has the same action. The other entries in that menu do the same for History, Commit, Changes, Diff, Blame, Repository files, LFS locks, and Command log.
+View → Window → Locations shows the locations pane and brings it forward. It does not hide it. A pane that was closed comes back. A pane that is open but has no space left in the split, which is what closing its floating window used to leave behind, is given a share again. The command palette has the same action. The other entries in that menu do the same for History, Commit, Changes, Diff, Blame, Repository files, LFS locks, and Command log.
 
 ## Locations
 

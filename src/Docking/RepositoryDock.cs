@@ -91,14 +91,29 @@ public partial class RepositoryDock : ObservableObject
         return InMain(tool) || Pinned(tool) || Floated(tool);
     }
 
-    /// <summary>Opens a tool and selects it. An open tool stays open.</summary>
+    /// <summary>Opens a tool and selects it. An open tool stays open. A tool squeezed to nothing gets a share of its split.</summary>
     public void Show(string id)
     {
-        if (!_tools.ContainsKey(id))
+        if (!_tools.TryGetValue(id, out var tool))
             return;
         if (!IsOpen(id))
             SetOpen(id, true);
+        else
+            GiveRoom(tool);
         BringForward(id);
+    }
+
+    /// <summary>
+    /// A proportion of 0 is a real value, so the split gives that pane no space. NaN means the split
+    /// has not assigned one yet. Closing a floating window used to dock the pane back at 0.
+    /// </summary>
+    private static void GiveRoom(RepositoryTool tool)
+    {
+        for (IDockable? node = tool.Owner; node is not null and not IRootDock; node = node.Owner)
+        {
+            if (!double.IsNaN(node.Proportion) && node.Proportion <= 0.001)
+                node.Proportion = 0.22;
+        }
     }
 
     public bool IsSelected(string id) =>
@@ -286,14 +301,18 @@ public partial class RepositoryDock : ObservableObject
             Id = "rehome-" + tool.ToolId,
             Alignment = Alignment.Left,
             VisibleDockables = Factory.CreateList<IDockable>(),
+            Proportion = 0.22,
         };
         if (tool.ToolId == DockIds.Changes)
             host.MinHeight = ChangesPaneMinHeight;
+        // An empty dock is collapsible. Adding it first lays it out at no size and stores that as
+        // proportion 0, which then keeps the pane invisible after the tool moves in.
+        if (!ReferenceEquals(source, host))
+            Factory.MoveDockable(source, host, tool, null);
+        host.Proportion = 0.22;
         if (main.VisibleDockables is { Count: > 0 })
             Factory.AddDockable(main, Factory.CreateProportionalDockSplitter());
         Factory.AddDockable(main, host);
-        if (!ReferenceEquals(source, host))
-            Factory.MoveDockable(source, host, tool, null);
     }
 
     private RepositoryViewModel? _focusedHook;
