@@ -200,6 +200,17 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         ActiveTab = tab;
         TitleText = $"Sextant — {tab.Title}";
         Save();
+        // The strip is bound already. Present it before open, diff, and locks.
+        // Those continuations resume above render and would hold the first frame.
+        await Dispatcher.Yield(DispatcherPriority.Background);
+        if (!Tabs.Contains(tab) || _lifetime.IsCancellationRequested)
+            return;
+        // A saved UNC path has no distribution binding yet. Only the tab being
+        // opened pays for that WSL lookup.
+        await EnsureTabWslAsync(tab);
+        if (!Tabs.Contains(tab) || _lifetime.IsCancellationRequested)
+            return;
+        TitleText = $"Sextant — {tab.Title}";
         await tab.EnsureLoadedAsync();
         // The first selection loads the repository. A later switch refreshes it
         // the same way focusing the window does, so commits and files stay current.
@@ -610,33 +621,86 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     private async Task InitializeCoreAsync()
     {
-        await Task.WhenAll(ProbeAsync(), RefreshWslAsync());
-        if (_lifetime.IsCancellationRequested)
-            return;
+        // The welcome screen is ActiveTab == null. Saved tabs are already in
+        // memory. Git, WSL, and directory probes used to run before this and
+        // held the empty window for many seconds.
+        RepositoryViewModel? active = null;
         if (_settings.ReopenTabs)
         {
-            foreach (var path in _workspace.OpenTabs)
-            {
-                if (string.IsNullOrWhiteSpace(path))
-                    continue;
-                var canonical = WslPath.CanonicalWindows(path);
-                var openPath = Directory.Exists(canonical) ? canonical : path;
-                if (!Directory.Exists(openPath))
-                    continue;
-                if (Tabs.Any(tab => SameTab(tab, openPath)))
-                    continue;
-                Tabs.Add(CreateTab(openPath, await BindingForAsync(openPath)));
-            }
-
-            var active = Tabs.FirstOrDefault(tab => _workspace.ActiveTab is not null && SameTab(tab, _workspace.ActiveTab));
-            if (active is null && Tabs.Count > 0)
-                active = Tabs[0];
+            active = RestoreSavedTabs();
             if (active is not null)
-                await Activate(active);
+                ShowTab(active);
         }
 
-        _started = true;
-        ArmPeriodicFetch();
+        await Dispatcher.Yield(DispatcherPriority.Background);
+        if (_lifetime.IsCancellationRequested)
+            return;
+
+        // The distribution list is for the Open from WSL command. It must not
+        // sit in front of the active repository.
+        var distributions = RefreshWslAsync();
+        try
+        {
+            await ProbeAsync();
+            if (_lifetime.IsCancellationRequested)
+                return;
+            if (active is not null && Tabs.Contains(active))
+                await Activate(active);
+        }
+        finally
+        {
+            _started = true;
+            ArmPeriodicFetch();
+        }
+
+        try
+        {
+            await distributions;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private RepositoryViewModel? RestoreSavedTabs()
+    {
+        foreach (var path in _workspace.OpenTabs)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                continue;
+            var openPath = WslPath.CanonicalWindows(path);
+            if (Tabs.Any(tab => SameTab(tab, openPath) || SameTab(tab, path)))
+                continue;
+            Tabs.Add(CreateTab(openPath));
+        }
+
+        RepositoryViewModel? active = null;
+        if (!string.IsNullOrWhiteSpace(_workspace.ActiveTab))
+        {
+            var canonical = WslPath.CanonicalWindows(_workspace.ActiveTab);
+            active = Tabs.FirstOrDefault(tab => SameTab(tab, canonical) || SameTab(tab, _workspace.ActiveTab));
+        }
+
+        return active ?? (Tabs.Count > 0 ? Tabs[0] : null);
+    }
+
+    private void ShowTab(RepositoryViewModel tab)
+    {
+        foreach (var other in Tabs)
+            other.IsActive = other == tab;
+        ActiveTab = tab;
+        TitleText = $"Sextant — {tab.Title}";
+        Save();
+    }
+
+    private async Task EnsureTabWslAsync(RepositoryViewModel tab)
+    {
+        if (tab.Wsl is not null || !WslPath.TryParseUnc(tab.RequestedPath, out _, out _))
+            return;
+        var binding = await BindingForAsync(tab.RequestedPath);
+        if (binding is null || !Tabs.Contains(tab) || _lifetime.IsCancellationRequested)
+            return;
+        tab.UseWsl(binding);
     }
 
     /// <summary>Test hook. The next wait uses this delay, then the schedule starts again.</summary>

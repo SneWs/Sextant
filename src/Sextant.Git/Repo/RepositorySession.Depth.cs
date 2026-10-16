@@ -269,7 +269,7 @@ public sealed partial class RepositorySession
         else if (!string.IsNullOrEmpty(document.RawPatch))
         {
             var probes = 0;
-            foreach (var file in DiffParser.ParseFiles(document.RawPatch))
+            foreach (var file in DiffParser.Slices(document))
             {
                 if (string.IsNullOrEmpty(file.Path) || !MayBePointer(file.Document))
                     continue;

@@ -188,6 +188,61 @@ public class TabBarTests
     }
 
     [Fact]
+    public async Task Startup_shows_saved_tabs_and_loads_only_the_active_repository()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var activeRepo = new TempRepo();
+        activeRepo.WriteFile("a.txt", "one\n");
+        activeRepo.CommitAll("active");
+        using var idleRepo = new TempRepo();
+        idleRepo.WriteFile("b.txt", "two\n");
+        idleRepo.CommitAll("idle");
+        var missing = Path.Combine(Path.GetTempPath(), "sextant-missing-" + Guid.NewGuid().ToString("N"));
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-startup-tabs-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var store = new WorkspaceStore(directory);
+            var workspace = store.LoadWorkspace();
+            workspace.OpenTabs = [activeRepo.Directory, missing, idleRepo.Directory];
+            workspace.ActiveTab = activeRepo.Directory;
+            store.SaveWorkspace(workspace);
+
+            await session.Dispatch(async () =>
+            {
+                var vm = new MainViewModel(
+                    store,
+                    store.LoadWorkspace(),
+                    new AppSettings { GitExecutable = activeRepo.Git, ReopenTabs = true },
+                    new GitProcessRunner());
+                await vm.InitializeAsync();
+                try
+                {
+                    Assert.False(vm.ShowEmpty);
+                    Assert.Equal(3, vm.Tabs.Count);
+                    Assert.Same(vm.Tabs[0], vm.ActiveTab);
+                    Assert.True(vm.ActiveTab!.IsReady);
+                    Assert.Contains(vm.ActiveTab.Rows, row => row.Subject == "active");
+                    Assert.False(vm.Tabs[1].IsReady);
+                    Assert.False(vm.Tabs[2].IsReady);
+                    Assert.Empty(vm.Tabs[2].Rows);
+                    Assert.False(vm.Tabs[1].HasBanner);
+                    Assert.False(vm.Tabs[2].HasBanner);
+                }
+                finally
+                {
+                    await vm.Shutdown();
+                }
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Shutdown_shares_completion_and_window_close_waits_for_it()
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));

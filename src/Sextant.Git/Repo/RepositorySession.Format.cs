@@ -39,7 +39,7 @@ public sealed partial class RepositorySession
         if (rules.Count == 0 || document.IsTooLarge || string.IsNullOrEmpty(document.RawPatch))
             return document;
 
-        var files = DiffParser.ParseFiles(document.RawPatch);
+        var files = DiffParser.Slices(document);
         if (files.Count == 0)
             return document;
 

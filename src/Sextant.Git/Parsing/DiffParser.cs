@@ -93,6 +93,20 @@ public static partial class DiffParser
         return files;
     }
 
+    /// <summary>File slices already stored on the document, or a fresh parse when a caller built the document by hand.</summary>
+    public static IReadOnlyList<DiffFileSlice> Slices(DiffDocument document)
+    {
+        if (document.Parts.Count > 0)
+            return document.Parts;
+        if (string.IsNullOrEmpty(document.RawPatch))
+            return [];
+        var parsed = ParseFiles(document.RawPatch);
+        var slices = new DiffFileSlice[parsed.Count];
+        for (var i = 0; i < parsed.Count; i++)
+            slices[i] = new DiffFileSlice(parsed[i].Path, parsed[i].Document);
+        return slices;
+    }
+
     /// <summary>
     /// A diff header path and a file-list path name the same file.
     /// Slashes are ignored so a Windows path still matches git's forward slashes.

@@ -3,7 +3,8 @@ namespace Sextant.Git.Repo;
 public sealed class RepositoryScheduler : IDisposable
 {
     private readonly object _gate = new();
-    private readonly SemaphoreSlim _readSlots = new(2, 2);
+    // Status, history, ref queries, and the file list start together.
+    private readonly SemaphoreSlim _readSlots = new(4, 4);
     private readonly SemaphoreSlim _write = new(1, 1);
     private CancellationTokenSource _epoch = new();
     private int _activeReads;
