@@ -98,6 +98,11 @@
                     </Grid>
                     <TextBlock TextWrapping="Wrap" Opacity="0.75"
                                Text="An empty path uses the git executable on PATH."/>
+                    <TextBlock Text="When pulling" Opacity="0.75" Margin="0,8,0,0"/>
+                    <RadioButton x:Name="PullRebaseOption" Content="Rebase" GroupName="SextantPull"/>
+                    <RadioButton x:Name="PullMergeOption" Content="Merge" GroupName="SextantPull"/>
+                    <TextBlock TextWrapping="Wrap" Opacity="0.75"
+                               Text="Pull uses this choice. Pull with rebase always rebases. Tracked changes are stashed and applied again when the pull finishes. Untracked files stay in the worktree."/>
                 </StackPanel>
 
                 <StackPanel x:Name="MergePage" Spacing="8" IsVisible="False">

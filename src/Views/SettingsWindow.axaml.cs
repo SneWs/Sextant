@@ -24,6 +24,9 @@ public partial class SettingsWindow : Window
         Inline.IsChecked = !draft.SideBySide;
         SideBySide.IsChecked = draft.SideBySide;
         IgnoreWhitespace.IsChecked = draft.IgnoreWhitespace;
+        var pull = PullPreference.Normalize(draft.PullMode);
+        PullRebaseOption.IsChecked = pull == PullPreference.Rebase;
+        PullMergeOption.IsChecked = pull == PullPreference.Merge;
         LoadFonts(draft.DiffFont, draft.DiffFontSize);
         MergeCommand.Text = draft.MergeTool;
         LoadFormats(draft.DiffFormats);
@@ -233,7 +236,8 @@ public partial class SettingsWindow : Window
             formats,
             palette.Id,
             SelectedFont(),
-            SelectedSize());
+            SelectedSize(),
+            PullMergeOption.IsChecked == true ? PullPreference.Merge : PullPreference.Rebase);
         Close();
     }
 

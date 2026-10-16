@@ -89,7 +89,8 @@ public sealed record SettingsDraft(
     IReadOnlyList<DiffFormatRule>? DiffFormats = null,
     string? Palette = null,
     string? DiffFont = null,
-    double DiffFontSize = DiffFontPreference.DefaultSize);
+    double DiffFontSize = DiffFontPreference.DefaultSize,
+    string? PullMode = null);
 
 public sealed record SecretPrompt(string? Value, bool RememberForSession);
 
@@ -114,6 +115,9 @@ public interface IWorkspaceHost
 
     /// <summary>File type tools. Empty when the host has none.</summary>
     IReadOnlyList<DiffFormatRule> DiffFormats => [];
+
+    /// <summary><see cref="PullPreference.Rebase"/> or <see cref="PullPreference.Merge"/>.</summary>
+    string PullMode => PullPreference.Rebase;
 
     bool GitReady { get; }
 

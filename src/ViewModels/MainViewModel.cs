@@ -77,6 +77,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     public IReadOnlyList<DiffFormatRule> DiffFormats => DiffFormatRules.Normalize(_settings.DiffFormats);
 
+    public string PullMode => PullPreference.Normalize(_settings.PullMode);
+
     [ObservableProperty]
     public partial bool GitReady { get; set; }
 
@@ -949,7 +951,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             DiffFormatRules.Normalize(_settings.DiffFormats),
             _settings.Palette,
             _settings.DiffFont,
-            _settings.DiffFontSize));
+            _settings.DiffFontSize,
+            _settings.PullMode));
         if (edit is null)
             return;
         var path = string.IsNullOrWhiteSpace(edit.GitExecutable) ? null : edit.GitExecutable.Trim();
@@ -971,6 +974,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         var font = DiffFontPreference.Normalize(edit.DiffFont);
         _settings.DiffFont = font.Length == 0 ? null : font;
         _settings.DiffFontSize = DiffFontPreference.NormalizeSize(edit.DiffFontSize);
+        _settings.PullMode = PullPreference.Normalize(edit.PullMode);
         _store.SaveSettings(_settings);
         AppTheme.Apply(_settings.Theme, _settings.Palette);
         DiffFont.Apply(_settings.DiffFont, _settings.DiffFontSize);

@@ -92,6 +92,10 @@ public class GitCommandTests
             ["-C", "repo", "pull", "--rebase", "--autostash", "--progress", "--no-edit"],
             GitCommands.Pull("repo"));
         Assert.Equal(GitCommands.Pull("repo"), GitCommands.PullRebase("repo"));
+        Assert.Equal(
+            ["-C", "repo", "pull", "--no-rebase", "--autostash", "--progress", "--no-edit"],
+            GitCommands.Pull("repo", rebase: false));
+        Assert.DoesNotContain(GitCommands.Pull("repo", rebase: false), argument => argument == "--rebase");
         Assert.DoesNotContain("--no-verify", GitCommands.Push("repo"));
         Assert.Contains("--no-verify", GitCommands.Push("repo", noVerify: true));
         Assert.DoesNotContain("--no-verify", GitCommands.PushUpstream("repo", "origin", "topic"));
