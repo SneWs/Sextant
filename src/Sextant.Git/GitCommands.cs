@@ -634,11 +634,12 @@ public static class GitCommands
     public static IReadOnlyList<string> FetchAllPrune(string toplevel) =>
         ["-C", toplevel, "fetch", "--all", "--prune", "--progress"];
 
+    // Default pull and the rebase menu item are one command. --autostash stashes
+    // tracked changes and applies them when the rebase ends, including after continue or abort.
     public static IReadOnlyList<string> Pull(string toplevel) =>
-        ["-C", toplevel, "pull", "--rebase", "--progress", "--no-edit"];
-
-    public static IReadOnlyList<string> PullRebase(string toplevel) =>
         ["-C", toplevel, "pull", "--rebase", "--autostash", "--progress", "--no-edit"];
+
+    public static IReadOnlyList<string> PullRebase(string toplevel) => Pull(toplevel);
 
     public static IReadOnlyList<string> Push(string toplevel, bool noVerify = false)
     {

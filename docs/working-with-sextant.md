@@ -95,7 +95,7 @@ PNG, JPG, JPEG, GIF, BMP, WEBP, ICO, SVG, TIF, and TIFF open as a picture of eac
 
 ## Fetch, pull, and push
 
-Pull takes the upstream of the current branch. The menu on that button also offers Pull, Pull with rebase, Fetch, Fetch all, and Fetch all and clean up. Pull with rebase rebases your local commits onto the upstream and passes --autostash, so uncommitted changes are stashed and restored around the rebase. Fetch all and clean up prunes remote-tracking branches that the remote has deleted. Pull is Ctrl+Shift+U (Command+Shift+U on macOS) and Push is Ctrl+Shift+P (Command+Shift+P). Both are also in the Repository menu.
+Pull takes the upstream of the current branch and rebases local commits onto it. It passes `--autostash`, so tracked changes, staged or unstaged, are stashed and applied again when the rebase finishes, including after continue or abort. Untracked files stay in the worktree. The menu on that button also offers Pull, Pull with rebase (the same command), Fetch, Fetch all, and Fetch all and clean up. Fetch all and clean up prunes remote-tracking branches that the remote has deleted. Pull is Ctrl+Shift+U (Command+Shift+U on macOS) and Push is Ctrl+Shift+P (Command+Shift+P). Both are also in the Repository menu.
 
 Push sends the current branch. The menu offers Push ignoring local checks, which skips hooks, and Push with force-with-lease. Force-with-lease refuses to overwrite remote commits that you have not seen. It is not a plain force.
 

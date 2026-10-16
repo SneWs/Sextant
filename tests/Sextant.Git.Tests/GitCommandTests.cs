@@ -88,8 +88,10 @@ public class GitCommandTests
             GitCommands.NotOnRemoteCount("repo", "origin"));
         Assert.Contains("--no-edit", GitCommands.Merge("repo", "topic"));
         Assert.Equal(["-C", "repo", "rebase", "topic"], GitCommands.Rebase("repo", "topic"));
-        Assert.Contains("--no-edit", GitCommands.Pull("repo"));
-        Assert.Contains("--rebase", GitCommands.Pull("repo"));
+        Assert.Equal(
+            ["-C", "repo", "pull", "--rebase", "--autostash", "--progress", "--no-edit"],
+            GitCommands.Pull("repo"));
+        Assert.Equal(GitCommands.Pull("repo"), GitCommands.PullRebase("repo"));
         Assert.DoesNotContain("--no-verify", GitCommands.Push("repo"));
         Assert.Contains("--no-verify", GitCommands.Push("repo", noVerify: true));
         Assert.DoesNotContain("--no-verify", GitCommands.PushUpstream("repo", "origin", "topic"));

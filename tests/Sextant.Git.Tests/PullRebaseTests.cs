@@ -5,7 +5,15 @@ namespace Sextant.Git.Tests;
 public class PullRebaseTests
 {
     [Fact]
-    public async Task Pull_rebase_autostashes_dirty_worktree_and_rebases_local_commit()
+    public Task Pull_autostashes_dirty_worktree_and_rebases_local_commit() =>
+        PullRestoresDirtyWorktree((session, cancellationToken) => session.PullAsync(null, cancellationToken));
+
+    [Fact]
+    public Task Pull_rebase_autostashes_dirty_worktree_and_rebases_local_commit() =>
+        PullRestoresDirtyWorktree((session, cancellationToken) => session.PullRebaseAsync(null, cancellationToken));
+
+    private static async Task PullRestoresDirtyWorktree(
+        Func<RepositorySession, CancellationToken, Task> pull)
     {
         using var origin = new TempRepo();
         origin.WriteFile("a.txt", "one\n");
@@ -25,7 +33,7 @@ public class PullRebaseTests
 
             await using var session = await RepositorySession.OpenAsync(
                 new GitProcessRunner(), origin.Git, clone, CancellationToken.None);
-            await session.PullRebaseAsync(null, CancellationToken.None);
+            await pull(session, CancellationToken.None);
 
             Assert.Contains(session.Snapshot().Commands, command =>
                 command.Arguments.Contains("pull")
