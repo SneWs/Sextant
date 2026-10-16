@@ -103,6 +103,14 @@
                     <RadioButton x:Name="PullMergeOption" Content="Merge" GroupName="SextantPull"/>
                     <TextBlock TextWrapping="Wrap" Opacity="0.75"
                                Text="Pull uses this choice. Pull with rebase always rebases. Tracked changes are stashed and applied again when the pull finishes. Untracked files stay in the worktree."/>
+                    <TextBlock Text="Fetch every" Opacity="0.75" Margin="0,8,0,0"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <NumericUpDown x:Name="FetchIntervalBox" Width="96" HorizontalAlignment="Left"
+                                       Minimum="0" Increment="1" FormatString="0"/>
+                        <TextBlock Text="minutes" VerticalAlignment="Center" Opacity="0.75"/>
+                    </StackPanel>
+                    <TextBlock TextWrapping="Wrap" Opacity="0.75"
+                               Text="0 turns this off. Any other value fetches the active repository after that many minutes, then again each time they pass. Another open repository is fetched only while it is the selected tab. The fetch waits while that repository is busy."/>
                 </StackPanel>
 
                 <StackPanel x:Name="MergePage" Spacing="8" IsVisible="False">

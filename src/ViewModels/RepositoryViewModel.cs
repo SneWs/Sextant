@@ -526,6 +526,14 @@ public partial class RepositoryViewModel : ViewModelBase
         return RunAsync("Fetching…", ct => Session.FetchAsync(progress, ct));
     }
 
+    /// <summary>Periodic fetch. A repository with no remote, or one that is already busy, is left alone.</summary>
+    public Task FetchInBackground()
+    {
+        if (_session is null || IsBusy || _session.Snapshot().Remotes.Count == 0)
+            return Task.CompletedTask;
+        return Fetch();
+    }
+
     [RelayCommand]
     public Task FetchAll()
     {

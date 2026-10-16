@@ -39,6 +39,7 @@ public class WorkspaceStoreTests
                 DiffFontSize = 16,
                 SkipUpdatePrompt = true,
                 PullMode = PullPreference.Merge,
+                FetchIntervalMinutes = 15,
             });
 
             var loaded = store.LoadWorkspace();
@@ -67,6 +68,10 @@ public class WorkspaceStoreTests
             Assert.Equal(PullPreference.Rebase, PullPreference.Normalize(null));
             Assert.Equal(PullPreference.Rebase, PullPreference.Normalize("nope"));
             Assert.Equal(PullPreference.Merge, PullPreference.Normalize(" Merge "));
+            Assert.Equal(15, settings.FetchIntervalMinutes);
+            Assert.Equal(0, FetchInterval.Normalize(-3));
+            Assert.Equal(FetchInterval.Maximum, FetchInterval.Normalize(FetchInterval.Maximum + 1));
+            Assert.Equal(5, FetchInterval.Normalize(5));
             Assert.Equal(ThemePreference.System, ThemePreference.Normalize(null));
             Assert.Equal(ThemePreference.Light, ThemePreference.Normalize(" Light "));
             Assert.Equal(ThemePreference.System, ThemePreference.Normalize("nope"));
@@ -84,6 +89,7 @@ public class WorkspaceStoreTests
             Assert.Equal(DiffFontPreference.DefaultSize, older.DiffFontSize);
             Assert.False(older.SkipUpdatePrompt);
             Assert.Equal(PullPreference.Rebase, older.PullMode);
+            Assert.Equal(0, older.FetchIntervalMinutes);
 
             File.WriteAllText(Path.Combine(directory, "workspace.json"), """
                 {

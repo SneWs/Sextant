@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sextant;
@@ -26,6 +27,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     private Task? _initialize;
     private Task? _shutdown;
     private bool _started;
+    private CancellationTokenSource? _fetchLoop;
+    private Func<TimeSpan, CancellationToken, Task> _fetchDelay = Task.Delay;
 
     public MainViewModel(WorkspaceStore store, WorkspaceState workspace, AppSettings settings, GitProcessRunner runner)
         : this(store, workspace, settings, runner, null)
@@ -177,6 +180,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     private async Task ShutdownCoreAsync()
     {
+        StopPeriodicFetch();
         Save();
         _lifetime.Cancel();
         var tabs = Tabs.ToArray();
@@ -632,6 +636,71 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         }
 
         _started = true;
+        ArmPeriodicFetch();
+    }
+
+    /// <summary>Test hook. The next wait uses this delay, then the schedule starts again.</summary>
+    internal void UseFetchDelay(Func<TimeSpan, CancellationToken, Task> delay)
+    {
+        _fetchDelay = delay;
+        ArmPeriodicFetch();
+    }
+
+    internal void ApplyFetchInterval(int minutes)
+    {
+        var next = FetchInterval.Normalize(minutes);
+        var running = _fetchLoop is not null;
+        if (next == _settings.FetchIntervalMinutes && running == next > 0)
+            return;
+        _settings.FetchIntervalMinutes = next;
+        ArmPeriodicFetch();
+    }
+
+    private void ArmPeriodicFetch()
+    {
+        StopPeriodicFetch();
+        var minutes = FetchInterval.Normalize(_settings.FetchIntervalMinutes);
+        _settings.FetchIntervalMinutes = minutes;
+        if (minutes == 0 || _lifetime.IsCancellationRequested)
+            return;
+        var loop = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _fetchLoop = loop;
+        _ = RunPeriodicFetchAsync(TimeSpan.FromMinutes(minutes), loop.Token);
+    }
+
+    private void StopPeriodicFetch()
+    {
+        var loop = _fetchLoop;
+        _fetchLoop = null;
+        if (loop is null)
+            return;
+        loop.Cancel();
+        loop.Dispose();
+    }
+
+    private async Task RunPeriodicFetchAsync(TimeSpan interval, CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await _fetchDelay(interval, cancellationToken).ConfigureAwait(false);
+                if (cancellationToken.IsCancellationRequested)
+                    return;
+                await OnUi(FetchActiveAsync).ConfigureAwait(false);
+            }
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or ObjectDisposedException)
+        {
+        }
+    }
+
+    private async Task FetchActiveAsync()
+    {
+        if (_lifetime.IsCancellationRequested)
+            return;
+        if (ActiveTab is { IsReady: true, CanRunCommands: true } tab)
+            await tab.FetchInBackground();
     }
 
     private async Task ProbeAsync()
@@ -952,7 +1021,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _settings.Palette,
             _settings.DiffFont,
             _settings.DiffFontSize,
-            _settings.PullMode));
+            _settings.PullMode,
+            _settings.FetchIntervalMinutes));
         if (edit is null)
             return;
         var path = string.IsNullOrWhiteSpace(edit.GitExecutable) ? null : edit.GitExecutable.Trim();
@@ -975,6 +1045,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         _settings.DiffFont = font.Length == 0 ? null : font;
         _settings.DiffFontSize = DiffFontPreference.NormalizeSize(edit.DiffFontSize);
         _settings.PullMode = PullPreference.Normalize(edit.PullMode);
+        ApplyFetchInterval(edit.FetchIntervalMinutes);
         _store.SaveSettings(_settings);
         AppTheme.Apply(_settings.Theme, _settings.Palette);
         DiffFont.Apply(_settings.DiffFont, _settings.DiffFontSize);

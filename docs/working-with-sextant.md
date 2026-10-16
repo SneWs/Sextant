@@ -101,6 +101,8 @@ Push sends the current branch. The menu offers Push ignoring local checks, which
 
 Network commands run one at a time per repository and report progress on the branch bar. Your credential helper answers any prompt. Sextant does not store a GitHub token of its own.
 
+Settings → Git → Fetch every runs Fetch for the active repository. 0 minutes leaves it off. Any other value is how many minutes pass between fetches. The first one waits that long after you set it. Switching tabs fetches the repository you selected, on the next interval.
+
 ## Conflicts
 
 Continue and Abort cover merge, rebase, cherry-pick, and revert.

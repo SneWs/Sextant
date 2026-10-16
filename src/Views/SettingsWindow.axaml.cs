@@ -27,6 +27,8 @@ public partial class SettingsWindow : Window
         var pull = PullPreference.Normalize(draft.PullMode);
         PullRebaseOption.IsChecked = pull == PullPreference.Rebase;
         PullMergeOption.IsChecked = pull == PullPreference.Merge;
+        FetchIntervalBox.Maximum = FetchInterval.Maximum;
+        FetchIntervalBox.Value = FetchInterval.Normalize(draft.FetchIntervalMinutes);
         LoadFonts(draft.DiffFont, draft.DiffFontSize);
         MergeCommand.Text = draft.MergeTool;
         LoadFormats(draft.DiffFormats);
@@ -237,7 +239,8 @@ public partial class SettingsWindow : Window
             palette.Id,
             SelectedFont(),
             SelectedSize(),
-            PullMergeOption.IsChecked == true ? PullPreference.Merge : PullPreference.Rebase);
+            PullMergeOption.IsChecked == true ? PullPreference.Merge : PullPreference.Rebase,
+            FetchInterval.Normalize((int)Math.Round(FetchIntervalBox.Value ?? 0, MidpointRounding.AwayFromZero)));
         Close();
     }
 
