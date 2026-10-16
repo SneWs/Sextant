@@ -212,6 +212,9 @@ public sealed class AppSettings
 
     /// <summary><see cref="PullPreference.Rebase"/> or <see cref="PullPreference.Merge"/>. Missing means rebase.</summary>
     public string PullMode { get; set; } = PullPreference.Rebase;
+
+    /// <summary>Minutes between fetches of the active repository. Zero is off.</summary>
+    public int FetchIntervalMinutes { get; set; }
 }
 
 public static class AppPaths

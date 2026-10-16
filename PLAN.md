@@ -146,6 +146,8 @@ On 2026-10-13 a tagged release builds and packages without the unit tests. `rele
 
 On 2026-10-16 Pull, including the default button and Ctrl+Shift+U, runs `pull --rebase --autostash` unless Settings → Git → When pulling is Merge, which runs `pull --no-rebase --autostash`. Rebase is the default. Tracked staged and unstaged changes are stashed and applied again when the pull finishes. Untracked files stay in the worktree. Pull with rebase always rebases. The choice is `pullMode` in settings.json and is not written into Git config. `Git_page_saves_rebase_or_merge`, `Merge_setting_merges_on_pull_and_pull_with_rebase_still_rebases`, and `Pull_merge_autostashes_dirty_worktree_and_merges_local_commit` passed. A headless window confirmed the Git page radios and that OK saves the choice. The desktop window was not launched.
 
+On 2026-10-16 Settings → Git → Fetch every saves `fetchIntervalMinutes`. 0 is the default and leaves periodic fetch off. A value from 1 to 10080 fetches the active repository with `fetch --progress` after that many minutes and repeats. The fetch waits while that repository is busy, and a repository with no remote is skipped. Switching tabs fetches the newly selected repository on the next interval. `Git_page_saves_fetch_minutes_and_zero_stays_off`, `Zero_minutes_does_not_fetch_and_a_new_value_restarts_the_wait`, `Periodic_fetch_updates_the_active_repository_only`, and `Workspace_round_trip_preserves_tabs_and_settings` passed. A headless window confirmed the Git page minute box and that OK saves the choice. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
@@ -297,7 +299,7 @@ Reads add `--no-optional-locks`. Writes do not.
 | Merge | `merge --no-edit <branch>`. The locations menu shows this on a local branch that is not checked out |
 | Rebase onto | `rebase <branch>`. The locations menu shows this on a local branch that is not checked out. It rebases the current branch onto that one. A remote-tracking branch, including one under origin, does not show merge or rebase. `GIT_EDITOR` and `GIT_SEQUENCE_EDITOR` are `true`, so git does not open an editor |
 | Abort merge | `merge --abort` |
-| Fetch | `fetch --progress` |
+| Fetch | `fetch --progress`. Settings → Git → Fetch every, saved as `fetchIntervalMinutes`, runs this for the active repository. 0 is off. A value from 1 to 10080 waits that many minutes, then fetches, and repeats. Another open repository is fetched only while its tab is selected |
 | Pull | `pull --rebase --autostash --progress --no-edit` when Settings → Git → When pulling is Rebase, which is the default. Merge uses `pull --no-rebase --autostash --progress --no-edit`. Pull with rebase always uses the rebase command. Tracked local changes are stashed and applied again when the pull finishes |
 | Push | `push --progress`. The split button's other action is `push --no-verify --progress`, which skips the pre-push hook for that push only |
 | Push with upstream | `push --progress -u <remote> <branch>`. The other action adds `--no-verify` |

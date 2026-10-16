@@ -104,6 +104,8 @@ Sextant still uses that Git's config, hooks, attributes, and credential helper. 
 
 **When pulling** chooses rebase or merge for Pull. Rebase is the default. The saved field is `pullMode` (`rebase` or `merge`). Pull with rebase always rebases. Both pass `--autostash`, so tracked local changes are stashed and applied again when the pull finishes. Untracked files stay in the worktree. Sextant does not write this choice into Git config.
 
+**Fetch every** is a number of minutes. It is saved as `fetchIntervalMinutes` and defaults to 0, which leaves periodic fetch off. A value from 1 to 10080 fetches the active repository that often, using the same Fetch command as the toolbar. The first fetch waits for that interval. Another open repository is fetched only while its tab is selected. The fetch waits while that repository is already running a command. A repository with no remote is skipped.
+
 ## Merging
 
 **External merge command** is optional.
