@@ -27,26 +27,39 @@ public class SchedulerTests
     [Fact]
     public async Task Write_cancels_an_in_flight_read_then_runs()
     {
-        using var scheduler = new RepositoryScheduler();
-        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var read = scheduler.ReadAsync(async cancellationToken =>
-        {
-            entered.TrySetResult();
-            await Task.Delay(Timeout.Infinite, cancellationToken);
-            return 0;
-        }, CancellationToken.None);
-        await entered.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        var wrote = false;
-        var write = scheduler.WriteAsync(cancellationToken =>
-        {
-            wrote = true;
-            return Task.FromResult(1);
-        }, CancellationToken.None);
+        for (var attempt = 0; attempt < 25; attempt++)
+            await CancelInFlightRead();
+    }
 
-        var finished = await Task.WhenAny(write, Task.Delay(2000));
-        Assert.Same(write, finished);
-        Assert.True(wrote);
-        Assert.False(read.IsCompletedSuccessfully);
+    [Fact]
+    public async Task Read_that_wakes_as_a_write_ends_is_cancelled_by_the_next_write()
+    {
+        for (var attempt = 0; attempt < 25; attempt++)
+        {
+            using var scheduler = new RepositoryScheduler();
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var writing = scheduler.WriteAsync(async cancellationToken =>
+            {
+                await release.Task.ConfigureAwait(false);
+                return 1;
+            }, CancellationToken.None);
+
+            var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var read = scheduler.ReadAsync(token => HoldUntilCancelled(token, entered), CancellationToken.None);
+            release.TrySetResult();
+            Assert.Equal(1, await writing.WaitAsync(TimeSpan.FromSeconds(5)));
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            var wrote = false;
+            var next = scheduler.WriteAsync(cancellationToken =>
+            {
+                wrote = true;
+                return Task.FromResult(2);
+            }, CancellationToken.None);
+            Assert.Equal(2, await next.WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.True(wrote);
+            await AssertCancelled(read);
+        }
     }
 
     [Fact]
@@ -77,6 +90,54 @@ public class SchedulerTests
         var finished = await Task.WhenAny(all, Task.Delay(3000));
         Assert.Same(all, finished);
         Assert.Equal(1, max);
+    }
+
+    private static async Task CancelInFlightRead()
+    {
+        using var scheduler = new RepositoryScheduler();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var read = scheduler.ReadAsync(token => HoldUntilCancelled(token, entered), CancellationToken.None);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var wrote = false;
+        var write = scheduler.WriteAsync(cancellationToken =>
+        {
+            wrote = true;
+            return Task.FromResult(1);
+        }, CancellationToken.None);
+
+        Assert.Equal(1, await write.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.True(wrote);
+        await AssertCancelled(read);
+    }
+
+    private static async Task<int> HoldUntilCancelled(CancellationToken cancellationToken, TaskCompletionSource entered)
+    {
+        // Register before announcing entry. Task.Delay(Timeout.Infinite) posts its
+        // cancellation to the thread pool, and a busy Linux runner can miss a short wait.
+        // Completing inline lets the read leave before the write waits. An asynchronous
+        // continuation needs a thread-pool thread, which a busy runner may not hand out
+        // before a short timeout.
+        var cancelled = new TaskCompletionSource();
+        using (cancellationToken.UnsafeRegister(static state => ((TaskCompletionSource)state!).TrySetResult(), cancelled))
+        {
+            entered.TrySetResult();
+            await cancelled.Task.ConfigureAwait(false);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return 0;
+    }
+
+    private static async Task AssertCancelled(Task<int> read)
+    {
+        try
+        {
+            await read.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Fail("The read finished instead of being cancelled.");
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     private static async Task<int> Wait(TaskCompletionSource gate, CancellationToken cancellationToken)

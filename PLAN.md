@@ -148,6 +148,8 @@ On 2026-10-16 Pull, including the default button and Ctrl+Shift+U, runs `pull --
 
 On 2026-10-16 Settings → Git → Fetch every saves `fetchIntervalMinutes`. 0 is the default and leaves periodic fetch off. A value from 1 to 10080 fetches the active repository with `fetch --progress` after that many minutes and repeats. The fetch waits while that repository is busy, and a repository with no remote is skipped. Switching tabs fetches the newly selected repository on the next interval. `Git_page_saves_fetch_minutes_and_zero_stays_off`, `Zero_minutes_does_not_fetch_and_a_new_value_restarts_the_wait`, `Periodic_fetch_updates_the_active_repository_only`, and `Workspace_round_trip_preserves_tabs_and_settings` passed. A headless window confirmed the Git page minute box and that OK saves the choice. The desktop window was not launched.
 
+On 2026-10-16 a write cancels in-flight reads outside the scheduler lock and waits until those reads have left. A read that was waiting for a write counts itself again after that write finishes, so the next write can cancel it. `Write_cancels_an_in_flight_read_then_runs`, `Read_that_wakes_as_a_write_ends_is_cancelled_by_the_next_write`, `Two_reads_overlap`, and `Writes_do_not_overlap` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
