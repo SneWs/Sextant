@@ -30,9 +30,11 @@ Sections group themselves by name. `release/1.2` is a folder of tags or branches
 
 A double-click checks out a local branch, checks out a remote branch into a local one, or opens a worktree or a checked-out submodule. An uninitialized submodule is not opened, and Sextant does not run `git submodule update`.
 
-A tag is different. One click selects the commit that tag points at, including an annotated tag. When that commit is not in the loaded history, for example on a hidden branch, Sextant loads the history up to that commit instead of reporting an error, and the search caption shows the revision until you close the filter. The same action is Show in graph on other rows that have it.
+A tag is different. One click selects the commit that tag points at, including an annotated tag. When that commit is not in the loaded history, for example on a hidden branch, Sextant loads the history up to that commit instead of reporting an error, and this pane names that revision until you close the filter. The same action is Show in graph on other rows that have it.
 
 The row menu is the rest of the branch work: merge, rebase, delete, rename, set upstream, push or delete a tag, hide a branch, and the stash actions. Hide branch keeps the row in the list at reduced opacity and drops that branch from the graph. Hidden names are stored for that repository. Show all branches brings them back. A stash can be hidden the same way.
+
+A file history, an applied search, or hidden branches show a line under the filter. The line names the file, the search, or what is hidden. File history and a search include a close button on that line. The button returns the commit graph. A line that only names hidden branches has no close button. Escape still returns the graph when the search box is not focused.
 
 Add remote and Add worktree are in the Repository menu and the command palette. The new worktree's folder must not exist yet. Sextant does not open it for you, and it does not remove worktrees.
 
@@ -44,7 +46,7 @@ Sextant loads a page of history and more as you reach the end. The soft cap is a
 
 Select a commit to see its files and diff. Select two commits to see the diff between them. The right-hand menu on a commit can check out a branch that points there, copy the SHA, create a branch or tag, save a patch, reset soft, mixed, or hard, cherry-pick, revert, or start an interactive rebase.
 
-Search is Ctrl+F (Command+F). The box spans the window under the branch bar. The magnifying glass runs the search. Escape clears it and hides the box.
+Search is Ctrl+F (Command+F). The box spans the window under the branch bar. The magnifying glass runs the search. Escape clears it and hides the box. The line that names the search, the file, or the hidden branches sits in the Locations pane.
 
 | Query | Result |
 | --- | --- |

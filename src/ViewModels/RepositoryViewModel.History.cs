@@ -33,7 +33,8 @@ public partial class RepositoryViewModel
     [ObservableProperty]
     public partial bool ShowHistorySearch { get; set; }
 
-    public bool ShowHistoryChrome => ShowHistorySearch || HasHistoryFilter;
+    /// <summary>The search field under the branch bar. The history caption lives in Locations.</summary>
+    public bool ShowHistoryChrome => ShowHistorySearch;
 
     [ObservableProperty]
     public partial string ConflictText { get; set; } = "";
@@ -108,8 +109,6 @@ public partial class RepositoryViewModel
         OnPropertyChanged(nameof(ShowingRows));
         NoteSectionFolds();
     }
-
-    partial void OnHasHistoryFilterChanged(bool value) => OnPropertyChanged(nameof(ShowHistoryChrome));
 
     partial void OnShowHistorySearchChanged(bool value) => OnPropertyChanged(nameof(ShowHistoryChrome));
 

@@ -107,7 +107,7 @@ public static class BranchVisibility
     }
 
     /// <summary>
-    /// Caption above the graph. A search that names a revision ignores the hidden set,
+    /// Caption shown in the Locations pane. A search that names a revision ignores the hidden set,
     /// because that revision is the whole walk.
     /// </summary>
     public static string? Caption(HistoryQuery? query, IReadOnlyCollection<string> hidden)
