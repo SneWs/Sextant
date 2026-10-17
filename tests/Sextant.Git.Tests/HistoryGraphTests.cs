@@ -178,7 +178,13 @@ public class HistoryGraphTests
 
             Assert.True(vm.HasHistoryQuery);
             Assert.Equal("File a.txt", vm.HistoryCaption);
+            Assert.False(vm.ShowHistoryChrome);
             Assert.True(close.IsEffectivelyVisible);
+            Assert.NotNull(close.FindAncestorOfType<LocationsToolView>());
+            Assert.Null(close.FindAncestorOfType<RepositoryChrome>());
+            var fileCaption = view.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == "File a.txt");
+            Assert.True(fileCaption.IsEffectivelyVisible);
+            Assert.NotNull(fileCaption.FindAncestorOfType<LocationsToolView>());
             Assert.Contains("accent", close.Classes);
             Assert.True(close.Bounds.Width >= 26, $"close width {close.Bounds.Width}");
             Assert.True(close.Bounds.Height >= 26, $"close height {close.Bounds.Height}");
@@ -223,8 +229,13 @@ public class HistoryGraphTests
             vm.HistoryCaption = "Hiding side";
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
+            Assert.False(vm.ShowHistoryChrome);
             Assert.False(close.IsEffectivelyVisible);
-            Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Hiding side" && text.IsEffectivelyVisible);
+            var caption = view.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == "Hiding side" && text.IsEffectivelyVisible);
+            Assert.NotNull(caption.FindAncestorOfType<LocationsToolView>());
+            Assert.Null(caption.FindAncestorOfType<RepositoryChrome>());
+            Assert.True(Left(caption, view) + caption.Bounds.Width <= Left(graph, view) + 1,
+                $"caption right {Left(caption, view) + caption.Bounds.Width} graph left {Left(graph, view)}");
 
             window.Close();
             await vm.DisposeAsync();

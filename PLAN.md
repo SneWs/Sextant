@@ -150,6 +150,8 @@ On 2026-10-16 Settings → Git → Fetch every saves `fetchIntervalMinutes`. 0 i
 
 On 2026-10-16 a write cancels in-flight reads outside the scheduler lock and waits until those reads have left. A read that was waiting for a write counts itself again after that write finishes, so the next write can cancel it. `Write_cancels_an_in_flight_read_then_runs`, `Read_that_wakes_as_a_write_ends_is_cancelled_by_the_next_write`, `Two_reads_overlap`, and `Writes_do_not_overlap` passed. The desktop window was not launched.
 
+On 2026-10-17 a file history, an applied search, or hidden branches show their caption in the Locations pane, under the filter and above the list. The close button stays beside a file history or a search. The branch bar keeps the search field and no longer grows for that caption. `File_history_back_restores_the_graph`, `Escape_in_the_search_box_hides_it_and_clears_the_text`, and `History_search_spans_the_window_under_the_branch` passed. A headless window confirmed the caption and the close button sit in Locations, to the left of the graph. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
@@ -450,7 +452,7 @@ The local branch name, ahead/behind counts, and the command in progress sit in a
 
 Toolbar buttons act on the active tab. Pull is the face of a split button, and Fetch is the item in its menu. Pull passes `--rebase`. Push is a split button. Push is the face and the first menu item. The next item is Push ignoring local checks, which runs `push --no-verify` for that push only. The third item is Push with force-with-lease. It is not the default, it is not `--force`, and a confirmation names commits already on the upstream before `push --force-with-lease` runs. Continue, Abort, and Cancel stay on the toolbar while they apply. Branch, Stash, Add remote, and Command log are in the Repository menu. View → Toggle branch view hides and shows the locations column, and the same command is in the command palette. Branch is Ctrl/Cmd+B. Stash is Ctrl/Cmd+Shift+S. Fetch and push follow the user's fetch and push config, including `fetch.prune`. They do not force prune. Push with no upstream asks which remote to use and then runs `push -u`, adding `--no-verify` when that menu item was chosen. There is no fetch-all action in Phase 1.
 
-The graph search field is hidden until Repository → Search, or Ctrl/Cmd+F, which toggles it and focuses the field. Enter in the field still runs the search. While a search is applied, its caption stays visible above the graph.
+The graph search field is hidden until Repository → Search, or Ctrl/Cmd+F, which toggles it and focuses the field. Enter in the field still runs the search. While a search is applied, its caption stays visible in the Locations pane.
 
 Command palette (Ctrl/Cmd+P) lists the commands that exist: open, clone, init, fetch, pull, push, push ignoring local checks, push with force-with-lease, refresh, checkout, create branch, merge, commit, amend, search history, toggle branch view. It is a filterable list, not a plugin host.
 
@@ -518,7 +520,7 @@ Land these in order. Each step should leave the solution building.
 Read-mostly depth and the local operations that do not need a rebase todo editor.
 
 - Commit search by subject, author, and revision, using `git log` greps and `git rev-parse` for a pasted sha. Include a `branch:` style filter in the same box.
-- File history with `git log -- <path>`, opened from a file in the list. The caption names that file. A close button next to the caption restores the commit graph. The button is the accent color, with an X. An applied search uses the same button. Hidden branches stay hidden. Escape restores the graph when the search box is not focused.
+- File history with `git log -- <path>`, opened from a file in the list. The caption names that file and sits in the Locations pane. A close button next to the caption restores the commit graph. The button is the accent color, with an X. An applied search uses the same button. Hidden branches stay hidden. Escape restores the graph when the search box is not focused.
 - Blame via `git blame --line-porcelain`, virtualized, for the selected file at the selected commit.
 - Stash: list, push, pop, apply, drop. Stash refs may then appear in the graph.
 - Reset soft and mixed. Hard reset only behind a confirmation that names the commit that will be discarded.
