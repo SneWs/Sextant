@@ -128,6 +128,8 @@
                         </NativeMenu>
                     </NativeMenuItem>
                     <NativeMenuItemSeparator/>
+                    <NativeMenuItem Header="_Save layout…" Command="{Binding SaveLayoutCommand}"/>
+                    <NativeMenuItem Header="Restore _layout…" Command="{Binding RestoreLayoutCommand}"/>
                     <NativeMenuItem Header="_Reset layout" Command="{Binding ResetLayoutCommand}"/>
                 </NativeMenu>
             </NativeMenuItem>

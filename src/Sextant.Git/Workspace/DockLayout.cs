@@ -100,6 +100,13 @@ public static class DockLayouts
 
     public static DockLayout Default() => Seed(220, 520, 180, showLocations: true);
 
+    /// <summary>Migrates a layout in place. False when the tree cannot be shown.</summary>
+    public static bool TryAccept(DockLayout layout)
+    {
+        var state = new WorkspaceState { DockLayout = layout };
+        return ReferenceEquals(Resolve(state), layout);
+    }
+
     /// <summary>A saved layout that names every pane and uses positive proportions. Otherwise the legacy pane sizes.</summary>
     public static DockLayout Resolve(WorkspaceState state)
     {

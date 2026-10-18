@@ -208,6 +208,8 @@ public class CommandPaletteTests
                 Assert.Contains(vm.PaletteMatches, item => item.Title == "Blame");
                 Assert.Contains(vm.PaletteMatches, item => item.Title == "Changes");
                 Assert.Contains(vm.PaletteMatches, item => item.Title == "Command log");
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Save layout");
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Restore layout");
 
                 vm.ClosePalette();
                 tab.ShowingWorkingCopy = false;

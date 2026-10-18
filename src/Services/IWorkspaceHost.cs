@@ -35,6 +35,10 @@ public interface IDialogService
 
     Task<string?> SaveFileAsync(string title, string suggestedName);
 
+    /// <summary>Save dialog for one file type. Cancel returns null. The default cancels.</summary>
+    Task<string?> SaveAsAsync(string title, string suggestedName, string typeName, IReadOnlyList<string> patterns, string defaultExtension) =>
+        Task.FromResult<string?>(null);
+
     /// <summary>
     /// Prompts for the committer name and email, and whether to write the global config or the repository's.
     /// Cancel returns null. The default implementation cancels.

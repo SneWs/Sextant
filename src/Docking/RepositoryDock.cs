@@ -174,12 +174,26 @@ public partial class RepositoryDock : ObservableObject
         Apply(layout);
     }
 
-    public void WriteLayout()
+    /// <summary>Shows a layout file. An unusable record leaves the current arrangement.</summary>
+    public bool TryRestore(DockLayout layout)
     {
-        var captured = Capture();
-        if (DockLayouts.IsUsable(captured))
-            _workspace.DockLayout = captured;
+        if (!DockLayouts.TryAccept(layout))
+            return false;
+        _workspace.DockLayout = layout;
+        Apply(layout);
+        RehomeOffScreenFloats();
+        return true;
     }
+
+    public DockLayout CaptureLayout()
+    {
+        var layout = Capture();
+        if (DockLayouts.IsUsable(layout))
+            _workspace.DockLayout = layout;
+        return layout;
+    }
+
+    public void WriteLayout() => CaptureLayout();
 
     public void RehomeOffScreenFloats()
     {
