@@ -172,7 +172,7 @@ public static class WindowInput
     private static long _escapeAt;
     private const int DoubleEscapeMilliseconds = 500;
 
-    /// <summary>The second plain Escape within the double-press window restores the working layout.</summary>
+    /// <summary>The second plain Escape within the double-press window activates the working tabs.</summary>
     private static bool TakeDoubleEscape(MainViewModel vm)
     {
         var now = Environment.TickCount64;
@@ -183,37 +183,18 @@ public static class WindowInput
     }
 
     /// <summary>
-    /// History returns to its top row and its tab, the review group returns to its first tab,
-    /// find boxes clear, and the commit message takes focus.
+    /// History selects its top row and its tab when that tab shares a group. The review group selects
+    /// its first tab. An open Commit pane is selected and the commit message takes focus. Closed tools
+    /// and split sizes stay as they are.
     /// </summary>
     private static void RestoreHome(MainViewModel vm, RepositoryViewModel tab, TopLevel? origin)
     {
-        if (vm.PaletteOpen)
-            vm.ClosePalette();
-        var clear = tab.ClearFind();
         vm.Dock.SelectGrouped(DockIds.History);
         vm.Dock.SelectFirstReviewTab();
         SelectWorkingCopy(tab, origin, vm.Dock);
-        vm.Dock.Show(DockIds.Changes);
+        vm.Dock.Activate(DockIds.Changes);
         ScrollHistoryToTop(origin, vm.Dock);
         ScheduleCommitFocus(origin, vm.Dock);
-        if (!clear.IsCompleted)
-            _ = ScrollAfterFind(clear, tab, origin, vm.Dock);
-    }
-
-    private static async Task ScrollAfterFind(Task clear, RepositoryViewModel tab, TopLevel? origin, RepositoryDock dock)
-    {
-        try
-        {
-            await clear.ConfigureAwait(true);
-        }
-        catch (OperationCanceledException)
-        {
-            return;
-        }
-
-        SelectWorkingCopy(tab, origin, dock);
-        ScrollHistoryToTop(origin, dock);
     }
 
     /// <summary>

@@ -142,7 +142,7 @@ The command key is Command on macOS and Ctrl on Windows and Linux, except where 
 | Search history | Command/Ctrl+F |
 | Commit | Command/Ctrl+Enter |
 | Commit message | Shift+Esc |
-| Working layout | Escape, Escape |
+| History and commit | Escape, Escape |
 | Pull | Command/Ctrl+Shift+U |
 | Push | Command/Ctrl+Shift+P |
 | Create branch | Command/Ctrl+B |
@@ -158,5 +158,5 @@ The command key is Command on macOS and Ctrl on Windows and Linux, except where 
 | Refresh | F5 |
 | Settings | Command+, on macOS |
 
-Escape in the history search box hides it and clears the query. Escape in the locations filter closes that box. Shift+Esc shows the Commit pane, selects the working copy at the top of the history list, and focuses the commit message. Pressing Escape twice returns to that working layout: History selects its top row and its tab when that tab is in a group, the Diff, Blame, and LFS locks group selects its first tab, the locations filter and the history search are cleared, hidden branches remain hidden, and the commit message takes focus.
+Escape in the history search box hides it and clears the query. Escape in the locations filter closes that box. Shift+Esc shows the Commit pane, selects the working copy at the top of the history list, and focuses the commit message. Pressing Escape twice within half a second selects that same top row and scrolls the history list there. History's tab is selected when it shares a group. The Diff, Blame, and LFS locks group selects its first tab. An open Commit pane is selected and the commit message takes focus. Pane sizes stay as they are, and a closed pane stays closed. A locations filter, a history search, and hidden branches stay as they are.
 In the command palette, Up and Down move through the matches, Enter runs the selected command, and Escape closes the palette.

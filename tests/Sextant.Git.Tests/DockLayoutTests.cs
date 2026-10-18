@@ -1200,7 +1200,7 @@ public class DockLayoutTests
     }
 
     [Fact]
-    public async Task Double_escape_restores_the_working_layout()
+    public async Task Double_escape_activates_tabs_and_focuses_the_commit_message()
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
         using var repo = new TempRepo();
@@ -1238,7 +1238,8 @@ public class DockLayoutTests
                 Assert.DoesNotContain(tab.Rows, row => row.Subject == "feature-only");
 
                 tab.LocationFilter = "zzz";
-                vm.Dock.SetOpen(DockIds.Changes, false);
+                tab.ShowHistorySearch = true;
+                tab.HistoryText = "kept";
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
                 var graph = Graph(window);
@@ -1248,18 +1249,19 @@ public class DockLayoutTests
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
                 Assert.Equal("zzz", tab.LocationFilter);
+                Assert.Equal("kept", tab.HistoryText);
+                Assert.True(tab.ShowHistorySearch);
                 Assert.True(vm.Dock.IsSelected(DockIds.History));
                 Assert.False(vm.Dock.IsSelected(DockIds.Blame));
-                Assert.False(vm.Dock.IsOpen(DockIds.Changes));
+                Assert.True(vm.Dock.IsOpen(DockIds.Changes));
                 Assert.Contains("refs/heads/feature/grass", tab.HiddenBranchNames);
 
                 await Task.Delay(600);
-                tab.ShowHistorySearch = true;
-                tab.HistoryText = "file:a.txt";
-                await tab.SearchHistoryCommand.ExecuteAsync(null);
-                await WaitIdle(tab);
-                Assert.True(tab.HasHistoryQuery);
-                var commit = tab.Rows.First(row => !row.IsWorkingCopy);
+                vm.Dock.SetOpen(DockIds.Locks, false);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(vm.Dock.IsOpen(DockIds.Locks));
+                var commit = tab.Rows.First(row => !row.IsWorkingCopy && row.Subject == "root");
                 tab.SelectedGraphRow = commit;
                 var shown = DateTime.UtcNow.AddSeconds(5);
                 while (tab.ShowingWorkingCopy && DateTime.UtcNow < shown)
@@ -1279,6 +1281,7 @@ public class DockLayoutTests
                 vm.Dock.Show(DockIds.Blame);
                 Assert.True(vm.Dock.IsSelected(DockIds.Files));
                 Assert.True(vm.Dock.IsSelected(DockIds.Blame));
+                var arrangement = Arrangement(vm);
 
                 window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
                 window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
@@ -1290,19 +1293,19 @@ public class DockLayoutTests
                     window.UpdateLayout();
                     Dispatcher.UIThread.RunJobs();
                     box = CommitMessage(window);
-                    if (!tab.IsBusy && !tab.HasHistoryQuery && tab.ShowingWorkingCopy
+                    if (!tab.IsBusy && tab.ShowingWorkingCopy
                         && tab.SelectedGraphRow?.IsWorkingCopy == true
                         && vm.Dock.IsSelected(DockIds.History)
                         && vm.Dock.IsSelected(DockIds.Diff)
-                        && vm.Dock.IsOpen(DockIds.Changes)
                         && box is { IsFocused: true })
                         break;
                     await Task.Delay(20);
                 }
 
-                Assert.Equal("", tab.LocationFilter);
-                Assert.Equal("", tab.HistoryText);
-                Assert.False(tab.ShowHistorySearch);
+                Assert.Equal(arrangement, Arrangement(vm));
+                Assert.Equal("zzz", tab.LocationFilter);
+                Assert.Equal("kept", tab.HistoryText);
+                Assert.True(tab.ShowHistorySearch);
                 Assert.False(tab.HasHistoryQuery);
                 Assert.False(tab.ShowingBlame);
                 Assert.True(tab.ShowingWorkingCopy);
@@ -1312,6 +1315,7 @@ public class DockLayoutTests
                 Assert.True(vm.Dock.IsOpen(DockIds.Files));
                 Assert.True(vm.Dock.IsSelected(DockIds.Diff));
                 Assert.False(vm.Dock.IsSelected(DockIds.Blame));
+                Assert.False(vm.Dock.IsOpen(DockIds.Locks));
                 Assert.True(vm.Dock.IsOpen(DockIds.Changes));
                 Assert.True(vm.Dock.IsSelected(DockIds.Changes));
                 Assert.True(box!.IsFocused);
@@ -1319,7 +1323,7 @@ public class DockLayoutTests
                 scroll = graph.GetVisualDescendants().OfType<ScrollViewer>().First();
                 Assert.True(scroll.Offset.Y < 1, $"history offset {scroll.Offset.Y}");
                 Assert.Contains("Hiding", tab.HistoryCaption);
-                Assert.True(tab.Locations.Single(item => item.Key == "b:feature/grass").EyeHidden);
+                Assert.Contains("refs/heads/feature/grass", tab.HiddenBranchNames);
                 Assert.DoesNotContain(tab.Rows, row => row.Subject == "feature-only");
 
                 await vm.Shutdown();
@@ -1333,6 +1337,14 @@ public class DockLayoutTests
             if (Directory.Exists(directory))
                 Directory.Delete(directory, recursive: true);
         }
+    }
+
+    /// <summary>Which tools are open, and the split proportion of every dock node.</summary>
+    private static string Arrangement(MainViewModel vm)
+    {
+        var open = string.Join(",", DockIds.Tools.Select(id => id + (vm.Dock.IsOpen(id) ? "+" : "-")));
+        var proportions = string.Join(",", SextantDockFactory.Collect(vm.Dock.Root).Select(node => node.Id + ":" + node.Proportion.ToString("R")));
+        return open + "|" + proportions;
     }
 
     private static async Task WaitIdle(RepositoryViewModel tab)

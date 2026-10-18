@@ -128,6 +128,9 @@ public partial class RepositoryDock : ObservableObject
         return null;
     }
 
+    /// <summary>Selects an open tool. A closed tool stays closed, and split sizes stay as they are.</summary>
+    public void Activate(string id) => BringForward(id);
+
     /// <summary>Opens a tool and selects it. An open tool stays open. A tool squeezed to nothing gets a share of its split.</summary>
     public void Show(string id)
     {
