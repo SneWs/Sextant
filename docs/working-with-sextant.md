@@ -141,6 +141,7 @@ The command key is Command on macOS and Ctrl on Windows and Linux, except where 
 | Command palette | Command/Ctrl+P |
 | Search history | Command/Ctrl+F |
 | Commit | Command/Ctrl+Enter |
+| Commit message | Shift+Esc |
 | Pull | Command/Ctrl+Shift+U |
 | Push | Command/Ctrl+Shift+P |
 | Create branch | Command/Ctrl+B |
@@ -156,5 +157,5 @@ The command key is Command on macOS and Ctrl on Windows and Linux, except where 
 | Refresh | F5 |
 | Settings | Command+, on macOS |
 
-Escape in the history search box hides it and clears the query. Escape in the locations filter closes that box.
+Escape in the history search box hides it and clears the query. Escape in the locations filter closes that box. Shift+Esc shows the Commit pane, selects the working copy at the top of the history list, and focuses the commit message.
 In the command palette, Up and Down move through the matches, Enter runs the selected command, and Escape closes the palette.

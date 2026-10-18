@@ -72,7 +72,7 @@ public partial class LocationsToolView : UserControl
 
     private void OnLocationFilterKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Escape || DataContext is not RepositoryViewModel vm)
+        if (e.Key != Key.Escape || e.KeyModifiers != KeyModifiers.None || DataContext is not RepositoryViewModel vm)
             return;
         vm.ToggleLocationFilterCommand.Execute(null);
         e.Handled = true;

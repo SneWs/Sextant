@@ -154,6 +154,8 @@ On 2026-10-17 a file history, an applied search, or hidden branches show their c
 
 On 2026-10-18 View → Save layout writes the current arrangement to a `.sextant-layout` file, and View → Restore layout reads that file back. The file is the same layout record as `workspace.json`. An older file still named `documents` is read as Diff. A file that is not a layout is left unused and the open arrangement stays. The command palette lists Save layout and Restore layout. `Layout_file_migrates_an_older_diff_and_rejects_a_broken_file` and `Saved_layout_file_restores_that_arrangement` passed. The desktop window was not launched.
 
+On 2026-10-18 Shift+Esc focuses the commit message and moves the history list to the working copy at the top. A Commit pane that is closed or not the selected tool is shown first. Escape without Shift still leaves a search, a locations filter, or a history query, and it leaves the selected commit where it is. `Shift_escape_focuses_the_commit_message` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

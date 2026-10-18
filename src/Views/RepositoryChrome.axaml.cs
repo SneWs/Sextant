@@ -72,7 +72,7 @@ public partial class RepositoryChrome : UserControl
     {
         // Tunnel visits this control before the search box. Only the bubble may leave history,
         // and only when that box did not already take Escape.
-        if (e.Handled || e.Route != RoutingStrategies.Bubble || e.Key != Key.Escape)
+        if (e.Handled || e.Route != RoutingStrategies.Bubble || e.Key != Key.Escape || e.KeyModifiers != KeyModifiers.None)
             return;
         if (DataContext is not RepositoryViewModel vm || !vm.HasHistoryQuery)
             return;
@@ -91,7 +91,7 @@ public partial class RepositoryChrome : UserControl
             return;
         }
 
-        if (e.Key != Key.Escape)
+        if (e.Key != Key.Escape || e.KeyModifiers != KeyModifiers.None)
             return;
         vm.DismissHistorySearchCommand.Execute(null);
         e.Handled = true;
