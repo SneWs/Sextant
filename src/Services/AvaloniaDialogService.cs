@@ -185,16 +185,19 @@ public sealed class AvaloniaDialogService : IDialogService
         return edit;
     }
 
-    public async Task<string?> SaveFileAsync(string title, string suggestedName)
+    public Task<string?> SaveFileAsync(string title, string suggestedName) =>
+        SaveAsAsync(title, suggestedName, "Patch", ["*.patch"], "patch");
+
+    public async Task<string?> SaveAsAsync(string title, string suggestedName, string typeName, IReadOnlyList<string> patterns, string defaultExtension)
     {
-        var patch = new FilePickerFileType("Patch") { Patterns = ["*.patch"] };
+        var kind = new FilePickerFileType(typeName) { Patterns = [.. patterns] };
         var file = await _owner.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = title,
             SuggestedFileName = suggestedName,
-            DefaultExtension = "patch",
-            FileTypeChoices = [patch, FilePickerFileTypes.All],
-            SuggestedFileType = patch,
+            DefaultExtension = defaultExtension,
+            FileTypeChoices = [kind, FilePickerFileTypes.All],
+            SuggestedFileType = kind,
             ShowOverwritePrompt = true,
         });
         return file?.Path.LocalPath;

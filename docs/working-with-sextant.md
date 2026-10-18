@@ -22,6 +22,8 @@ Below that, the window is three columns. Drag the splitters to resize them. The 
 
 View → Window → Locations shows the locations pane and brings it forward. It does not hide it. A pane that was closed comes back. A pane that is open but has no space left in the split, which is what closing its floating window used to leave behind, is given a share again. The command palette has the same action. The other entries in that menu do the same for History, Commit, Changes, Diff, Blame, Repository files, LFS locks, and Command log.
 
+View → Save layout… writes the current arrangement to a file. View → Restore layout… reads one of those files and uses it, including the next time Sextant opens. Reset layout returns to the default arrangement. The command palette lists Save layout and Restore layout.
+
 ## Locations
 
 The filter icon under the Locations heading opens a box. Text there filters branches, tags, stashes, and the other rows. Escape closes that box and clears the text.

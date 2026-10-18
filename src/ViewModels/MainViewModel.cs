@@ -454,6 +454,46 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     private void ShowCommands() => Dock.Show(DockIds.Commands);
 
     [RelayCommand(CanExecute = nameof(HasActiveTab))]
+    private async Task SaveLayout()
+    {
+        if (Dialogs is null)
+            return;
+        var path = await Dialogs.SaveAsAsync(
+            "Save layout",
+            DockLayoutFile.SuggestedName,
+            DockLayoutFile.TypeName,
+            DockLayoutFile.SavePatterns,
+            DockLayoutFile.Extension);
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+        try
+        {
+            DockLayoutFile.Write(path, Dock.CaptureLayout());
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            await Dialogs.ShowNoticeAsync("Save layout", "Sextant could not save that file.");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(HasActiveTab))]
+    private async Task RestoreLayout()
+    {
+        if (Dialogs is null)
+            return;
+        var path = await Dialogs.PickFileAsync("Restore layout", DockLayoutFile.TypeName, DockLayoutFile.OpenPatterns);
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+        if (!DockLayoutFile.TryRead(path, out var layout, out var error) || layout is null || !Dock.TryRestore(layout))
+        {
+            await Dialogs.ShowNoticeAsync("Restore layout", error ?? "That file is not a Sextant layout.");
+            return;
+        }
+
+        Save();
+    }
+
+    [RelayCommand(CanExecute = nameof(HasActiveTab))]
     private void ResetLayout() => Dock.Reset();
 
     [RelayCommand]
@@ -614,6 +654,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         ShowFilesCommand.NotifyCanExecuteChanged();
         ShowLfsLocksCommand.NotifyCanExecuteChanged();
         ShowCommandsCommand.NotifyCanExecuteChanged();
+        SaveLayoutCommand.NotifyCanExecuteChanged();
+        RestoreLayoutCommand.NotifyCanExecuteChanged();
         ResetLayoutCommand.NotifyCanExecuteChanged();
     }
 
@@ -1287,6 +1329,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             }
             _palette.Add(new PaletteItem { Title = "LFS locks", Run = () => { ShowLfsLocks(); return Task.CompletedTask; } });
             _palette.Add(new PaletteItem { Title = "Command log", Run = () => { ShowCommands(); return Task.CompletedTask; } });
+            _palette.Add(new PaletteItem { Title = "Save layout", Run = () => SaveLayoutCommand.ExecuteAsync(null) });
+            _palette.Add(new PaletteItem { Title = "Restore layout", Run = () => RestoreLayoutCommand.ExecuteAsync(null) });
         }
 
         _palette.Add(new PaletteItem { Title = "Next tab", Run = () => NextTabCommand.ExecuteAsync(null) });

@@ -10,8 +10,11 @@ using Dock.Model.Core;
 using Dock.Model.Mvvm;
 using Dock.Model.Mvvm.Controls;
 using Sextant.Docking;
+using Sextant.Git;
+using Sextant.Git.Models;
 using Sextant.Git.Repo;
 using Sextant.Git.Workspace;
+using Sextant.Services;
 using Sextant.ViewModels;
 using Sextant.Views;
 
@@ -479,6 +482,8 @@ public class DockLayoutTests
                 var tools = SextantDockFactory.Collect(vm.Dock.Root).OfType<RepositoryTool>().ToList();
                 Assert.Equal("Commit", tools.Single(tool => tool.ToolId == DockIds.Changes).Title);
                 Assert.Equal("Changes", tools.Single(tool => tool.ToolId == DockIds.Staging).Title);
+                Assert.Contains(view.Menu.Items.OfType<NativeMenuItem>(), item => item.Header == "_Save layout…");
+                Assert.Contains(view.Menu.Items.OfType<NativeMenuItem>(), item => item.Header == "Restore _layout…");
                 Assert.Contains(view.Menu.Items.OfType<NativeMenuItem>(), item => item.Header == "_Reset layout");
                 Assert.DoesNotContain(view.Menu.Items.OfType<NativeMenuItem>(), item => item.Header == "_Locations");
 
@@ -895,6 +900,194 @@ public class DockLayoutTests
 
             return 0;
         }, CancellationToken.None);
+    }
+
+    [Fact]
+    public void Layout_file_migrates_an_older_diff_and_rejects_a_broken_file()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-layout-file-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var older = Path.Combine(directory, "old.sextant-layout");
+            File.WriteAllText(older, """
+                {
+                  "schema": 0,
+                  "root": {
+                    "orientation": "horizontal",
+                    "slots": [
+                      { "id": "history", "proportion": 0.5 },
+                      { "id": "documents", "proportion": 0.5 }
+                    ]
+                  }
+                }
+                """);
+            Assert.True(DockLayoutFile.TryRead(older, out var layout, out var error));
+            Assert.Null(error);
+            Assert.NotNull(layout);
+            Assert.Equal(DockLayouts.CurrentSchema, layout.Schema);
+            Assert.Equal([DockIds.Diff, DockIds.Blame], layout.Root!.Slots[1].Tabs);
+
+            using var host = Open(new WorkspaceState());
+            Assert.True(host.View.Dock.TryRestore(layout));
+            Assert.True(host.View.Dock.IsOpen(DockIds.History));
+            Assert.True(host.View.Dock.SharesHost(DockIds.Diff, DockIds.Blame));
+            Assert.False(host.View.Dock.IsOpen(DockIds.Locations));
+            Assert.False(host.View.Dock.IsOpen(DockIds.Commands));
+
+            var broken = Path.Combine(directory, "broken.json");
+            File.WriteAllText(broken, "{ \"openTabs\": [] }");
+            Assert.False(DockLayoutFile.TryRead(broken, out _, out error));
+            Assert.Equal("That file is not a Sextant layout.", error);
+            File.WriteAllText(broken, "not json");
+            Assert.False(DockLayoutFile.TryRead(broken, out _, out error));
+            Assert.Equal("That file is not a Sextant layout.", error);
+            Assert.False(DockLayoutFile.TryRead(Path.Combine(directory, "missing.sextant-layout"), out _, out error));
+            Assert.Equal("Sextant could not read that file.", error);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Saved_layout_file_restores_that_arrangement()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-layout-save-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "Layout.sextant-layout");
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var store = new WorkspaceStore(directory);
+                var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner());
+                var dialogs = new LayoutDialogs(path);
+                vm.Attach(dialogs);
+                var tab = new RepositoryViewModel(vm, Path.Combine(directory, "repo"));
+                vm.Tabs.Add(tab);
+                vm.ActiveTab = tab;
+                vm.Dock.SetOpen(DockIds.Files, false);
+                vm.Dock.SetOpen(DockIds.Locations, false);
+                vm.Dock.SetOpen(DockIds.Commands, true);
+
+                await vm.SaveLayoutCommand.ExecuteAsync(null);
+                Assert.Null(dialogs.Notice);
+                var saved = File.ReadAllText(path);
+                Assert.Contains("\"schema\": 2", saved, StringComparison.Ordinal);
+                Assert.Contains("\"commands\"", saved, StringComparison.Ordinal);
+                Assert.DoesNotContain("\"files\"", saved, StringComparison.Ordinal);
+
+                vm.Dock.Reset();
+                Assert.True(vm.Dock.IsOpen(DockIds.Files));
+                Assert.True(vm.Dock.IsOpen(DockIds.Locations));
+                Assert.False(vm.Dock.IsOpen(DockIds.Commands));
+
+                dialogs.OpenPath = null;
+                await vm.RestoreLayoutCommand.ExecuteAsync(null);
+                Assert.Null(dialogs.Notice);
+                Assert.True(vm.Dock.IsOpen(DockIds.Files));
+
+                dialogs.OpenPath = Path.Combine(directory, "notes.txt");
+                File.WriteAllText(dialogs.OpenPath, "hello");
+                await vm.RestoreLayoutCommand.ExecuteAsync(null);
+                Assert.Equal("That file is not a Sextant layout.", dialogs.Notice);
+                Assert.True(vm.Dock.IsOpen(DockIds.Files));
+                Assert.False(vm.Dock.IsOpen(DockIds.Commands));
+
+                dialogs.Notice = null;
+                dialogs.OpenPath = path;
+                await vm.RestoreLayoutCommand.ExecuteAsync(null);
+                Assert.Null(dialogs.Notice);
+                Assert.False(vm.Dock.IsOpen(DockIds.Files));
+                Assert.False(vm.Dock.IsOpen(DockIds.Locations));
+                Assert.True(vm.Dock.IsOpen(DockIds.Commands));
+
+                var again = new MainViewModel(new WorkspaceStore(directory), new WorkspaceStore(directory).LoadWorkspace(), new AppSettings(), new GitProcessRunner());
+                Assert.False(again.Dock.IsOpen(DockIds.Files));
+                Assert.False(again.Dock.IsOpen(DockIds.Locations));
+                Assert.True(again.Dock.IsOpen(DockIds.Commands));
+
+                await again.Shutdown();
+                await vm.Shutdown();
+                return 0;
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private sealed class LayoutDialogs : IDialogService
+    {
+        private readonly string _savePath;
+
+        public LayoutDialogs(string path)
+        {
+            _savePath = path;
+            OpenPath = path;
+        }
+
+        public string? OpenPath { get; set; }
+
+        public string? Notice { get; set; }
+
+        public Task<string?> PickFolderAsync(string title, string? startDirectory = null) => throw new NotSupportedException();
+
+        public Task<string?> PickGitExecutableAsync() => throw new NotSupportedException();
+
+        public Task<bool> ConfirmAsync(string title, string message, string confirm = "OK") => throw new NotSupportedException();
+
+        public Task<string?> PromptAsync(string title, string message, string initial = "", bool allowEmpty = false) => throw new NotSupportedException();
+
+        public Task<string?> PromptSecretAsync(string title, string message) => throw new NotSupportedException();
+
+        public Task<string?> SaveFileAsync(string title, string suggestedName) => throw new NotSupportedException();
+
+        public Task<string?> SaveAsAsync(string title, string suggestedName, string typeName, IReadOnlyList<string> patterns, string defaultExtension)
+        {
+            Assert.Equal("Save layout", title);
+            Assert.Equal(DockLayoutFile.SuggestedName, suggestedName);
+            Assert.Equal(DockLayoutFile.TypeName, typeName);
+            Assert.Contains("*.sextant-layout", patterns);
+            Assert.Equal(DockLayoutFile.Extension, defaultExtension);
+            return Task.FromResult<string?>(_savePath);
+        }
+
+        public Task<string?> PickFileAsync(string title, string typeName, IReadOnlyList<string> patterns)
+        {
+            Assert.Equal("Restore layout", title);
+            Assert.Equal(DockLayoutFile.TypeName, typeName);
+            Assert.Contains("*.sextant-layout", patterns);
+            Assert.Contains("*.json", patterns);
+            return Task.FromResult(OpenPath);
+        }
+
+        public Task<CloneRequest?> PromptCloneAsync() => throw new NotSupportedException();
+
+        public Task<string?> PickAsync(string title, string message, IReadOnlyList<string> options) => throw new NotSupportedException();
+
+        public Task<PerformanceChoice?> ConfirmPerformanceAsync(PerformanceSuggestion suggestion) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<RebaseStep>?> EditRebaseAsync(IReadOnlyList<RebaseStep> steps) => throw new NotSupportedException();
+
+        public Task<SettingsDraft?> EditSettingsAsync(SettingsDraft current) => throw new NotSupportedException();
+
+        public Task ShowAboutAsync() => throw new NotSupportedException();
+
+        public Task ShowNoticeAsync(string title, string message)
+        {
+            Assert.Equal("Restore layout", title);
+            Notice = message;
+            return Task.CompletedTask;
+        }
+
+        public Task CopyAsync(string text) => throw new NotSupportedException();
     }
 
     private static ToolDock ChangesHost(MainViewModel vm)
