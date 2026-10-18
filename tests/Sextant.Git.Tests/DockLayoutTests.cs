@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -1088,6 +1089,136 @@ public class DockLayoutTests
         }
 
         public Task CopyAsync(string text) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public async Task Shift_escape_focuses_the_commit_message()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("readme.txt", "hello\n");
+        repo.CommitAll("first");
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-commit-focus-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var vm = new MainViewModel(new WorkspaceStore(directory), new WorkspaceState(), new AppSettings(), new GitProcessRunner())
+                {
+                    GitExecutable = repo.Git,
+                    GitReady = true,
+                };
+                var tab = new RepositoryViewModel(vm, repo.Directory);
+                vm.Tabs.Add(tab);
+                var window = new MainWindow { DataContext = vm, Width = 1200, Height = 800 };
+                window.Show();
+                await vm.Activate(tab);
+                var until = DateTime.UtcNow.AddSeconds(5);
+                while (tab.IsBusy && DateTime.UtcNow < until)
+                    await Task.Delay(30);
+                Assert.False(tab.IsBusy);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                var graph = Graph(window);
+                graph.Focusable = true;
+                Assert.True(graph.Focus(), $"graph visible {graph.IsEffectivelyVisible} enabled {graph.IsEnabled}");
+                Assert.False(CommitMessage(window)!.IsFocused);
+
+                window.KeyPress(Key.Escape, RawInputModifiers.Shift, PhysicalKey.Escape, null);
+                var box = await WaitForCommitFocus(window);
+                Assert.True(vm.Dock.IsOpen(DockIds.Changes));
+                Assert.True(vm.Dock.IsSelected(DockIds.Changes));
+                Assert.True(box.IsFocused);
+
+                vm.Dock.SetOpen(DockIds.Changes, false);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(vm.Dock.IsOpen(DockIds.Changes));
+                graph = Graph(window);
+                graph.Focusable = true;
+                Assert.True(graph.Focus(), $"graph visible {graph.IsEffectivelyVisible} enabled {graph.IsEnabled}");
+                window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(vm.Dock.IsOpen(DockIds.Changes));
+
+                window.KeyPress(Key.Escape, RawInputModifiers.Shift, PhysicalKey.Escape, null);
+                box = await WaitForCommitFocus(window);
+                Assert.True(vm.Dock.IsOpen(DockIds.Changes));
+                Assert.True(vm.Dock.IsSelected(DockIds.Changes));
+                Assert.True(box.IsEffectivelyVisible);
+                Assert.True(box.IsFocused);
+
+                graph = Graph(window);
+                var commit = tab.Rows.First(row => !row.IsWorkingCopy && row.Subject == "first");
+                tab.SelectedGraphRow = commit;
+                var shown = DateTime.UtcNow.AddSeconds(5);
+                while (tab.ShowingWorkingCopy && DateTime.UtcNow < shown)
+                    await Task.Delay(20);
+                Assert.False(tab.ShowingWorkingCopy);
+                for (var i = 0; i < 40; i++)
+                    tab.Rows.Add(new GraphRowViewModel { Subject = "pad " + i });
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                var scroll = graph.GetVisualDescendants().OfType<ScrollViewer>().First();
+                scroll.Offset = new Vector(0, 2000);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(scroll.Offset.Y > 40, $"offset {scroll.Offset.Y} extent {scroll.Extent.Height} viewport {scroll.Viewport.Height}");
+
+                graph.Focusable = true;
+                Assert.True(graph.Focus());
+                window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.Same(commit, tab.SelectedGraphRow);
+                Assert.False(tab.ShowingWorkingCopy);
+                Assert.True(scroll.Offset.Y > 40, $"plain escape moved the history list to {scroll.Offset.Y}");
+
+                window.KeyPress(Key.Escape, RawInputModifiers.Shift, PhysicalKey.Escape, null);
+                box = await WaitForCommitFocus(window);
+                Assert.True(tab.SelectedGraphRow!.IsWorkingCopy);
+                Assert.True(tab.ShowingWorkingCopy);
+                Assert.True(scroll.Offset.Y < 1, $"history offset {scroll.Offset.Y}");
+                Assert.True(box.IsFocused);
+
+                await vm.Shutdown();
+                window.DataContext = null;
+                window.Close();
+                return 0;
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static ListBox Graph(Window window) =>
+        window.GetVisualDescendants().OfType<ListBox>().First(list => list.Name == "GraphList");
+
+    private static TextBox? CommitMessage(Window window) =>
+        window.GetVisualDescendants().OfType<TextBox>().FirstOrDefault(box => box.Name == "CommitMessageInput");
+
+    private static async Task<TextBox> WaitForCommitFocus(Window window)
+    {
+        var until = DateTime.UtcNow.AddSeconds(2);
+        TextBox? box = null;
+        while (DateTime.UtcNow < until)
+        {
+            window.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            box = CommitMessage(window);
+            if (box is { IsFocused: true })
+                return box;
+            await Task.Delay(20);
+        }
+
+        Assert.Fail(box is null ? "The commit message was not shown." : "The commit message did not take focus.");
+        return box!;
     }
 
     private static ToolDock ChangesHost(MainViewModel vm)
