@@ -245,6 +245,23 @@ public partial class RepositoryViewModel
         return RunHistoryLoadAsync("Loading history…", ct => _session.SetHistoryAsync(null, ct));
     }
 
+    /// <summary>
+    /// Clears the locations filter, the history search box, and an applied search or file history.
+    /// Hidden branches stay hidden.
+    /// </summary>
+    public Task ClearFind()
+    {
+        LocationFilterOpen = false;
+        if (LocationFilter.Length > 0)
+            LocationFilter = "";
+        ShowHistorySearch = false;
+        if (HistoryText.Length > 0)
+            HistoryText = "";
+        if (!HasHistoryQuery || _session is null)
+            return Task.CompletedTask;
+        return ShowAllCommits();
+    }
+
     /// <summary>Leaves file history or a search. Hidden branches stay hidden.</summary>
     [RelayCommand]
     private Task ShowAllCommits()

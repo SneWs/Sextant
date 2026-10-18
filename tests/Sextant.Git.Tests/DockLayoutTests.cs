@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using CommunityToolkit.Mvvm.Input;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Layout;
@@ -1170,6 +1171,7 @@ public class DockLayoutTests
 
                 graph.Focusable = true;
                 Assert.True(graph.Focus());
+                await Task.Delay(600);
                 window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
@@ -1195,6 +1197,150 @@ public class DockLayoutTests
             if (Directory.Exists(directory))
                 Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task Double_escape_restores_the_working_layout()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "root\n");
+        repo.CommitAll("root");
+        var trunk = repo.CurrentBranch();
+        repo.Run("switch", "-c", "feature/grass");
+        repo.WriteFile("c.txt", "feature\n");
+        repo.CommitAll("feature-only");
+        repo.Run("switch", trunk);
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-double-esc-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var vm = new MainViewModel(new WorkspaceStore(directory), new WorkspaceState(), new AppSettings(), new GitProcessRunner())
+                {
+                    GitExecutable = repo.Git,
+                    GitReady = true,
+                };
+                var tab = new RepositoryViewModel(vm, repo.Directory);
+                vm.Tabs.Add(tab);
+                var window = new MainWindow { DataContext = vm, Width = 1200, Height = 800 };
+                window.Show();
+                await vm.Activate(tab);
+                await WaitIdle(tab);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                var branch = tab.Locations.Single(item => item.Key == "b:feature/grass");
+                await ((AsyncRelayCommand)branch.HideCommand).ExecuteAsync(null);
+                await WaitIdle(tab);
+                Assert.True(tab.Locations.Single(item => item.Key == "b:feature/grass").EyeHidden);
+                Assert.DoesNotContain(tab.Rows, row => row.Subject == "feature-only");
+
+                tab.LocationFilter = "zzz";
+                vm.Dock.SetOpen(DockIds.Changes, false);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                var graph = Graph(window);
+                graph.Focusable = true;
+                Assert.True(graph.Focus());
+                window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal("zzz", tab.LocationFilter);
+                Assert.True(vm.Dock.IsSelected(DockIds.History));
+                Assert.False(vm.Dock.IsSelected(DockIds.Blame));
+                Assert.False(vm.Dock.IsOpen(DockIds.Changes));
+                Assert.Contains("refs/heads/feature/grass", tab.HiddenBranchNames);
+
+                await Task.Delay(600);
+                tab.ShowHistorySearch = true;
+                tab.HistoryText = "file:a.txt";
+                await tab.SearchHistoryCommand.ExecuteAsync(null);
+                await WaitIdle(tab);
+                Assert.True(tab.HasHistoryQuery);
+                var commit = tab.Rows.First(row => !row.IsWorkingCopy);
+                tab.SelectedGraphRow = commit;
+                var shown = DateTime.UtcNow.AddSeconds(5);
+                while (tab.ShowingWorkingCopy && DateTime.UtcNow < shown)
+                    await Task.Delay(20);
+                Assert.False(tab.ShowingWorkingCopy);
+                graph = Graph(window);
+                for (var i = 0; i < 40; i++)
+                    tab.Rows.Add(new GraphRowViewModel { Subject = "pad " + i });
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                var scroll = graph.GetVisualDescendants().OfType<ScrollViewer>().First();
+                scroll.Offset = new Vector(0, 2000);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(scroll.Offset.Y > 40, $"offset {scroll.Offset.Y} extent {scroll.Extent.Height}");
+                vm.Dock.Show(DockIds.Files);
+                vm.Dock.Show(DockIds.Blame);
+                Assert.True(vm.Dock.IsSelected(DockIds.Files));
+                Assert.True(vm.Dock.IsSelected(DockIds.Blame));
+
+                window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+                window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+
+                var until = DateTime.UtcNow.AddSeconds(8);
+                TextBox? box = null;
+                while (DateTime.UtcNow < until)
+                {
+                    window.UpdateLayout();
+                    Dispatcher.UIThread.RunJobs();
+                    box = CommitMessage(window);
+                    if (!tab.IsBusy && !tab.HasHistoryQuery && tab.ShowingWorkingCopy
+                        && tab.SelectedGraphRow?.IsWorkingCopy == true
+                        && vm.Dock.IsSelected(DockIds.History)
+                        && vm.Dock.IsSelected(DockIds.Diff)
+                        && vm.Dock.IsOpen(DockIds.Changes)
+                        && box is { IsFocused: true })
+                        break;
+                    await Task.Delay(20);
+                }
+
+                Assert.Equal("", tab.LocationFilter);
+                Assert.Equal("", tab.HistoryText);
+                Assert.False(tab.ShowHistorySearch);
+                Assert.False(tab.HasHistoryQuery);
+                Assert.False(tab.ShowingBlame);
+                Assert.True(tab.ShowingWorkingCopy);
+                Assert.True(tab.SelectedGraphRow!.IsWorkingCopy);
+                Assert.True(vm.Dock.IsSelected(DockIds.History));
+                Assert.False(vm.Dock.IsSelected(DockIds.Files));
+                Assert.True(vm.Dock.IsOpen(DockIds.Files));
+                Assert.True(vm.Dock.IsSelected(DockIds.Diff));
+                Assert.False(vm.Dock.IsSelected(DockIds.Blame));
+                Assert.True(vm.Dock.IsOpen(DockIds.Changes));
+                Assert.True(vm.Dock.IsSelected(DockIds.Changes));
+                Assert.True(box!.IsFocused);
+                graph = Graph(window);
+                scroll = graph.GetVisualDescendants().OfType<ScrollViewer>().First();
+                Assert.True(scroll.Offset.Y < 1, $"history offset {scroll.Offset.Y}");
+                Assert.Contains("Hiding", tab.HistoryCaption);
+                Assert.True(tab.Locations.Single(item => item.Key == "b:feature/grass").EyeHidden);
+                Assert.DoesNotContain(tab.Rows, row => row.Subject == "feature-only");
+
+                await vm.Shutdown();
+                window.DataContext = null;
+                window.Close();
+                return 0;
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static async Task WaitIdle(RepositoryViewModel tab)
+    {
+        var until = DateTime.UtcNow.AddSeconds(8);
+        while (tab.IsBusy && DateTime.UtcNow < until)
+            await Task.Delay(30);
+        Assert.False(tab.IsBusy);
     }
 
     private static ListBox Graph(Window window) =>
