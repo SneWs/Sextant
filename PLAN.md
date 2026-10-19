@@ -156,6 +156,8 @@ On 2026-10-18 View → Save layout writes the current arrangement to a `.sextant
 
 On 2026-10-18 Shift+Esc focuses the commit message and moves the history list to the working copy at the top. A Commit pane that is closed or not the selected tool is shown first. Escape without Shift still leaves a search, a locations filter, or a history query, and it leaves the selected commit where it is. `Shift_escape_focuses_the_commit_message` passed. The desktop window was not launched.
 
+On 2026-10-18 pressing Escape twice within half a second selects the working copy at the top of History and scrolls that list to the top. History's tab is selected when it shares a group. The Diff, Blame, and LFS locks group selects its first tab. An open Commit pane is selected and the commit message takes focus. Pane sizes stay as they are, and a closed pane stays closed. A locations filter, a history search, and hidden branches stay as they are. One Escape still leaves the selected commit where it is. `Double_escape_activates_tabs_and_focuses_the_commit_message` and `Shift_escape_focuses_the_commit_message` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

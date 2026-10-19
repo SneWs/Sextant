@@ -91,6 +91,46 @@ public partial class RepositoryDock : ObservableObject
         return InMain(tool) || Pinned(tool) || Floated(tool);
     }
 
+    /// <summary>Selects an open tool that shares its dock with another tool. A closed tool stays closed.</summary>
+    public void SelectGrouped(string id)
+    {
+        if (!_tools.TryGetValue(id, out var tool) || !IsOpen(id))
+            return;
+        if (tool.Owner is not IDock owner || owner.VisibleDockables is not { Count: > 1 })
+            return;
+        BringForward(id);
+    }
+
+    /// <summary>
+    /// Selects the first tab of the Diff, Blame, and LFS locks group. In the default layout that tab is Diff.
+    /// A tool that sits alone stays as it is.
+    /// </summary>
+    public void SelectFirstReviewTab()
+    {
+        var dock = ReviewGroup();
+        if (dock?.VisibleDockables is not { Count: > 1 } items || items[0] is not RepositoryTool first)
+            return;
+        BringForward(first.ToolId);
+    }
+
+    private ToolDock? ReviewGroup()
+    {
+        foreach (var id in new[] { DockIds.Diff, DockIds.Blame, DockIds.Locks })
+        {
+            if (!_tools.TryGetValue(id, out var tool) || !IsOpen(id) || tool.Owner is not ToolDock dock)
+                continue;
+            var count = dock.VisibleDockables?.OfType<RepositoryTool>()
+                .Count(item => item.ToolId is DockIds.Diff or DockIds.Blame or DockIds.Locks) ?? 0;
+            if (count >= 2)
+                return dock;
+        }
+
+        return null;
+    }
+
+    /// <summary>Selects an open tool. A closed tool stays closed, and split sizes stay as they are.</summary>
+    public void Activate(string id) => BringForward(id);
+
     /// <summary>Opens a tool and selects it. An open tool stays open. A tool squeezed to nothing gets a share of its split.</summary>
     public void Show(string id)
     {

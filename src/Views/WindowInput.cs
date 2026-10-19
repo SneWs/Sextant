@@ -109,11 +109,22 @@ public static class WindowInput
             return;
         }
 
-        if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None && vm.PaletteOpen)
+        if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None)
         {
-            vm.ClosePalette();
-            e.Handled = true;
-            return;
+            if (TakeDoubleEscape(vm) && vm.ActiveTab is { } home)
+            {
+                e.Handled = true;
+                var origin = TopLevel.GetTopLevel(e.Source as Visual);
+                RestoreHome(vm, home, origin);
+                return;
+            }
+
+            if (vm.PaletteOpen)
+            {
+                vm.ClosePalette();
+                e.Handled = true;
+                return;
+            }
         }
 
         if (AppGestures.Matches(e, Key.W))
@@ -155,6 +166,35 @@ public static class WindowInput
             return;
         tab.ShowAllCommitsCommand.Execute(null);
         e.Handled = true;
+    }
+
+    private static MainViewModel? _escapeOwner;
+    private static long _escapeAt;
+    private const int DoubleEscapeMilliseconds = 500;
+
+    /// <summary>The second plain Escape within the double-press window activates the working tabs.</summary>
+    private static bool TakeDoubleEscape(MainViewModel vm)
+    {
+        var now = Environment.TickCount64;
+        var doubled = ReferenceEquals(_escapeOwner, vm) && now - _escapeAt <= DoubleEscapeMilliseconds;
+        _escapeOwner = vm;
+        _escapeAt = now;
+        return doubled;
+    }
+
+    /// <summary>
+    /// History selects its top row and its tab when that tab shares a group. The review group selects
+    /// its first tab. An open Commit pane is selected and the commit message takes focus. Closed tools
+    /// and split sizes stay as they are.
+    /// </summary>
+    private static void RestoreHome(MainViewModel vm, RepositoryViewModel tab, TopLevel? origin)
+    {
+        vm.Dock.SelectGrouped(DockIds.History);
+        vm.Dock.SelectFirstReviewTab();
+        SelectWorkingCopy(tab, origin, vm.Dock);
+        vm.Dock.Activate(DockIds.Changes);
+        ScrollHistoryToTop(origin, vm.Dock);
+        ScheduleCommitFocus(origin, vm.Dock);
     }
 
     /// <summary>
