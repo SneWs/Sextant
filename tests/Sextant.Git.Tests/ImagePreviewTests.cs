@@ -44,7 +44,7 @@ public class ImagePreviewTests
     }
 
     [Fact]
-    public async Task Image_preview_loads_svg_and_tiff()
+    public async Task Image_preview_loads_svg_tiff_and_tga()
     {
         using var repo = new TempRepo();
         repo.Run("config", "core.autocrlf", "false");
@@ -68,6 +68,22 @@ public class ImagePreviewTests
             CancellationToken.None);
         Assert.NotNull(tiffPreview);
         Assert.Equal(tiff, tiffPreview.After);
+
+        var tga = new byte[]
+        {
+            0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            1, 0, 1, 0, 24, 0,
+            0, 0, 255,
+        };
+        File.WriteAllBytes(Path.Combine(repo.Directory, "tex.tga"), tga);
+        repo.Run("add", "tex.tga");
+        repo.Run("commit", "-m", "tga");
+        head = repo.RunCapture("rev-parse", "HEAD").Trim();
+        var tgaPreview = await session.PreviewImageAsync(
+            new ImageRequest("tex.tga", null, head, false, false),
+            CancellationToken.None);
+        Assert.NotNull(tgaPreview);
+        Assert.Equal(tga, tgaPreview.After);
     }
 
     [Fact]
@@ -76,7 +92,7 @@ public class ImagePreviewTests
         using var repo = new TempRepo();
         repo.Run("config", "core.autocrlf", "false");
         repo.WriteFile(".gitattributes", "*.png filter=lfs diff=lfs merge=lfs -text\n");
-        var huge = HistoryLimits.MaxPreviewBytes + 1;
+        var huge = HistoryLimits.MaxImageBytes + 1;
         repo.WriteFile("pic.png", Pointer('c', huge));
         repo.CommitAll("huge pointer");
         var head = repo.RunCapture("rev-parse", "HEAD").Trim();
@@ -91,8 +107,8 @@ public class ImagePreviewTests
         Assert.NotNull(preview);
         Assert.Null(preview.Before);
         Assert.Null(preview.After);
-        Assert.Contains("8 MB", preview.BeforeNotice, StringComparison.Ordinal);
-        Assert.Contains("8 MB", preview.AfterNotice, StringComparison.Ordinal);
+        Assert.Contains("20 MB", preview.BeforeNotice, StringComparison.Ordinal);
+        Assert.Contains("20 MB", preview.AfterNotice, StringComparison.Ordinal);
         var added = session.Snapshot().Commands.Skip(before);
         Assert.DoesNotContain(added, command => command.Arguments.Contains("--filters"));
         Assert.DoesNotContain(added, command => command.Arguments.Contains("lfs"));

@@ -95,7 +95,7 @@ Changed lines can be staged or unstaged one hunk or one line at a time, from the
 
 A large diff waits for Load anyway. A line longer than 256 characters is split so one line does not stall the window.
 
-PNG, JPG, JPEG, GIF, BMP, WEBP, ICO, SVG, TIF, and TIFF open as a picture of each side. An FBX file shows a clay view of each model, with mesh, vertex, and triangle counts, material names, and animation takes. Hold Ctrl, or Command on macOS, and drag to rotate. The wheel zooms while that key is held. A double-click with the key returns the first angle. A plain wheel scrolls the diff.
+PNG, JPG, JPEG, GIF, BMP, WEBP, ICO, SVG, TGA, TIF, and TIFF open as a picture of each side. `.targa` is the same preview as `.tga`. An FBX file shows a clay view of each model, with mesh, vertex, and triangle counts, material names, and animation takes. Hold Ctrl, or Command on macOS, and drag to rotate. The wheel zooms while that key is held. A double-click with the key returns the first angle. A plain wheel scrolls the diff.
 
 ## Fetch, pull, and push
 
@@ -119,7 +119,7 @@ If an external merge command is set, or Git has `merge.tool`, the file's merge a
 
 ## Git LFS
 
-Pointer files stay pointers in a normal diff. Sextant does not download them just to show status. An image or FBX pointer under 8 MB is the exception: both versions load for the preview. When the signed-in `gh` account cannot see the repository, another account already signed in to `gh` is tried for that download.
+Pointer files stay pointers in a normal diff. Sextant does not download them just to show status. An image pointer under 20 MB, or an FBX pointer under 8 MB, is the exception: both versions load for the preview. When the signed-in `gh` account cannot see the repository, another account already signed in to `gh` is tried for that download.
 
 The file list marks a path with an LFS badge when Git's attributes say the filter is `lfs`. The tooltip says when the path is not tracked.
 

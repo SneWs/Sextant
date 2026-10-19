@@ -384,7 +384,7 @@ public sealed partial class RepositorySession
                 return new ImageBytes(null, "No file in this version.");
             if (pointer is not null)
                 return await ExpandWorktreePointerAsync(full, path, pointer, kind, cancellationToken).ConfigureAwait(false);
-            if (!PreviewLimit.Allows(length))
+            if (!WithinPreview(length, kind))
                 return new ImageBytes(null, TooLarge(kind));
             return new ImageBytes(await File.ReadAllBytesAsync(full, cancellationToken).ConfigureAwait(false), "");
         }
@@ -401,12 +401,14 @@ public sealed partial class RepositorySession
         Track(sizeOutput);
         if (sizeOutput.ExitCode != 0 || !TrySize(sizeOutput.Stdout, out var size))
             return new ImageBytes(null, "No file in this version.");
-        if (!PreviewLimit.Allows(size))
+        if (!WithinPreview(size, kind))
             return new ImageBytes(null, TooLarge(kind));
         var blob = await ExecuteAsync(GitCommands.CatFileBlob(_toplevel, spec), null, cancellationToken).ConfigureAwait(false);
         Track(blob);
-        if (blob.ExitCode != 0 || blob.Stdout.LongLength > HistoryLimits.MaxPreviewBytes)
+        if (blob.ExitCode != 0)
             return new ImageBytes(null, "No file in this version.");
+        if (blob.Stdout.LongLength > PreviewCap(kind))
+            return new ImageBytes(null, TooLarge(kind));
         if (LfsPointers.TryParseBytes(blob.Stdout, out var lfs) && lfs is not null)
             return await ExpandPointerAsync(revision, path, lfs, blob.Stdout, kind, cancellationToken).ConfigureAwait(false);
         return new ImageBytes(blob.Stdout, "");
@@ -414,7 +416,7 @@ public sealed partial class RepositorySession
 
     private async Task<ImageBytes> ExpandWorktreePointerAsync(string full, string path, LfsPointer pointer, string kind, CancellationToken cancellationToken)
     {
-        if (!PreviewLimit.Allows(pointer.Size))
+        if (!WithinPreview(pointer.Size, kind))
             return new ImageBytes(null, TooLarge(kind));
         byte[] pointerBytes;
         try
@@ -446,7 +448,7 @@ public sealed partial class RepositorySession
         string kind,
         CancellationToken cancellationToken)
     {
-        if (!PreviewLimit.Allows(pointer.Size))
+        if (!WithinPreview(pointer.Size, kind))
             return new ImageBytes(null, TooLarge(kind));
 
         var reason = "";
@@ -653,14 +655,20 @@ public sealed partial class RepositorySession
     {
         if (output.ExitCode != 0 || output.Stdout.Length == 0)
             return null;
-        if (output.Stdout.LongLength > HistoryLimits.MaxPreviewBytes)
+        if (output.Stdout.LongLength > PreviewCap(kind))
             return new ImageBytes(null, TooLarge(kind));
         if (LfsPointers.TryParseBytes(output.Stdout, out var still) && still is not null)
             return null;
         return new ImageBytes(output.Stdout, "");
     }
 
-    private static string TooLarge(string kind) => "This " + kind + " is larger than 8 MB, so it was not loaded.";
+    private static int PreviewCap(string kind) =>
+        kind == "image" ? HistoryLimits.MaxImageBytes : HistoryLimits.MaxPreviewBytes;
+
+    private static bool WithinPreview(long size, string kind) => size >= 0 && size <= PreviewCap(kind);
+
+    private static string TooLarge(string kind) =>
+        "This " + kind + " is larger than " + ImageFiles.FormatBytes(PreviewCap(kind)) + ", so it was not loaded.";
 
     private static string DownloadFailed(string kind, string stderr = "")
     {

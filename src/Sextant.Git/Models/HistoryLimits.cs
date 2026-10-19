@@ -14,5 +14,8 @@ public static class HistoryLimits
 
     public const int MaxPreviewBytes = 8 * 1024 * 1024;
 
+    /// <summary>Picture diffs. FBX and other previews stay at <see cref="MaxPreviewBytes"/>.</summary>
+    public const int MaxImageBytes = 20 * 1024 * 1024;
+
     public const int LfsPointerProbeBytes = 1024;
 }
