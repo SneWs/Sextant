@@ -162,6 +162,8 @@ On 2026-10-18 Shift+Esc focuses the commit message and moves the history list to
 
 On 2026-10-18 pressing Escape twice within half a second selects the working copy at the top of History and scrolls that list to the top. History's tab is selected when it shares a group. The Diff, Blame, and LFS locks group selects its first tab. An open Commit pane is selected and the commit message takes focus. Pane sizes stay as they are, and a closed pane stays closed. A locations filter, a history search, and hidden branches stay as they are. One Escape still leaves the selected commit where it is. `Double_escape_activates_tabs_and_focuses_the_commit_message` and `Shift_escape_focuses_the_commit_message` passed. The desktop window was not launched.
 
+On 2026-10-19 a click on a stash in Locations selects that stash and shows its files and diff. Untracked files are included when they were stashed. A double-click shows the same stash and leaves the checked-out branch as it is. Selecting that commit in the graph shows the same files. `git stash show` does not take a path, so one file is the first-parent diff, then the untracked parent when that diff is empty. `Stash_show_lists_tracked_edits_and_untracked_files`, `Stash_show_lists_a_plain_edit_and_a_staged_file`, and `Clicking_a_stash_shows_its_files_and_diff` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
@@ -532,7 +534,7 @@ Read-mostly depth and the local operations that do not need a rebase todo editor
 - Commit search by subject, author, and revision, using `git log` greps and `git rev-parse` for a pasted sha. Include a `branch:` style filter in the same box.
 - File history with `git log -- <path>`, opened from a file in the list. The caption names that file and sits in the Locations pane. A close button next to the caption restores the commit graph. The button is the accent color, with an X. An applied search uses the same button. Hidden branches stay hidden. Escape restores the graph when the search box is not focused.
 - Blame via `git blame --line-porcelain`, virtualized, for the selected file at the selected commit.
-- Stash: list, push, pop, apply, drop. Stash refs may then appear in the graph.
+- Stash: list, push, pop, apply, drop. A click shows the stashed files and their diff, including untracked files when they were stashed. Stash refs may then appear in the graph.
 - Reset soft and mixed. Hard reset only behind a confirmation that names the commit that will be discarded.
 - Cherry-pick and revert of the selected commit.
 - Apply patch, from the Repository menu and the command palette. The picker accepts a `.patch` or `.diff` file. The command is `git apply -- <file>`, which changes the working tree and does not stage. A patch saved from a commit is a format-patch; git apply uses its diff and ignores the mail headers. This does not run `git am`, so a failure does not start a rebase. Git's stderr is the failure.

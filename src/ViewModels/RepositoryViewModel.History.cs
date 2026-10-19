@@ -606,6 +606,7 @@ public partial class RepositoryViewModel
             "");
         ShowCommitStats = false;
         _shownSha = null;
+        _stashRef = null;
         ReplaceDetails();
         var token = _details!.Token;
         try

@@ -230,6 +230,43 @@ public static class GitCommands
     public static IReadOnlyList<string> StashDrop(string toplevel, string stashRef) =>
         ["-C", toplevel, "stash", "drop", stashRef];
 
+    /// <summary>Files in a stash, including untracked files stored on its third parent.</summary>
+    public static IReadOnlyList<string> StashShowNameStatus(string toplevel, string stashRef) =>
+    [
+        "-C", toplevel, "--no-optional-locks", "stash", "show",
+        "--include-untracked", "-z", "--name-status", stashRef,
+    ];
+
+    /// <summary>
+    /// The whole stash as a patch. A path cannot be passed: git reads it as another stash.
+    /// </summary>
+    public static IReadOnlyList<string> StashShowPatch(string toplevel, string stashRef, bool ignoreWhitespace)
+    {
+        var arguments = new List<string>
+        {
+            "-C", toplevel, "--no-optional-locks", "stash", "show",
+            "--include-untracked", "--no-textconv",
+        };
+        if (ignoreWhitespace)
+            arguments.Add("-w");
+        arguments.Add("-p");
+        arguments.Add(stashRef);
+        KeepLfsPointers(arguments);
+        return arguments;
+    }
+
+    /// <summary>Added and removed lines in a stash, including untracked files.</summary>
+    public static IReadOnlyList<string> StashShowNumStat(string toplevel, string stashRef)
+    {
+        var arguments = new List<string>
+        {
+            "-C", toplevel, "--no-optional-locks", "stash", "show",
+            "--include-untracked", "--no-textconv", "--numstat", "-z", stashRef,
+        };
+        KeepLfsPointers(arguments);
+        return arguments;
+    }
+
     public static IReadOnlyList<string> Reset(string toplevel, string mode, string sha) =>
         ["-C", toplevel, "reset", mode, sha];
 
