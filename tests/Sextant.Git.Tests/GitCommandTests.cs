@@ -167,6 +167,40 @@ public class GitCommandTests
         Assert.Contains("--no-optional-locks", GitCommands.CatFileBlob("repo", "HEAD:./a"));
         Assert.DoesNotContain("--no-optional-locks", GitCommands.CatFileFiltered("repo", "HEAD:./a"));
         Assert.Equal(["-C", "wt", "checkout"], GitCommands.CheckoutCurrent("wt"));
+        Assert.Equal(
+            [
+                "-C", "repo", "--no-optional-locks", "stash", "show",
+                "--include-untracked", "-z", "--name-status", "stash@{1}",
+            ],
+            GitCommands.StashShowNameStatus("repo", "stash@{1}"));
+        Assert.DoesNotContain("filter.lfs.process=", GitCommands.StashShowNameStatus("repo", "stash@{1}"));
+        Assert.Equal(
+            [
+                "-c", "filter.lfs.smudge=",
+                "-c", "filter.lfs.process=",
+                "-c", "filter.lfs.required=false",
+                "-C", "repo", "--no-optional-locks", "stash", "show",
+                "--include-untracked", "--no-textconv", "-p", "stash@{1}",
+            ],
+            GitCommands.StashShowPatch("repo", "stash@{1}", false));
+        Assert.Equal(
+            [
+                "-c", "filter.lfs.smudge=",
+                "-c", "filter.lfs.process=",
+                "-c", "filter.lfs.required=false",
+                "-C", "repo", "--no-optional-locks", "stash", "show",
+                "--include-untracked", "--no-textconv", "-w", "-p", "stash@{0}",
+            ],
+            GitCommands.StashShowPatch("repo", "stash@{0}", true));
+        Assert.Equal(
+            [
+                "-c", "filter.lfs.smudge=",
+                "-c", "filter.lfs.process=",
+                "-c", "filter.lfs.required=false",
+                "-C", "repo", "--no-optional-locks", "stash", "show",
+                "--include-untracked", "--no-textconv", "--numstat", "-z", "stash@{2}",
+            ],
+            GitCommands.StashShowNumStat("repo", "stash@{2}"));
     }
 
     [Fact]

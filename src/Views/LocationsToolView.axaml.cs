@@ -94,7 +94,8 @@ public partial class LocationsToolView : UserControl
         if (source.FindAncestorOfType<Button>(includeSelf: true) is not null)
             return;
         var row = source as ListBoxItem ?? source.FindAncestorOfType<ListBoxItem>();
-        if (row?.DataContext is not LocationItem { ShowTag: true, Oid: { Length: > 0 } } item)
+        // A tag or a stash selects that commit. A branch waits for the double-click, which checks it out.
+        if (row?.DataContext is not LocationItem { Oid: { Length: > 0 } } item || (!item.ShowTag && !item.ShowPop))
             return;
         item.RevealCommand.Execute(null);
     }

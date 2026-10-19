@@ -2173,6 +2173,8 @@ public partial class RepositoryViewModel : ViewModelBase
                 ShowPop = true,
                 ShowApply = true,
                 ShowDrop = true,
+                ShowReveal = true,
+                Oid = stash.Sha,
                 ShowEye = true,
                 EyeHidden = hidden,
                 EyeOpen = !hidden,
@@ -2181,6 +2183,7 @@ public partial class RepositoryViewModel : ViewModelBase
                 PopCommand = new AsyncRelayCommand(() => PopStashAsync(stash)),
                 ApplyCommand = new AsyncRelayCommand(() => ApplyStashAsync(stash)),
                 DropCommand = new AsyncRelayCommand(() => DropStashAsync(stash)),
+                RevealCommand = new AsyncRelayCommand(() => RevealAsync(stash.Sha, stash.Ref)),
                 HideCommand = new AsyncRelayCommand(() => ToggleHiddenAsync(BranchVisibility.StashToken(stash.Sha))),
             });
         }
@@ -2679,6 +2682,7 @@ public partial class RepositoryViewModel : ViewModelBase
             ShowingCommit = false;
             ClearCommitFields();
             _shownSha = null;
+            _stashRef = null;
             if (_showingCommitFiles)
                 RestoreWorkingFiles();
             await LoadDiffAsync();
@@ -2707,7 +2711,13 @@ public partial class RepositoryViewModel : ViewModelBase
         try
         {
             var parent = row.Commit?.Parents.Count > 0 ? row.Commit.Parents[0] : null;
-            var files = await _session.CommitFilesAsync(sha, parent, token);
+            var stash = _session.Snapshot().Stashes.FirstOrDefault(entry =>
+                string.Equals(entry.Sha, sha, StringComparison.OrdinalIgnoreCase));
+            _diffParent = parent;
+            _stashRef = stash?.Ref;
+            var files = stash is null
+                ? await _session.CommitFilesAsync(sha, parent, token)
+                : await _session.StashFilesAsync(stash.Ref, token);
             if (files is null || token.IsCancellationRequested)
                 return;
             var tracked = await LfsMarksAsync(files, sha, token);
@@ -2715,8 +2725,10 @@ public partial class RepositoryViewModel : ViewModelBase
                 return;
             ShowCommitFiles(files, tracked);
             _shownSha = sha;
-            _diffParent = parent;
-            await ApplyCommitStatsAsync(parent, sha, token);
+            if (stash is null)
+                await ApplyCommitStatsAsync(parent, sha, token);
+            else
+                await ApplyStashStatsAsync(stash.Ref, token);
             try
             {
                 var message = await _session.CommitMessageAsync(sha, token);
@@ -2739,6 +2751,9 @@ public partial class RepositoryViewModel : ViewModelBase
     }
 
     private string? _diffParent;
+
+    // Set while the selected commit is a stash, so the file list and diff include its untracked files.
+    private string? _stashRef;
 
     private void RestoreWorkingFiles()
     {
@@ -2885,6 +2900,15 @@ public partial class RepositoryViewModel : ViewModelBase
                 if (stagedDocument is null || token.IsCancellationRequested)
                     return;
                 document = await _session.WorktreeDiffAsync(false, allowLarge, ignoreWhitespace, token).ConfigureAwait(false);
+            }
+            else if (_stashRef is { Length: > 0 } stashRef)
+            {
+                document = await _session.StashDiffAsync(
+                    stashRef,
+                    AllDiffFiles ? null : file!.Path,
+                    allowLarge,
+                    token,
+                    ignoreWhitespace).ConfigureAwait(false);
             }
             else
             {
@@ -3711,6 +3735,26 @@ public partial class RepositoryViewModel : ViewModelBase
         try
         {
             var stat = await _session.DiffStatAsync(older, newer, token);
+            if (!token.IsCancellationRequested)
+            {
+                CommitStatsFiles = DiffStatText.Files(stat.Files);
+                CommitStatsRemoved = DiffStatText.Removed(stat.Removed);
+                CommitStatsAdded = DiffStatText.Added(stat.Added);
+                ShowCommitStats = true;
+            }
+        }
+        catch (GitCommandFailedException)
+        {
+        }
+    }
+
+    private async Task ApplyStashStatsAsync(string stashRef, CancellationToken token)
+    {
+        if (_session is null)
+            return;
+        try
+        {
+            var stat = await _session.StashStatAsync(stashRef, token);
             if (!token.IsCancellationRequested)
             {
                 CommitStatsFiles = DiffStatText.Files(stat.Files);

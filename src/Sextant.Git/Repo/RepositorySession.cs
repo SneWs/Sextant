@@ -180,6 +180,21 @@ public sealed partial class RepositorySession : IAsyncDisposable
         }, cancellationToken);
     }
 
+    public Task<IReadOnlyList<CommitFileChange>?> StashFilesAsync(string stashRef, CancellationToken cancellationToken)
+    {
+        var token = _filesGate.Next();
+        return RunAsync(async ct =>
+        {
+            var changes = await _scheduler.ReadAsync(async inner =>
+            {
+                var output = await ExecuteAsync(GitCommands.StashShowNameStatus(_toplevel, stashRef), null, inner).ConfigureAwait(false);
+                Checked(output);
+                return NameStatusParser.Parse(output.Stdout);
+            }, ct).ConfigureAwait(false);
+            return _filesGate.IsCurrent(token) ? changes : null;
+        }, cancellationToken);
+    }
+
     public Task<DiffStat> DiffStatAsync(string? older, string newer, CancellationToken cancellationToken) =>
         RunAsync(async ct =>
         {
@@ -188,6 +203,16 @@ public sealed partial class RepositorySession : IAsyncDisposable
                 : GitCommands.NumStat(_toplevel, older, newer);
             var output = await _scheduler.ReadAsync(
                 inner => ExecuteAsync(arguments, null, inner),
+                ct).ConfigureAwait(false);
+            Checked(output);
+            return NumStatParser.Parse(output.Stdout);
+        }, cancellationToken);
+
+    public Task<DiffStat> StashStatAsync(string stashRef, CancellationToken cancellationToken) =>
+        RunAsync(async ct =>
+        {
+            var output = await _scheduler.ReadAsync(
+                inner => ExecuteAsync(GitCommands.StashShowNumStat(_toplevel, stashRef), null, inner),
                 ct).ConfigureAwait(false);
             Checked(output);
             return NumStatParser.Parse(output.Stdout);
@@ -295,6 +320,80 @@ public sealed partial class RepositorySession : IAsyncDisposable
             return ExecuteAsync(arguments, null, inner);
         },
         (document, inner) => AnnotateAsync(document, path, firstParent, sha, false, inner, ignoreWhitespace, allowLarge));
+    }
+
+    /// <summary>
+    /// A stash patch. With no path this is <c>stash show --include-untracked</c>.
+    /// One path is the first-parent diff, then the untracked parent when that diff is empty,
+    /// because <c>stash show</c> reads a path as another stash.
+    /// </summary>
+    public Task<DiffDocument?> StashDiffAsync(
+        string stashRef,
+        string? path,
+        bool allowLarge,
+        CancellationToken cancellationToken,
+        bool ignoreWhitespace = false)
+    {
+        var token = _diffGate.Next();
+        if (string.IsNullOrEmpty(path))
+        {
+            return ReadDiffAsync(token, allowLarge, cancellationToken, inner =>
+                ExecuteAsync(GitCommands.StashShowPatch(_toplevel, stashRef, ignoreWhitespace), null, inner),
+                (document, inner) => AnnotateAsync(document, null, stashRef + "^1", stashRef, false, inner, ignoreWhitespace, allowLarge));
+        }
+
+        return RunAsync(async ct =>
+        {
+            var document = await _scheduler.ReadAsync(async inner =>
+            {
+                var trackedOutput = Checked(await ExecuteAsync(
+                    GitCommands.DiffRange(_toplevel, stashRef + "^1", stashRef, path, ignoreWhitespace),
+                    null,
+                    inner).ConfigureAwait(false));
+                if (trackedOutput.Stdout.Length > 0)
+                {
+                    return await AnnotateAsync(
+                        ToDiff(trackedOutput, allowLarge),
+                        path,
+                        stashRef + "^1",
+                        stashRef,
+                        false,
+                        inner,
+                        ignoreWhitespace,
+                        allowLarge).ConfigureAwait(false);
+                }
+
+                var third = await ExecuteAsync(GitCommands.RevParseCommit(_toplevel, stashRef + "^3"), null, inner).ConfigureAwait(false);
+                Track(third);
+                var chosen = trackedOutput;
+                string? before = stashRef + "^1";
+                var after = stashRef;
+                if (third.ExitCode == 0)
+                {
+                    var untrackedOutput = Checked(await ExecuteAsync(
+                        GitCommands.ShowPatch(_toplevel, stashRef + "^3", path, ignoreWhitespace),
+                        null,
+                        inner).ConfigureAwait(false));
+                    if (untrackedOutput.Stdout.Length > 0)
+                    {
+                        chosen = untrackedOutput;
+                        before = null;
+                        after = stashRef + "^3";
+                    }
+                }
+
+                return await AnnotateAsync(
+                    ToDiff(chosen, allowLarge),
+                    path,
+                    before,
+                    after,
+                    false,
+                    inner,
+                    ignoreWhitespace,
+                    allowLarge).ConfigureAwait(false);
+            }, ct).ConfigureAwait(false);
+            return _diffGate.IsCurrent(token) ? document : null;
+        }, cancellationToken);
     }
 
     public Task<DiffDocument?> RangeDiffAsync(
