@@ -16,6 +16,9 @@ public class ImageRasterTests
         Assert.True(ImageFiles.IsImagePath("a.png"));
         Assert.True(ImageFiles.IsImagePath("a.jpg"));
         Assert.True(ImageFiles.IsImagePath("a.jpeg"));
+        Assert.True(ImageFiles.IsImagePath("a.tga"));
+        Assert.True(ImageFiles.IsImagePath("a.TGA"));
+        Assert.True(ImageFiles.IsImagePath("a.targa"));
         Assert.True(ImageFiles.IsImagePath("a.tif"));
         Assert.True(ImageFiles.IsImagePath("a.tiff"));
         Assert.False(ImageFiles.IsImagePath("a.txt"));
@@ -64,12 +67,121 @@ public class ImageRasterTests
     }
 
     [Fact]
+    public void Tga_preview_is_upright_and_ignores_a_footer()
+    {
+        // File order is bottom row first: red, green, then blue, white.
+        var pixels = new byte[]
+        {
+            0, 0, 255, 0, 255, 0,
+            255, 0, 0, 255, 255, 255,
+        };
+        var footer = Encoding.ASCII.GetBytes("TRUEVISION-XFILE.\0");
+        var png = ImageRaster.Prepare("tex.tga", Tga(2, 2, 2, 24, 0, pixels, id: Encoding.ASCII.GetBytes("mark"), footer: footer));
+        using var bitmap = Decode(png);
+        Assert.Equal(2, bitmap.Width);
+        Assert.Equal(2, bitmap.Height);
+        AssertColor(bitmap.GetPixel(0, 0), 0, 0, 255);
+        AssertColor(bitmap.GetPixel(1, 0), 255, 255, 255);
+        AssertColor(bitmap.GetPixel(0, 1), 255, 0, 0);
+        AssertColor(bitmap.GetPixel(1, 1), 0, 255, 0);
+
+        var flipped = ImageRaster.Prepare("tex.targa", Tga(2, 2, 1, 24, 0x10, new byte[] { 0, 0, 255, 255, 0, 0 }));
+        using var wide = Decode(flipped);
+        AssertColor(wide.GetPixel(0, 0), 0, 0, 255);
+        AssertColor(wide.GetPixel(1, 0), 255, 0, 0);
+    }
+
+    [Fact]
+    public void Tga_rle_keeps_alpha_and_padding_stays_opaque()
+    {
+        // A run of two red pixels at alpha 128, then one raw blue pixel at alpha 255. Origin is the top.
+        var rle = new byte[]
+        {
+            0x81, 0, 0, 255, 128,
+            0x00, 255, 0, 0, 255,
+        };
+        var png = ImageRaster.Prepare("tex.tga", Tga(10, 3, 1, 32, 0x28, rle));
+        using var bitmap = Decode(png);
+        Assert.Equal(3, bitmap.Width);
+        AssertColor(bitmap.GetPixel(0, 0), 255, 0, 0, 128);
+        AssertColor(bitmap.GetPixel(1, 0), 255, 0, 0, 128);
+        AssertColor(bitmap.GetPixel(2, 0), 0, 0, 255, 255);
+
+        var padded = ImageRaster.Prepare("pad.tga", Tga(2, 1, 1, 32, 0x20, new byte[] { 0, 0, 255, 0 }));
+        AssertColor(Pixel(padded), 255, 0, 0, 255);
+    }
+
+    [Fact]
+    public void Tga_palette_and_gray_decode()
+    {
+        var palette = new byte[] { 0, 0, 255, 255, 0, 0 };
+        var indexes = new byte[] { 0x01, 0, 1 };
+        var png = ImageRaster.Prepare("map.tga", Tga(9, 2, 1, 8, 0x20, indexes, palette: palette));
+        using var bitmap = Decode(png);
+        AssertColor(bitmap.GetPixel(0, 0), 255, 0, 0);
+        AssertColor(bitmap.GetPixel(1, 0), 0, 0, 255);
+
+        var gray = ImageRaster.Prepare("gray.tga", Tga(3, 1, 1, 8, 0, new byte[] { 200 }));
+        AssertColor(Pixel(gray), 200, 200, 200);
+    }
+
+    [Fact]
+    public void Broken_tga_is_not_a_preview()
+    {
+        Assert.Null(ImageRaster.Prepare("a.tga", new byte[17]));
+        Assert.Null(ImageRaster.Prepare("a.tga", new byte[18]));
+        Assert.Null(ImageRaster.Prepare("a.tga", Tga(2, 2, 2, 24, 0, new byte[] { 0, 0, 255 })));
+        Assert.Null(ImageRaster.Prepare("a.tga", Tga(2, 20000, 1, 24, 0, Array.Empty<byte>())));
+    }
+
+    [Fact]
     public void Png_bytes_are_left_unchanged()
     {
         var png = BluePng();
         Assert.Same(png, ImageRaster.Prepare("a.png", png));
         Assert.Same(png, ImageRaster.Prepare("a.jpg", png));
         Assert.Same(png, ImageRaster.Prepare("a.jpeg", png));
+    }
+
+    private static void AssertColor(SKColor color, byte red, byte green, byte blue, byte alpha = 255) =>
+        Assert.True(color.Red == red && color.Green == green && color.Blue == blue && color.Alpha == alpha, color.ToString());
+
+    private static byte[] Tga(
+        int imageType,
+        int width,
+        int height,
+        int depth,
+        int descriptor,
+        byte[] pixels,
+        byte[]? id = null,
+        byte[]? palette = null,
+        byte[]? footer = null)
+    {
+        id ??= [];
+        var entryBytes = palette is null ? 0 : 3;
+        var colors = palette is null ? 0 : palette.Length / entryBytes;
+        var header = new byte[18];
+        header[0] = (byte)id.Length;
+        header[1] = palette is null ? (byte)0 : (byte)1;
+        header[2] = (byte)imageType;
+        header[5] = (byte)colors;
+        header[6] = (byte)(colors >> 8);
+        header[7] = palette is null ? (byte)0 : (byte)24;
+        header[12] = (byte)width;
+        header[13] = (byte)(width >> 8);
+        header[14] = (byte)height;
+        header[15] = (byte)(height >> 8);
+        header[16] = (byte)depth;
+        header[17] = (byte)descriptor;
+        using var stream = new MemoryStream();
+        stream.Write(header);
+        stream.Write(id);
+        if (palette is not null)
+            stream.Write(palette);
+        stream.Write(pixels);
+        if (footer is not null)
+            stream.Write(footer);
+        return stream.ToArray();
     }
 
     private static SKColor Pixel(byte[]? png)

@@ -293,7 +293,7 @@ public partial class RepositoryViewModel
 
             if (PreviewPath(note.Path))
             {
-                builder.Append(". It is over 8 MB, so it stays a pointer.");
+                builder.Append(". It is over ").Append(ImageFiles.FormatBytes(PreviewLimit.CapFor(note.Path))).Append(", so it stays a pointer.");
                 continue;
             }
 
@@ -357,11 +357,11 @@ public partial class RepositoryViewModel
 
     private static bool ImagePointerWithinCap(LfsFileNote note)
     {
-        if (note.LocalBytes is { } local && PreviewLimit.Allows(local))
+        if (note.LocalBytes is { } local && PreviewLimit.AllowsPreview(note.Path, local))
             return true;
-        if (note.Before is { } before && PreviewLimit.Allows(before.Size))
+        if (note.Before is { } before && PreviewLimit.AllowsPreview(note.Path, before.Size))
             return true;
-        if (note.After is { } after && PreviewLimit.Allows(after.Size))
+        if (note.After is { } after && PreviewLimit.AllowsPreview(note.Path, after.Size))
             return true;
         return false;
     }
