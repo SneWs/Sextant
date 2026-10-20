@@ -596,8 +596,9 @@ public sealed partial class RepositorySession : IAsyncDisposable
         CancellationToken cancellationToken,
         bool includeUntracked = false,
         bool keepIndex = false,
-        bool staged = false) =>
-        MutateAsync(GitCommands.StashPush(_toplevel, message, includeUntracked, keepIndex, staged), null, cancellationToken);
+        bool staged = false,
+        IReadOnlyList<string>? paths = null) =>
+        MutateAsync(GitCommands.StashPush(_toplevel, message, includeUntracked, keepIndex, staged, paths), null, cancellationToken);
 
     public Task StashPopAsync(string stashRef, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.StashPop(_toplevel, stashRef), null, cancellationToken);
@@ -779,6 +780,13 @@ public sealed partial class RepositorySession : IAsyncDisposable
     public Task StageFileAsync(string path, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.Stage(_toplevel, path), null, cancellationToken);
 
+    public Task StagePathsAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    {
+        if (paths.Count == 0)
+            return Task.CompletedTask;
+        return MutateAsync(GitCommands.StagePaths(_toplevel, paths), null, cancellationToken);
+    }
+
     public Task StageAllAsync(CancellationToken cancellationToken)
     {
         var entries = Snapshot().Entries;
@@ -815,6 +823,16 @@ public sealed partial class RepositorySession : IAsyncDisposable
         var unborn = IsUnborn();
         var command = unborn ? GitCommands.UnstageUnborn(_toplevel, path) : GitCommands.Unstage(_toplevel, path);
         var fallback = unborn ? null : GitCommands.UnstageUnborn(_toplevel, path);
+        return MutateAsync(command, null, cancellationToken, fallback);
+    }
+
+    public Task UnstagePathsAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    {
+        if (paths.Count == 0)
+            return Task.CompletedTask;
+        var unborn = IsUnborn();
+        var command = unborn ? GitCommands.UnstageUnbornPaths(_toplevel, paths) : GitCommands.UnstagePaths(_toplevel, paths);
+        var fallback = unborn ? null : GitCommands.UnstageUnbornPaths(_toplevel, paths);
         return MutateAsync(command, null, cancellationToken, fallback);
     }
 

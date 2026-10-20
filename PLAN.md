@@ -164,6 +164,8 @@ On 2026-10-18 pressing Escape twice within half a second selects the working cop
 
 On 2026-10-19 a click on a stash in Locations selects that stash and shows its files and diff. Untracked files are included when they were stashed. A double-click shows the same stash and leaves the checked-out branch as it is. Selecting that commit in the graph shows the same files. `git stash show` does not take a path, so one file is the first-parent diff, then the untracked parent when that diff is empty. `Stash_show_lists_tracked_edits_and_untracked_files`, `Stash_show_lists_a_plain_edit_and_a_staged_file`, and `Clicking_a_stash_shows_its_files_and_diff` passed. The desktop window was not launched.
 
+On 2026-10-19 the Changes file list selects more than one file. A click selects one file. Command-click or Ctrl-click adds or removes a file, and Shift-click selects the range. Stage selected, Unstage selected, and Stash selected sit on the Changes command bar, to the right of Discard all. Stash selected saves those paths with `git stash push` and leaves the other files. An untracked file in the selection is included. A path that is both staged and unstaged is saved as a whole. Stash selected is unavailable before the first commit or while a file is conflicted. `Stash_push_paths_leaves_the_other_files`, `Stash_push_path_saves_a_staged_file_and_a_partial_file`, `Selecting_files_stages_and_stashes_only_those`, and the bulk stage button tests passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

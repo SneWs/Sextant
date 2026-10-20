@@ -203,7 +203,8 @@ public static class GitCommands
         string? message,
         bool includeUntracked = false,
         bool keepIndex = false,
-        bool staged = false)
+        bool staged = false,
+        IReadOnlyList<string>? paths = null)
     {
         var arguments = new List<string> { "-C", toplevel, "stash", "push" };
         if (includeUntracked)
@@ -216,6 +217,13 @@ public static class GitCommands
         {
             arguments.Add("-m");
             arguments.Add(message);
+        }
+
+        // A pathspec stashes those paths only. Omit it to stash the whole worktree.
+        if (paths is { Count: > 0 })
+        {
+            arguments.Add("--");
+            arguments.AddRange(paths);
         }
 
         return arguments;
@@ -512,6 +520,13 @@ public static class GitCommands
     public static IReadOnlyList<string> Unstage(string toplevel, string path) =>
         ["-C", toplevel, "restore", "--staged", "--", path];
 
+    public static IReadOnlyList<string> UnstagePaths(string toplevel, IReadOnlyList<string> paths)
+    {
+        var arguments = new List<string> { "-C", toplevel, "restore", "--staged", "--" };
+        arguments.AddRange(paths);
+        return arguments;
+    }
+
     public static IReadOnlyList<string> UnstageAll(string toplevel) =>
         ["-C", toplevel, "restore", "--staged", ":"];
 
@@ -527,6 +542,13 @@ public static class GitCommands
     /// </summary>
     public static IReadOnlyList<string> UnstageUnborn(string toplevel, string path) =>
         ["-C", toplevel, "rm", "--cached", "-f", "--", path];
+
+    public static IReadOnlyList<string> UnstageUnbornPaths(string toplevel, IReadOnlyList<string> paths)
+    {
+        var arguments = new List<string> { "-C", toplevel, "rm", "--cached", "-f", "--" };
+        arguments.AddRange(paths);
+        return arguments;
+    }
 
     public static IReadOnlyList<string> DiscardTracked(string toplevel, string path) =>
         ["-C", toplevel, "restore", "--source=HEAD", "--worktree", "--staged", "--", path];

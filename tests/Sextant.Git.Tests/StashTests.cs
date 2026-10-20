@@ -100,6 +100,70 @@ public class StashTests
         Assert.Equal(ChangeKind.Added, stagedFiles[0].Kind);
     }
 
+    [Fact]
+    public async Task Stash_push_paths_leaves_the_other_files()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.WriteFile("b.txt", "one\n");
+        repo.WriteFile("c.txt", "one\n");
+        repo.CommitAll("first");
+        repo.WriteFile("a.txt", "A\n");
+        repo.WriteFile("b.txt", "B\n");
+        repo.WriteFile("c.txt", "C\n");
+        repo.WriteFile("new.txt", "fresh\n");
+        await using var session = await Open(repo);
+        await session.StashPushAsync("picked", CancellationToken.None, includeUntracked: true, paths: ["a.txt", "new.txt"]);
+
+        var state = session.Snapshot();
+        var stash = Assert.Single(state.Stashes);
+        Assert.Contains("picked", stash.Subject, StringComparison.Ordinal);
+        Assert.DoesNotContain(state.Entries, entry => entry.Path is "a.txt" or "new.txt");
+        Assert.Contains(state.Entries, entry => entry.Path == "b.txt");
+        Assert.Contains(state.Entries, entry => entry.Path == "c.txt");
+        Assert.Equal("one\n", File.ReadAllText(Path.Combine(repo.Directory, "a.txt")));
+        Assert.Equal("B\n", File.ReadAllText(Path.Combine(repo.Directory, "b.txt")));
+        Assert.False(File.Exists(Path.Combine(repo.Directory, "new.txt")));
+
+        var files = await session.StashFilesAsync(stash.Ref, CancellationToken.None);
+        Assert.NotNull(files);
+        Assert.Contains(files, file => file.Path == "a.txt");
+        Assert.Contains(files, file => file.Path == "new.txt");
+        Assert.DoesNotContain(files, file => file.Path is "b.txt" or "c.txt");
+    }
+
+    [Fact]
+    public async Task Stash_push_path_saves_a_staged_file_and_a_partial_file()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.WriteFile("b.txt", "one\n");
+        repo.CommitAll("first");
+        repo.WriteFile("a.txt", "staged\n");
+        repo.Run("add", "a.txt");
+        repo.WriteFile("b.txt", "leave\n");
+        await using var session = await Open(repo);
+        await session.StashPushAsync("index file", CancellationToken.None, paths: ["a.txt"]);
+        var staged = session.Snapshot();
+        Assert.DoesNotContain(staged.Entries, entry => entry.Path == "a.txt");
+        Assert.Contains(staged.Entries, entry => entry.Path == "b.txt" && !entry.Staged);
+        Assert.Equal("one\n", File.ReadAllText(Path.Combine(repo.Directory, "a.txt")));
+
+        repo.WriteFile("a.txt", "one\nstaged-line\n");
+        repo.Run("add", "a.txt");
+        repo.WriteFile("a.txt", "one\nstaged-line\nunstaged-line\n");
+        await session.StashPushAsync("both sides", CancellationToken.None, paths: ["a.txt"]);
+        var partial = session.Snapshot();
+        Assert.DoesNotContain(partial.Entries, entry => entry.Path == "a.txt");
+        Assert.Contains(partial.Entries, entry => entry.Path == "b.txt");
+        Assert.Equal("one\n", File.ReadAllText(Path.Combine(repo.Directory, "a.txt")));
+        var patch = await session.StashDiffAsync(partial.Stashes[0].Ref, "a.txt", true, CancellationToken.None);
+        Assert.NotNull(patch);
+        Assert.Contains("staged-line", patch.RawPatch, StringComparison.Ordinal);
+        Assert.Contains("unstaged-line", patch.RawPatch, StringComparison.Ordinal);
+        Assert.DoesNotContain("leave", patch.RawPatch, StringComparison.Ordinal);
+    }
+
     private static Task<RepositorySession> Open(TempRepo repo) =>
         RepositorySession.OpenAsync(new GitProcessRunner(), repo.Git, repo.Directory, CancellationToken.None);
 }
