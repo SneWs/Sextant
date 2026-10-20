@@ -201,6 +201,19 @@ public class GitCommandTests
                 "--include-untracked", "--no-textconv", "--numstat", "-z", "stash@{2}",
             ],
             GitCommands.StashShowNumStat("repo", "stash@{2}"));
+        Assert.Equal(
+            ["-C", "repo", "stash", "push", "-m", "note", "--", "a.txt", "b.txt"],
+            GitCommands.StashPush("repo", "note", paths: ["a.txt", "b.txt"]));
+        Assert.Equal(
+            ["-C", "repo", "stash", "push", "--include-untracked", "--", "new.txt"],
+            GitCommands.StashPush("repo", null, includeUntracked: true, paths: ["new.txt"]));
+        Assert.DoesNotContain("--", GitCommands.StashPush("repo", null));
+        Assert.Equal(
+            ["-C", "repo", "restore", "--staged", "--", "a.txt", "b.txt"],
+            GitCommands.UnstagePaths("repo", ["a.txt", "b.txt"]));
+        Assert.Equal(
+            ["-C", "repo", "rm", "--cached", "-f", "--", "a.txt"],
+            GitCommands.UnstageUnbornPaths("repo", ["a.txt"]));
     }
 
     [Fact]

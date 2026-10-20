@@ -268,6 +268,12 @@ public partial class RepositoryViewModel
 
     public bool CanStashStaged => CanStashBase && _hasStagedWork;
 
+    /// <summary>
+    /// Selected files can be stashed on their own. A conflict, or a repository with no commit yet, cannot.
+    /// </summary>
+    public bool CanStashSelected =>
+        CanStashBase && !_branchUnborn && ChosenPaths(row => row.Kind != ChangeKind.Unmerged).Count > 0;
+
     public bool CanPopLatestStash => _session is not null && !IsBusy && !_lifetime.IsCancellationRequested
         && !_hasUnmergedFiles && _latestStash is not null;
 
@@ -282,6 +288,7 @@ public partial class RepositoryViewModel
         StashKeepIndexCommand.NotifyCanExecuteChanged();
         StashStagedCommand.NotifyCanExecuteChanged();
         PopLatestStashCommand.NotifyCanExecuteChanged();
+        NotifySelectionCommands();
     }
 
     [RelayCommand(CanExecute = nameof(CanStash))]
@@ -295,6 +302,24 @@ public partial class RepositoryViewModel
 
     [RelayCommand(CanExecute = nameof(CanStashStaged))]
     private Task StashStaged() => StashAsync("Stashing staged changes…", false, false, true);
+
+    [RelayCommand(CanExecute = nameof(CanStashSelected))]
+    private Task StashSelected()
+    {
+        if (!CanStashSelected || _host.Dialogs is not { } dialogs)
+            return Task.CompletedTask;
+        var paths = ChosenPaths(row => row.Kind != ChangeKind.Unmerged);
+        var includeUntracked = ChosenFiles().Any(row => row.Untracked && row.Kind != ChangeKind.Unmerged);
+        if (paths.Count == 0)
+            return Task.CompletedTask;
+        return HoldFocus(async () =>
+        {
+            var message = await dialogs.PromptAsync("Stash", "Stash message. Leave it blank to let git describe the stash.", allowEmpty: true);
+            if (message is null || _session is null || IsBusy || _branchUnborn)
+                return;
+            await RunAsync("Stashing selected…", ct => _session.StashPushAsync(message, ct, includeUntracked, paths: paths));
+        });
+    }
 
     [RelayCommand(CanExecute = nameof(CanPopLatestStash))]
     private Task PopLatestStash() =>

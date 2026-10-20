@@ -47,6 +47,9 @@ public partial class RepositoryViewModel : ViewModelBase
     private string _commandSignature = "";
     private string? _rawPatch;
     private FileRowViewModel? _keptFile;
+    private readonly List<FileRowViewModel> _chosenFiles = [];
+    private bool _fileSelectionFromView;
+    private bool _branchUnborn;
     private bool _diffReady;
     private bool _allFilesShown;
     private bool _armJump;
@@ -428,7 +431,13 @@ public partial class RepositoryViewModel : ViewModelBase
 
     public bool CanDiscardAll => !IsBusy && ShowingWorkingCopy && (_hasUnstagedWork || _hasStagedWork);
 
-    /// <summary>Stage all, unstage all, and discard all are on the left of the staging and diff command bars while the working copy is open and the staging list has files.</summary>
+    /// <summary>Selected unstaged or untracked files, not conflicted ones.</summary>
+    public bool CanStageSelected => !IsBusy && ShowingWorkingCopy && ChosenPaths(row => row.ShowStage && row.Kind != ChangeKind.Unmerged).Count > 0;
+
+    /// <summary>Selected staged files.</summary>
+    public bool CanUnstageSelected => !IsBusy && ShowingWorkingCopy && ChosenPaths(row => row.ShowUnstage).Count > 0;
+
+    /// <summary>Stage all, unstage all, and discard all are on the left of the Changes and diff command bars while the working copy is open and that list has files. Stage selected, unstage selected, and stash selected sit with them on the Changes bar.</summary>
     public bool ShowBulkActions => ShowingWorkingCopy && !ShowingBlame && IsDirty;
 
     private bool _hasUnstagedWork;
@@ -658,6 +667,24 @@ public partial class RepositoryViewModel : ViewModelBase
 
     [RelayCommand]
     private Task UnstageAll() => RunAsync("Unstaging all…", ct => Session.UnstageAllAsync(ct));
+
+    [RelayCommand(CanExecute = nameof(CanStageSelected))]
+    private Task StageSelected()
+    {
+        var paths = ChosenPaths(row => row.ShowStage && row.Kind != ChangeKind.Unmerged);
+        if (paths.Count == 0 || !CanStageSelected)
+            return Task.CompletedTask;
+        return RunAsync("Staging selected…", ct => Session.StagePathsAsync(paths, ct));
+    }
+
+    [RelayCommand(CanExecute = nameof(CanUnstageSelected))]
+    private Task UnstageSelected()
+    {
+        var paths = ChosenPaths(row => row.ShowUnstage);
+        if (paths.Count == 0 || !CanUnstageSelected)
+            return Task.CompletedTask;
+        return RunAsync("Unstaging selected…", ct => Session.UnstagePathsAsync(paths, ct));
+    }
 
     [RelayCommand]
     private Task DiscardAll()
@@ -895,6 +922,65 @@ public partial class RepositoryViewModel : ViewModelBase
             return;
         }
         LoadSelectedFileCommand.Execute(value);
+    }
+
+    /// <summary>
+    /// The Changes list reports its selection. A plain click still selects one file and opens it.
+    /// Command-click or Shift-click adds files. Section titles are ignored.
+    /// </summary>
+    public void NoteFileSelection(FileRowViewModel? primary, IReadOnlyList<FileRowViewModel> rows)
+    {
+        _fileSelectionFromView = true;
+        _chosenFiles.Clear();
+        foreach (var row in rows)
+        {
+            if (!row.IsHeader)
+                _chosenFiles.Add(row);
+        }
+
+        NotifySelectionCommands();
+        if (_applying || ReferenceEquals(SelectedFile, primary))
+            return;
+        SelectedFile = primary;
+    }
+
+    private List<FileRowViewModel> ChosenFiles()
+    {
+        if (!_fileSelectionFromView)
+            return SelectedFile is { IsHeader: false } file ? [file] : [];
+
+        var chosen = new List<FileRowViewModel>(_chosenFiles.Count);
+        foreach (var row in _chosenFiles)
+        {
+            if (!row.IsHeader && Files.Contains(row))
+                chosen.Add(row);
+        }
+
+        return chosen;
+    }
+
+    private List<string> ChosenPaths(Func<FileRowViewModel, bool> include)
+    {
+        var paths = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var row in ChosenFiles())
+        {
+            if (!include(row) || row.Path.Length == 0 || !seen.Add(row.Path))
+                continue;
+            paths.Add(row.Path);
+        }
+
+        return paths;
+    }
+
+    private void NotifySelectionCommands()
+    {
+        OnPropertyChanged(nameof(CanStageSelected));
+        OnPropertyChanged(nameof(CanUnstageSelected));
+        OnPropertyChanged(nameof(CanStashSelected));
+        StageSelectedCommand.NotifyCanExecuteChanged();
+        UnstageSelectedCommand.NotifyCanExecuteChanged();
+        StashSelectedCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
@@ -1560,6 +1646,7 @@ public partial class RepositoryViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanStageAll));
         OnPropertyChanged(nameof(CanUnstageAll));
         OnPropertyChanged(nameof(CanDiscardAll));
+        NotifySelectionCommands();
     }
 
     private void Fail(string message)
@@ -1600,6 +1687,7 @@ public partial class RepositoryViewModel : ViewModelBase
             IsConflicted = state.Sequencer != SequencerKind.None;
             var unmerged = state.Entries.Any(entry => entry.Kind == ChangeKind.Unmerged);
             _hasUnmergedFiles = unmerged;
+            _branchUnborn = state.Branch.Unborn;
             _hasStashableChanges = !state.Branch.Unborn
                 && state.Entries.Any(entry => entry.Kind != ChangeKind.Untracked && (entry.Staged || entry.Unstaged));
             _latestStash = state.Stashes.FirstOrDefault();

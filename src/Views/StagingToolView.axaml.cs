@@ -14,6 +14,7 @@ public partial class StagingToolView : UserControl
     private readonly record struct FileAnchor(bool Header, string Key, bool FromStaged, double Top);
 
     private RepositoryViewModel? _scrollVm;
+    private bool _fromList;
 
     public StagingToolView()
     {
@@ -39,6 +40,43 @@ public partial class StagingToolView : UserControl
         base.OnUnloaded(e);
     }
 
+    private void OnFileSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (DataContext is not RepositoryViewModel vm || sender is not ListBox list)
+            return;
+        var rows = new List<FileRowViewModel>();
+        if (list.SelectedItems is not null)
+        {
+            foreach (var item in list.SelectedItems)
+            {
+                if (item is FileRowViewModel row)
+                    rows.Add(row);
+            }
+        }
+
+        _fromList = true;
+        try
+        {
+            vm.NoteFileSelection(list.SelectedItem as FileRowViewModel, rows);
+        }
+        finally
+        {
+            _fromList = false;
+        }
+
+        // A section title puts the last file back. That correction must reach the list,
+        // and a file that is no longer in the list must not be pushed in during a rebuild.
+        if (vm.SelectedFile is null)
+        {
+            if (list.SelectedItem is not null)
+                list.SelectedItem = null;
+        }
+        else if (!ReferenceEquals(list.SelectedItem, vm.SelectedFile) && vm.Files.Contains(vm.SelectedFile))
+        {
+            list.SelectedItem = vm.SelectedFile;
+        }
+    }
+
     private async void OnFilePointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (e.InitialPressMouseButton != MouseButton.Left)
@@ -59,15 +97,33 @@ public partial class StagingToolView : UserControl
         if (DataContext is not RepositoryViewModel vm)
             return;
         _scrollVm = vm;
+        vm.PropertyChanged += OnRepositoryPropertyChanged;
         vm.PreserveFileScroll += OnPreserveFileScroll;
+        ApplySelectedFile(vm.SelectedFile);
     }
 
     private void UnhookFileScroll()
     {
         if (_scrollVm is null)
             return;
+        _scrollVm.PropertyChanged -= OnRepositoryPropertyChanged;
         _scrollVm.PreserveFileScroll -= OnPreserveFileScroll;
         _scrollVm = null;
+    }
+
+    private void OnRepositoryPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_fromList || e.PropertyName != nameof(RepositoryViewModel.SelectedFile))
+            return;
+        if (sender is RepositoryViewModel vm)
+            ApplySelectedFile(vm.SelectedFile);
+    }
+
+    private void ApplySelectedFile(FileRowViewModel? file)
+    {
+        if (ReferenceEquals(FileList.SelectedItem, file))
+            return;
+        FileList.SelectedItem = file;
     }
 
     private void OnPreserveFileScroll(Action update)

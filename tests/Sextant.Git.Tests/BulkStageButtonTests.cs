@@ -66,7 +66,11 @@ public class BulkStageButtonTests
             Assert.Same(bar, discard.FindAncestorOfType<CommandBar>());
             Assert.DoesNotContain(
                 changes.GetVisualDescendants().OfType<Button>(),
-                button => button is CommandBarButton labeled && labeled.Label is "Stage all" or "Unstage all" or "Discard all");
+                button => button is CommandBarButton labeled && labeled.Label is "Stage all" or "Unstage all" or "Discard all"
+                    or "Stage selected" or "Unstage selected" or "Stash selected");
+            Assert.DoesNotContain(
+                diff.GetVisualDescendants().OfType<CommandBarButton>(),
+                button => button.Label is "Stage selected" or "Unstage selected" or "Stash selected");
 
             var list = diff.FindControl<CopyListBox>("DiffList");
             Assert.NotNull(list);
@@ -95,20 +99,41 @@ public class BulkStageButtonTests
             Assert.Same(vm.StageAllCommand, stagingStage.Command);
             Assert.Same(vm.UnstageAllCommand, stagingUnstage.Command);
             Assert.Same(vm.DiscardAllCommand, stagingDiscard.Command);
+            var stagingStageSelected = BarButton(staging, "Stage selected");
+            var stagingUnstageSelected = BarButton(staging, "Unstage selected");
+            var stagingStashSelected = BarButton(staging, "Stash selected");
+            Assert.True(stagingStageSelected.IsEffectivelyVisible);
+            Assert.True(stagingUnstageSelected.IsEffectivelyVisible);
+            Assert.True(stagingStashSelected.IsEffectivelyVisible);
+            Assert.False(stagingStageSelected.IsEnabled);
+            Assert.True(stagingUnstageSelected.IsEnabled);
+            Assert.True(stagingStashSelected.IsEnabled);
+            Assert.False(vm.CanStageSelected);
+            Assert.True(vm.CanUnstageSelected);
+            Assert.True(vm.CanStashSelected);
+            Assert.Same(vm.StageSelectedCommand, stagingStageSelected.Command);
+            Assert.Same(vm.UnstageSelectedCommand, stagingUnstageSelected.Command);
+            Assert.Same(vm.StashSelectedCommand, stagingStashSelected.Command);
             var stagingBar = staging.FindControl<CommandBar>("StagingCommandBar");
             Assert.NotNull(stagingBar);
             Assert.NotSame(bar, stagingBar);
             Assert.Same(stagingBar, stagingStage.FindAncestorOfType<CommandBar>());
             Assert.Same(stagingBar, stagingUnstage.FindAncestorOfType<CommandBar>());
             Assert.Same(stagingBar, stagingDiscard.FindAncestorOfType<CommandBar>());
+            Assert.Same(stagingBar, stagingStashSelected.FindAncestorOfType<CommandBar>());
             var files = staging.FindControl<ListBox>("FileList");
             Assert.NotNull(files);
+            Assert.Equal(SelectionMode.Multiple, files.SelectionMode);
             Assert.True(Bottom(stagingBar, staging) <= Top(files, staging), "staging bar sits above the file list");
             Assert.True(Math.Abs(Top(stagingStage, stagingBar) - Top(stagingDiscard, stagingBar)) < 8);
+            Assert.True(Math.Abs(Top(stagingStage, stagingBar) - Top(stagingStashSelected, stagingBar)) < 8);
             Assert.True(Left(stagingStage, stagingBar) < Left(stagingUnstage, stagingBar));
             Assert.True(Right(stagingUnstage, stagingBar) <= Left(stagingDiscard, stagingBar));
+            Assert.True(Right(stagingDiscard, stagingBar) <= Left(stagingStageSelected, stagingBar));
+            Assert.True(Right(stagingStageSelected, stagingBar) <= Left(stagingUnstageSelected, stagingBar));
+            Assert.True(Right(stagingUnstageSelected, stagingBar) <= Left(stagingStashSelected, stagingBar));
             Assert.True(Left(stagingStage, stagingBar) < 40, "Stage all starts on the left of the staging bar");
-            Assert.True(Right(stagingDiscard, stagingBar) < stagingBar.Bounds.Width - 24, "the staging actions leave the right side empty");
+            Assert.True(Right(stagingStashSelected, stagingBar) < stagingBar.Bounds.Width - 8, "selected actions stay on the Changes bar");
 
             vm.ShowingBlame = true;
             view.UpdateLayout();
@@ -140,6 +165,9 @@ public class BulkStageButtonTests
             Assert.False(stagingStage.IsEffectivelyVisible);
             Assert.False(stagingUnstage.IsEffectivelyVisible);
             Assert.False(stagingDiscard.IsEffectivelyVisible);
+            Assert.False(BarButton(staging, "Stage selected").IsEffectivelyVisible);
+            Assert.False(BarButton(staging, "Unstage selected").IsEffectivelyVisible);
+            Assert.False(BarButton(staging, "Stash selected").IsEffectivelyVisible);
 
             window.Close();
             await vm.DisposeAsync();
@@ -177,12 +205,18 @@ public class BulkStageButtonTests
             var stagingStage = BarButton(staging, "Stage all");
             var stagingUnstage = BarButton(staging, "Unstage all");
             var stagingDiscard = BarButton(staging, "Discard all");
+            var stagingStageSelected = BarButton(staging, "Stage selected");
+            var stagingUnstageSelected = BarButton(staging, "Unstage selected");
+            var stagingStashSelected = BarButton(staging, "Stash selected");
             Assert.False(stage.IsVisible);
             Assert.False(unstage.IsVisible);
             Assert.False(discard.IsVisible);
             Assert.False(stagingStage.IsVisible);
             Assert.False(stagingUnstage.IsVisible);
             Assert.False(stagingDiscard.IsVisible);
+            Assert.False(stagingStageSelected.IsVisible);
+            Assert.False(stagingUnstageSelected.IsVisible);
+            Assert.False(stagingStashSelected.IsVisible);
 
             repo.WriteFile("unstaged.txt", "unstaged\n");
             await vm.Refresh();
@@ -203,6 +237,15 @@ public class BulkStageButtonTests
             Assert.True(stagingStage.IsEnabled);
             Assert.False(stagingUnstage.IsEnabled);
             Assert.True(stagingDiscard.IsEnabled);
+            Assert.True(stagingStageSelected.IsEffectivelyVisible);
+            Assert.True(stagingUnstageSelected.IsEffectivelyVisible);
+            Assert.True(stagingStashSelected.IsEffectivelyVisible);
+            Assert.True(stagingStageSelected.IsEnabled);
+            Assert.False(stagingUnstageSelected.IsEnabled);
+            Assert.True(stagingStashSelected.IsEnabled);
+            Assert.True(vm.CanStageSelected);
+            Assert.False(vm.CanUnstageSelected);
+            Assert.True(vm.CanStashSelected);
 
             window.Close();
             await vm.DisposeAsync();
