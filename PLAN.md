@@ -170,9 +170,12 @@ On 2026-10-21 Expand all and Collapse all sit to the left of the Locations filte
 
 On 2026-10-21 a click on a branch, a tag, or a stash shows the History pane when it is closed or another tab is in front, and scrolls that graph to the commit the row points at. The checked-out branch stays checked out. A double-click still checks out a branch. Show in graph does the same scroll. `Clicking_a_branch_tag_or_stash_shows_history_and_scrolls_to_that_commit` passed. The desktop window was not launched.
 
+
 On 2026-10-21 Create branch is Ctrl+Shift+C (Command+Shift+C on macOS). Ctrl+B (Command+B) still opens the same prompt. Collapse all in the diff moved to Ctrl+Shift+- (Command+Shift+-). Expand all stays Ctrl+Shift+E (Command+Shift+E). `Command_shift_C_and_command_B_open_create_branch` and `Expand_and_collapse_all_follow_the_keyboard` passed. The desktop window was not launched.
 
-On 2026-10-21 Ctrl+B (Command+B) no longer creates a branch. Create branch is only Ctrl+Shift+C (Command+Shift+C). `Command_shift_C_opens_create_branch_and_command_B_does_not` passed. The desktop window was not launched.
+On 2026-10-21 a GNOME session no longer shows Avalonia's Windows caption buttons. Mutter does not decorate a native Wayland window, so Sextant draws a GNOME title bar and stays on Wayland. The buttons follow `org.gnome.desktop.wm.preferences button-layout`, read when the process starts. The title is centered, and the close button turns red under the pointer. KDE and Cinnamon keep the compositor's frame. `GnomeWindowChromeTests` passed 5/5. The desktop window was not launched.
+
+On 2026-10-21 that drawn title bar was still the wrong frame: square corners and Windows caption glyphs beside Files. GNOME now stays on X11 so Mutter draws the desktop frame, including the theme's corners and caption buttons. KDE and Cinnamon still use Wayland. `Gnome_keeps_the_desktop_frame_and_other_desktops_use_wayland` passed. The desktop window was not launched.
 
 Update this block at the end of any session that lands or revises a step.
 
