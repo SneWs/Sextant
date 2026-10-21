@@ -53,6 +53,8 @@ public class UpdateMenuTests
                         windowHelp.Items.OfType<NativeMenuItem>().Select(item => item.Header).ToList());
                     var item = windowHelp.Items.OfType<NativeMenuItem>().Single(entry => entry.Header == "_Check for update");
                     Assert.Same(vm.CheckForUpdateCommand, item.Command);
+                    Assert.True(vm.ShowCheckForUpdate);
+                    Assert.True(item.IsVisible);
                 }
                 finally
                 {
@@ -66,6 +68,75 @@ public class UpdateMenuTests
         {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task A_store_install_hides_check_for_update_and_does_not_ask_github()
+    {
+        StorePackage.Override = true;
+        try
+        {
+            using var session = HeadlessUnitTestSession.StartNew(typeof(App));
+            var directory = Path.Combine(Path.GetTempPath(), "sextant-store-update-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            try
+            {
+                await session.Dispatch(async () =>
+                {
+                    var appMenu = NativeMenu.GetMenu(Application.Current!);
+                    Assert.NotNull(appMenu);
+                    var appItem = appMenu.Items.OfType<NativeMenuItem>().Single(item => item.Header == "Check for update");
+                    Assert.False(appItem.IsVisible);
+
+                    var dialogs = new RecordingDialogs();
+                    var catalog = new FakeReleases { Release = Full("99.0.0") };
+                    var store = new WorkspaceStore(directory);
+                    var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner(), catalog);
+                    vm.Attach(dialogs);
+                    var window = new MainWindow { DataContext = vm, Width = 800, Height = 600 };
+                    window.Show();
+                    try
+                    {
+                        Assert.False(vm.ShowCheckForUpdate);
+                        var menu = NativeMenu.GetMenu(window);
+                        Assert.NotNull(menu);
+                        var update = menu.Items.OfType<NativeMenuItem>()
+                            .SelectMany(item => item.Menu?.Items.OfType<NativeMenuItem>() ?? [])
+                            .Single(item => item.Header == "_Check for update");
+                        Assert.False(update.IsVisible);
+                        await vm.CheckForUpdateCommand.ExecuteAsync(null);
+                        await vm.WatchForReleaseAsync();
+                        await vm.CheckForReleaseAsync(announceWhenCurrent: true);
+                        Assert.Equal(0, catalog.Calls);
+                        Assert.Empty(dialogs.Offers);
+                        Assert.Empty(dialogs.Notices);
+                    }
+                    finally
+                    {
+                        await vm.Shutdown();
+                        window.DataContext = null;
+                        window.Close();
+                    }
+                }, CancellationToken.None);
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+        finally
+        {
+            StorePackage.Override = null;
+        }
+    }
+
+    [Fact]
+    public void The_store_family_name_is_the_partner_center_package()
+    {
+        Assert.True(StorePackage.IsStoreFamily("20817M.Grenangen.SextantGit_nr8zhaqknvty0"));
+        Assert.False(StorePackage.IsStoreFamily("Sextant_dev"));
+        Assert.False(StorePackage.IsStoreFamily(null));
+        Assert.False(StorePackage.IsStoreInstall);
     }
 
     [Fact]

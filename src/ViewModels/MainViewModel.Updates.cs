@@ -17,7 +17,7 @@ public partial class MainViewModel
     /// <summary>Startup check. It stays quiet when this copy is current, and when prompts are turned off.</summary>
     internal async Task WatchForReleaseAsync()
     {
-        if (ReleaseCheck.IsTestProcess)
+        if (ReleaseCheck.IsTestProcess || StorePackage.IsStoreInstall)
             return;
         try
         {
@@ -34,6 +34,10 @@ public partial class MainViewModel
 
     private async Task RunReleaseCheckAsync(bool announceWhenCurrent)
     {
+        // The Store installs and updates this package. Do not offer a GitHub download.
+        if (StorePackage.IsStoreInstall)
+            return;
+
         if (!announceWhenCurrent && _settings.SkipUpdatePrompt)
             return;
 

@@ -30,7 +30,7 @@ On Windows, an SSH key passphrase can be remembered for later prompts in the sam
 
 ## Network
 
-Sextant does not send telemetry. When it starts, unless you have chosen not to be prompted for updates, and when you choose Check for update, it requests the latest release from `https://api.github.com/repos/SneWs/Sextant/releases/latest`. That request names Sextant as the user agent. It does not send repository contents, settings, or credentials.
+Sextant does not send telemetry. When it starts, unless you have chosen not to be prompted for updates, and when you choose Check for update, it requests the latest release from `https://api.github.com/repos/SneWs/Sextant/releases/latest`. That request names Sextant as the user agent. It does not send repository contents, settings, or credentials. A copy installed from the Microsoft Store does not make that request. The Store delivers its updates.
 
 Clone, fetch, pull, push, and Git LFS use the `git` already installed on the machine, and the credential helper, SSH client, and GPG tools that Git is configured to use. Those programs talk to the remotes in your repositories. What they send, including credentials, is decided by your Git configuration and by that remote. Sextant does not replace your credential store and does not keep a copy of a hosting token. When Fetch every in Settings is above 0, that same fetch runs for the active repository on that interval.
 

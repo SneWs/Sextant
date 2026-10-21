@@ -175,7 +175,7 @@
             <NativeMenuItem Header="_Help" IsVisible="{Binding ShowWindowAboutMenu}">
                 <NativeMenu>
                     <NativeMenuItem Header="_Get help" Command="{Binding GetHelpCommand}"/>
-                    <NativeMenuItem Header="_Check for update" Command="{Binding CheckForUpdateCommand}"/>
+                    <NativeMenuItem Header="_Check for update" Command="{Binding CheckForUpdateCommand}" IsVisible="{Binding ShowCheckForUpdate}"/>
                     <NativeMenuItemSeparator />
                     <NativeMenuItem Header="_About Sextant" Command="{Binding ShowAboutCommand}"/>
                 </NativeMenu>

@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Sextant.Docking;
@@ -18,6 +19,13 @@ public partial class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+        if (!StorePackage.IsStoreInstall || NativeMenu.GetMenu(this) is not { } menu)
+            return;
+        foreach (var item in menu.Items.OfType<NativeMenuItem>())
+        {
+            if (item.Header == "Check for update")
+                item.IsVisible = false;
+        }
     }
 
     public override void OnFrameworkInitializationCompleted()

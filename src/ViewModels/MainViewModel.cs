@@ -160,6 +160,9 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     /// <summary>macOS keeps Get help under Help. About itself is in the application menu.</summary>
     public bool ShowMacHelpMenu => OperatingSystem.IsMacOS();
 
+    /// <summary>The Microsoft Store copy is updated by the Store. It has no GitHub check.</summary>
+    public bool ShowCheckForUpdate => !StorePackage.IsStoreInstall;
+
     public bool ShowEmpty => ActiveTab is null;
 
     public void Attach(IDialogService dialogs) => Dialogs = dialogs;
