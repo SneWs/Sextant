@@ -14,6 +14,8 @@
 It talks only to the `git` already on your machine, so your config, hooks, attributes, and credential helper stay the ones you set up in the terminal.
 </p>
 
+The official Windows build is listed as Sextant Git on the [Microsoft Store](https://apps.microsoft.com/detail/9N1T9BGFCTZS). The Store installs that copy and delivers its updates.
+
 The guides are in the [documentation](docs/README.md):
 - [Getting started](docs/getting-started.md) covers download, install, and update on each platform.
 - [Configuration](docs/configuration.md) covers settings, including formatted JSON diffs with `jq`.
@@ -61,4 +63,4 @@ On Linux a published build includes `sextant.desktop` and the sextant mark besid
 
 ## License
 
-Sextant is free to use when you build it from source, and when you install a release from GitHub. Marcus Grenängen also sells official pre-built binaries for Windows and macOS. The terms are in [LICENSE](LICENSE). The [privacy policy](docs/privacy.md) covers what the app stores on your computer.
+Sextant is free to use when you build it from source, and when you install a release from GitHub. Marcus Grenängen also sells official pre-built binaries for [Windows](https://apps.microsoft.com/detail/9N1T9BGFCTZS) and macOS. The terms are in [LICENSE](LICENSE). The [privacy policy](docs/privacy.md) covers what the app stores on your computer.
