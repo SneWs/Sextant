@@ -44,7 +44,7 @@ public class SectionFoldShortcutTests
             Assert.True(expand.IsEffectivelyVisible);
             Assert.True(collapse.IsEffectivelyVisible);
             Assert.Equal(AppGestures.CommandKey(Key.E, KeyModifiers.Shift), expand.HotKey);
-            Assert.Equal(AppGestures.CommandKey(Key.C, KeyModifiers.Shift), collapse.HotKey);
+            Assert.Equal(AppGestures.CommandKey(Key.OemMinus, KeyModifiers.Shift), collapse.HotKey);
             Assert.True(vm.ExpandAllSectionsCommand.CanExecute(null));
             Assert.True(vm.CollapseAllSectionsCommand.CanExecute(null));
 
@@ -106,7 +106,12 @@ public class SectionFoldShortcutTests
             raw |= RawInputModifiers.Shift;
         if (gesture.KeyModifiers.HasFlag(KeyModifiers.Meta))
             raw |= RawInputModifiers.Meta;
-        var physical = gesture.Key == Key.C ? PhysicalKey.C : PhysicalKey.E;
+        var physical = gesture.Key switch
+        {
+            Key.C => PhysicalKey.C,
+            Key.OemMinus => PhysicalKey.Minus,
+            _ => PhysicalKey.E,
+        };
         window.KeyPress(gesture.Key, raw, physical, null);
         Dispatcher.UIThread.RunJobs();
     }

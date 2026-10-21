@@ -53,7 +53,8 @@ public static class WindowInput
             return;
         }
 
-        if (AppGestures.Matches(e, Key.B) && vm.ActiveTab is { } branchTab)
+        if (AppGestures.Matches(e, Key.C, KeyModifiers.Shift)
+            && vm.ActiveTab is { } branchTab)
         {
             e.Handled = true;
             if (branchTab.CanRunCommands)

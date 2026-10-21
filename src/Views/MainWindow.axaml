@@ -140,7 +140,7 @@
             </NativeMenuItem>
             <NativeMenuItem Header="_Repository" IsEnabled="{Binding HasActiveTab}">
                 <NativeMenu>
-                    <NativeMenuItem Header="_Create Branch" Command="{Binding CreateBranchCommand}" Gesture="{app:CommandGesture Key=B}"/>
+                    <NativeMenuItem Header="_Create Branch" Command="{Binding CreateBranchCommand}" Gesture="{app:CommandGesture Key=C, Shift=True}"/>
                     <NativeMenuItem Header="_Pull" Command="{Binding PullCommand}" Gesture="{app:CommandGesture Key=U, Shift=True}"/>
                     <NativeMenuItem Header="_Push" Command="{Binding PushCommand}" IsEnabled="{Binding CanPush}" Gesture="{app:CommandGesture Key=P, Shift=True}"/>
                     <NativeMenuItem Header="Stage _all" Command="{Binding StageAllCommand}" IsEnabled="{Binding CanStageAll}" Gesture="{app:CommandGesture Key=A, Shift=True}"/>
