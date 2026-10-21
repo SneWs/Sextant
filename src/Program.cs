@@ -16,12 +16,19 @@ sealed class Program
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
-        => AppBuilder.Configure<App>()
-            .UsePlatformDetect()
-            .UseWaylandWithFallback()
+    {
+        var builder = AppBuilder.Configure<App>()
+            .UsePlatformDetect();
+        // GNOME only paints its own corners and caption buttons on an X11 window.
+        if (!OperatingSystem.IsLinux() || GnomeSession.PrefersWayland(
+                Environment.GetEnvironmentVariable("XDG_CURRENT_DESKTOP"),
+                Environment.GetEnvironmentVariable("XDG_SESSION_DESKTOP")))
+            builder = builder.UseWaylandWithFallback();
 #if DEBUG
-            .WithDeveloperTools()
+        builder = builder.WithDeveloperTools();
 #endif
+        return builder
             .WithInterFont()
             .LogToTrace();
+    }
 }

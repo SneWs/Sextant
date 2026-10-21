@@ -1,12 +1,16 @@
 namespace Sextant;
 
 /// <summary>
-/// GNOME's compositor does not advertise server-side decorations to a native Wayland window.
-/// KDE and Cinnamon do, so those sessions keep the desktop's frame. A GNOME session is named in
+/// Mutter will not decorate a native Wayland window, and a drawn title bar does not match the
+/// desktop theme. A GNOME session stays on X11 so Mutter draws the frame. KDE and Cinnamon
+/// decorate Wayland windows, so those sessions stay on Wayland. A GNOME session is named in
 /// <c>XDG_CURRENT_DESKTOP</c> or <c>XDG_SESSION_DESKTOP</c> as GNOME or GNOME-something.
 /// </summary>
 public static class GnomeSession
 {
+    public static bool PrefersWayland(string? currentDesktop, string? sessionDesktop)
+        => !IsGnome(currentDesktop, sessionDesktop);
+
     public static bool IsGnome(string? currentDesktop, string? sessionDesktop)
         => Names(currentDesktop).Any(IsGnomeName) || Names(sessionDesktop).Any(IsGnomeName);
 

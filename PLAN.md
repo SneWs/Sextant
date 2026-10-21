@@ -172,6 +172,8 @@ On 2026-10-21 a click on a branch, a tag, or a stash shows the History pane when
 
 On 2026-10-21 a GNOME session no longer shows Avalonia's Windows caption buttons. Mutter does not decorate a native Wayland window, so Sextant draws a GNOME title bar and stays on Wayland. The buttons follow `org.gnome.desktop.wm.preferences button-layout`, read when the process starts. The title is centered, and the close button turns red under the pointer. KDE and Cinnamon keep the compositor's frame. `GnomeWindowChromeTests` passed 5/5. The desktop window was not launched.
 
+On 2026-10-21 that drawn title bar was still the wrong frame: square corners and Windows caption glyphs beside Files. GNOME now stays on X11 so Mutter draws the desktop frame, including the theme's corners and caption buttons. KDE and Cinnamon still use Wayland. `Gnome_keeps_the_desktop_frame_and_other_desktops_use_wayland` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

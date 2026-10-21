@@ -10,7 +10,7 @@ The command palette (Ctrl+P, or Command+P on macOS) lists the actions for the op
 
 ## The window
 
-On GNOME, Sextant draws the title bar. GNOME does not put its own frame on a native Wayland window. The drawn bar centers the title and uses the button layout from GNOME settings, read when Sextant starts. The close button turns red under the pointer. KDE, Cinnamon, Windows, and macOS keep the frame from the desktop.
+On GNOME, the window uses the desktop's own frame, including that theme's corners and caption buttons. KDE, Cinnamon, Windows, and macOS keep the frame from the desktop too.
 
 Under the tabs, the branch bar names the checked-out branch and, when Git knows, how many commits you are ahead of or behind the upstream. The name sits in a rounded pill with a Stash button beside it on the left and a search button beside it on the right, and the group stays centered. The Stash split menu holds the stash variants, and the search button toggles the history search box, the same as the Search menu item. The down and up arrow buttons for Pull and Push sit on the right of the bar. While a command runs, its label replaces that status, and Cancel appears when the command can be cancelled.
 
