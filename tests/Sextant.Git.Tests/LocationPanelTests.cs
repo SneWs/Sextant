@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Media;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Threading;
@@ -416,6 +417,61 @@ public class LocationPanelTests
 
             await vm.DisposeAsync();
         }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Location_icons_can_be_drawn_again_in_the_next_headless_session()
+    {
+        await DrawIcons();
+        await DrawIcons();
+
+        static async Task DrawIcons()
+        {
+            // Leave the dispatcher thread before Dispose. That call waits for the
+            // session thread, and the dispatch continuation is still on it.
+            var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+            try
+            {
+                await session.Dispatch(() =>
+                {
+                    var panel = new StackPanel();
+                    foreach (var name in new[]
+                             {
+                                 LocationIcons.Branches,
+                                 LocationIcons.Remote,
+                                 LocationIcons.Tags,
+                                 LocationIcons.Stashes,
+                                 LocationIcons.Submodules,
+                                 LocationIcons.Worktrees,
+                                 LocationIcons.Folder,
+                             })
+                    {
+                        var geometry = new LocationItem { IconName = name }.Icon;
+                        Assert.NotNull(geometry);
+                        panel.Children.Add(new Avalonia.Controls.Shapes.Path
+                        {
+                            Data = geometry,
+                            Stroke = Brushes.Black,
+                            StrokeThickness = 1,
+                            Width = 16,
+                            Height = 16,
+                        });
+                    }
+
+                    var window = new Window { Width = 80, Height = 200, Content = panel };
+                    window.Show();
+                    window.UpdateLayout();
+                    Dispatcher.UIThread.RunJobs();
+                    window.Close();
+                    return 0;
+                }, CancellationToken.None);
+            }
+            finally
+            {
+                await Task.Yield();
+                session.Dispose();
+            }
+        }
     }
 
     private static Point Origin(Control control, Visual relative)

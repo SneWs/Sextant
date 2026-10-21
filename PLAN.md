@@ -179,6 +179,8 @@ On 2026-10-21 that drawn title bar was still the wrong frame: square corners and
 
 On 2026-10-21 Branches and each remote split every `/` into a folder, including a prefix that holds one branch. `fix/create` is a `fix` folder with a `create` row, and `topic/only/leaf` nests the same way. Tags still folder only when more than one tag shares a prefix. `Every_slash_becomes_a_folder_for_a_single_name`, `Every_slash_nests_a_lone_tail`, and `A_single_slashed_branch_is_a_folder_under_branches_and_origin` passed. The desktop window was not launched.
 
+On 2026-10-21 location icons are built for the dispatcher that draws them. A geometry kept from an earlier headless session made `Double_escape_activates_tabs_and_focuses_the_commit_message` throw because a different thread owned it: on Linux while the compositor committed the shape, and on macOS while that shape was measured. `Location_icons_can_be_drawn_again_in_the_next_headless_session` passed, and DockLayoutTests passed 29/29. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
