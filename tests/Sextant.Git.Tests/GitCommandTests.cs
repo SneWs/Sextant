@@ -157,6 +157,15 @@ public class GitCommandTests
 
         var added = GitCommands.WorktreeAdd("repo", "C:/wt", "feature", "HEAD", noCheckout: true);
         Assert.Contains("--no-checkout", added);
+        Assert.Equal(["-C", "repo", "worktree", "remove", "C:/wt"], GitCommands.WorktreeRemove("repo", "C:/wt"));
+        Assert.Equal(["-C", "repo", "worktree", "remove", "--force", "C:/wt"], GitCommands.WorktreeRemoveForce("repo", "C:/wt"));
+        Assert.Equal(
+            ["-C", "repo", "worktree", "remove", "--force", "--force", "C:/wt"],
+            GitCommands.WorktreeRemoveForce("repo", "C:/wt", locked: true));
+        Assert.Equal(["-C", "repo", "worktree", "lock", "--reason", "away", "C:/wt"], GitCommands.WorktreeLock("repo", "C:/wt", "away"));
+        Assert.Equal(["-C", "repo", "worktree", "lock", "C:/wt"], GitCommands.WorktreeLock("repo", "C:/wt", " "));
+        Assert.Equal(["-C", "repo", "worktree", "unlock", "C:/wt"], GitCommands.WorktreeUnlock("repo", "C:/wt"));
+        Assert.Equal(["-C", "repo", "worktree", "move", "C:/wt", "C:/next"], GitCommands.WorktreeMove("repo", "C:/wt", "C:/next"));
         Assert.Contains("-b", added);
         Assert.DoesNotContain("--force", added);
         Assert.Contains("--no-cone", GitCommands.SparseSet("wt", false, ["keep"]));

@@ -791,7 +791,36 @@ public static class GitCommands
     }
 
     public static IReadOnlyList<string> WorktreeRemove(string toplevel, string path) =>
-        ["-C", toplevel, "worktree", "remove", "--force", path];
+        ["-C", toplevel, "worktree", "remove", path];
+
+    /// <summary>One <c>--force</c> removes a dirty worktree. A second one also removes a lock.</summary>
+    public static IReadOnlyList<string> WorktreeRemoveForce(string toplevel, string path, bool locked = false)
+    {
+        var arguments = new List<string> { "-C", toplevel, "worktree", "remove", "--force" };
+        if (locked)
+            arguments.Add("--force");
+        arguments.Add(path);
+        return arguments;
+    }
+
+    public static IReadOnlyList<string> WorktreeLock(string toplevel, string path, string? reason)
+    {
+        var arguments = new List<string> { "-C", toplevel, "worktree", "lock" };
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            arguments.Add("--reason");
+            arguments.Add(reason);
+        }
+
+        arguments.Add(path);
+        return arguments;
+    }
+
+    public static IReadOnlyList<string> WorktreeUnlock(string toplevel, string path) =>
+        ["-C", toplevel, "worktree", "unlock", path];
+
+    public static IReadOnlyList<string> WorktreeMove(string toplevel, string path, string destination) =>
+        ["-C", toplevel, "worktree", "move", path, destination];
 
     public static IReadOnlyList<string> SparseList(string toplevel) =>
         ["-C", toplevel, "--no-optional-locks", "sparse-checkout", "list"];

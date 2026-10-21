@@ -42,7 +42,7 @@ The row menu is the rest of the branch work: merge, rebase, delete, rename, set 
 
 A file history, an applied search, or hidden branches show a line under the filter. The line names the file, the search, or what is hidden. File history and a search include a close button on that line. The button returns the commit graph. A line that only names hidden branches has no close button. Escape still returns the graph when the search box is not focused.
 
-Add remote and Add worktree are in the Repository menu and the command palette. The new worktree's folder must not exist yet. Sextant does not open it for you, and it does not remove worktrees.
+Add remote and Add worktree are in the Repository menu and the command palette. The new worktree's folder must not exist yet. Sextant does not open it for you. The row menu of a linked worktree can remove it, lock or unlock it, or move it. The main worktree, and the worktree open in this tab, cannot be removed or moved. Remove deletes the folder and keeps the branch. A worktree with changes, submodules, or a lock asks again before Git deletes it.
 
 ## History
 

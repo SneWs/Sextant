@@ -165,7 +165,7 @@ public sealed partial class RepositorySession
                 {
                     try
                     {
-                        Checked(await ExecuteAsync(GitCommands.WorktreeRemove(_toplevel, path), null, token).ConfigureAwait(false));
+                        Checked(await ExecuteAsync(GitCommands.WorktreeRemoveForce(_toplevel, path), null, token).ConfigureAwait(false));
                     }
                     catch (GitCommandFailedException)
                     {
@@ -177,6 +177,38 @@ public sealed partial class RepositorySession
                 return 0;
             }, ct).ConfigureAwait(false);
             await LoadRefsAndMaybeHistoryAsync(ct, statusAlreadyApplied: false).ConfigureAwait(false);
+        }, cancellationToken);
+
+    public Task RemoveWorktreeAsync(string path, bool force, bool locked, CancellationToken cancellationToken) =>
+        RunAsync(async ct =>
+        {
+            await _scheduler.WriteAsync(async token =>
+            {
+                var arguments = force
+                    ? GitCommands.WorktreeRemoveForce(_toplevel, path, locked)
+                    : GitCommands.WorktreeRemove(_toplevel, path);
+                Checked(await ExecuteAsync(arguments, null, token).ConfigureAwait(false));
+                return 0;
+            }, ct).ConfigureAwait(false);
+            await LoadRefsAndMaybeHistoryAsync(ct, statusAlreadyApplied: false).ConfigureAwait(false);
+        }, cancellationToken);
+
+    public Task LockWorktreeAsync(string path, string? reason, CancellationToken cancellationToken) =>
+        ChangeWorktreeAsync(async token =>
+        {
+            Checked(await ExecuteAsync(GitCommands.WorktreeLock(_toplevel, path, reason), null, token).ConfigureAwait(false));
+        }, cancellationToken);
+
+    public Task UnlockWorktreeAsync(string path, CancellationToken cancellationToken) =>
+        ChangeWorktreeAsync(async token =>
+        {
+            Checked(await ExecuteAsync(GitCommands.WorktreeUnlock(_toplevel, path), null, token).ConfigureAwait(false));
+        }, cancellationToken);
+
+    public Task MoveWorktreeAsync(string path, string destination, CancellationToken cancellationToken) =>
+        ChangeWorktreeAsync(async token =>
+        {
+            Checked(await ExecuteAsync(GitCommands.WorktreeMove(_toplevel, path, destination), null, token).ConfigureAwait(false));
         }, cancellationToken);
 
     public Task<byte[]?> ReadObjectAsync(string revision, string path, CancellationToken cancellationToken) =>

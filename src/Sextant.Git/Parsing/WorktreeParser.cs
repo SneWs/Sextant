@@ -19,7 +19,8 @@ public static class WorktreeParser
         {
             if (path is null)
                 return;
-            entries.Add(new WorktreeEntry(path, head, branch, detached, bare, locked, reason));
+            // git worktree list prints the main worktree first.
+            entries.Add(new WorktreeEntry(path, head, branch, detached, bare, locked, reason, entries.Count == 0));
             path = null;
             head = null;
             branch = null;
