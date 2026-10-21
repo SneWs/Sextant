@@ -170,6 +170,8 @@ On 2026-10-21 Expand all and Collapse all sit to the left of the Locations filte
 
 On 2026-10-21 a click on a branch, a tag, or a stash shows the History pane when it is closed or another tab is in front, and scrolls that graph to the commit the row points at. The checked-out branch stays checked out. A double-click still checks out a branch. Show in graph does the same scroll. `Clicking_a_branch_tag_or_stash_shows_history_and_scrolls_to_that_commit` passed. The desktop window was not launched.
 
+On 2026-10-21 a GNOME session no longer shows Avalonia's Windows caption buttons. Mutter does not decorate a native Wayland window, so Sextant draws a GNOME title bar and stays on Wayland. The buttons follow `org.gnome.desktop.wm.preferences button-layout`, read when the process starts. The title is centered, and the close button turns red under the pointer. KDE and Cinnamon keep the compositor's frame. `GnomeWindowChromeTests` passed 5/5. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

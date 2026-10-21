@@ -30,7 +30,8 @@
     <PackageReference Include="Avalonia.AvaloniaEdit" Version="12.0.0" />
     <PackageReference Include="AvaloniaEdit.TextMate" Version="12.0.0" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
-    <!-- X11-on-XWayland does not see the compositor scale. Opt in; X11 stays the fallback. -->
+    <!-- X11-on-XWayland does not see the compositor scale. Opt in; X11 stays the fallback.
+         GNOME does not decorate a native Wayland window, so GnomeWindowChrome draws that frame. -->
     <PackageReference Include="Avalonia.Wayland" Version="12.1.4" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.4" />
     <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3">

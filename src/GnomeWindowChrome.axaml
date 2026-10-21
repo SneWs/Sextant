@@ -1,0 +1,217 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Sextant"
+        x:Class="Sextant.GnomeWindowChrome">
+    <Styles.Resources>
+        <ControlTheme x:Key="GnomeCaptionButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}"/>
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Margin" Value="2,0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="CornerRadius" Value="17"/>
+            <Setter Property="(WindowDecorationProperties.ElementRole)" Value="DecorationsElement"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Name="Circle"
+                            Width="26"
+                            Height="26"
+                            CornerRadius="13"
+                            Background="{TemplateBinding Background}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover /template/ Border#Circle">
+                <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}"/>
+            </Style>
+            <Style Selector="^:pressed /template/ Border#Circle">
+                <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListMediumBrush}"/>
+            </Style>
+            <Style Selector="^:disabled">
+                <Setter Property="Opacity" Value="0.35"/>
+            </Style>
+        </ControlTheme>
+        <ControlTheme x:Key="GnomeCloseButton" TargetType="Button" BasedOn="{StaticResource GnomeCaptionButton}">
+            <Style Selector="^:pointerover /template/ Border#Circle">
+                <Setter Property="Background" Value="#E01B24"/>
+            </Style>
+            <Style Selector="^:pointerover">
+                <Setter Property="Foreground" Value="White"/>
+            </Style>
+            <Style Selector="^:pressed /template/ Border#Circle">
+                <Setter Property="Background" Value="#C01C28"/>
+            </Style>
+            <Style Selector="^:pressed">
+                <Setter Property="Foreground" Value="White"/>
+            </Style>
+        </ControlTheme>
+        <ControlTheme x:Key="GnomeWindowDecorations" TargetType="WindowDrawnDecorations">
+            <Setter Property="DefaultTitleBarHeight" Value="40"/>
+            <Setter Property="DefaultFrameThickness" Value="1"/>
+            <Setter Property="DefaultShadowThickness" Value="8"/>
+            <Setter Property="Template">
+                <WindowDrawnDecorationsTemplate>
+                    <WindowDrawnDecorationsContent>
+                        <WindowDrawnDecorationsContent.Underlay>
+                            <Panel Name="PART_UnderlayWrapper">
+                                <Border Name="PART_WindowBorder"
+                                        Background="{DynamicResource SystemControlTransparentBrush}"
+                                        BorderThickness="{TemplateBinding FrameThickness}"
+                                        BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                        IsHitTestVisible="False"/>
+                                <Border Name="PART_TitleBar"
+                                        VerticalAlignment="Top"
+                                        Height="{TemplateBinding TitleBarHeight}"
+                                        Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                                        BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                        BorderThickness="0,0,0,1"
+                                        IsVisible="{TemplateBinding HasTitleBar}"
+                                        WindowDecorationProperties.ElementRole="TitleBar"/>
+                            </Panel>
+                        </WindowDrawnDecorationsContent.Underlay>
+                        <WindowDrawnDecorationsContent.Overlay>
+                            <Panel Name="PART_OverlayWrapper">
+                                <Panel Name="PART_TitleTextPanel"
+                                       VerticalAlignment="Top"
+                                       Height="{TemplateBinding TitleBarHeight}"
+                                       IsHitTestVisible="False"
+                                       IsVisible="{TemplateBinding HasTitleBar}">
+                                    <TextBlock Name="PART_TitleText"
+                                               Text="{TemplateBinding Title}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Margin="120,0"
+                                               FontSize="13"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </Panel>
+                                <local:GnomeCaptionBar Name="PART_CaptionBar"
+                                                       ButtonLayout="{DynamicResource GnomeButtonLayout}"
+                                                       VerticalAlignment="Top"
+                                                       Height="{TemplateBinding TitleBarHeight}"
+                                                       Margin="6,0"
+                                                       IsVisible="{TemplateBinding HasTitleBar}">
+                                    <Button Name="PART_MinimizeButton"
+                                            Theme="{StaticResource GnomeCaptionButton}"
+                                            AutomationProperties.Name="Minimize"
+                                            WindowDecorationProperties.ElementRole="MinimizeButton">
+                                        <Viewbox Width="10" Height="10">
+                                            <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  Stretch="Uniform"
+                                                  Data="M2048 1229v-205h-2048v205h2048z"/>
+                                        </Viewbox>
+                                    </Button>
+                                    <Button Name="PART_MaximizeButton"
+                                            Theme="{StaticResource GnomeCaptionButton}"
+                                            AutomationProperties.Name="Maximize"
+                                            WindowDecorationProperties.ElementRole="MaximizeButton">
+                                        <Viewbox Width="10" Height="10">
+                                            <Path Name="RestoreButtonPath"
+                                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  Stretch="Uniform"
+                                                  Data="M2048 2048v-2048h-2048v2048h2048zM1843 1843h-1638v-1638h1638v1638z"/>
+                                        </Viewbox>
+                                    </Button>
+                                    <Button Name="PART_CloseButton"
+                                            Theme="{StaticResource GnomeCloseButton}"
+                                            AutomationProperties.Name="Close"
+                                            WindowDecorationProperties.ElementRole="CloseButton">
+                                        <Viewbox Width="10" Height="10">
+                                            <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  Stretch="Uniform"
+                                                  Data="M1169 1024l879 -879l-145 -145l-879 879l-879 -879l-145 145l879 879l-879 879l145 145l879 -879l879 879l145 -145z"/>
+                                        </Viewbox>
+                                    </Button>
+                                </local:GnomeCaptionBar>
+                            </Panel>
+                        </WindowDrawnDecorationsContent.Overlay>
+                        <WindowDrawnDecorationsContent.FullscreenPopover>
+                            <Panel Height="{TemplateBinding DefaultTitleBarHeight}"
+                                   VerticalAlignment="Top"
+                                   Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                                   WindowDecorationProperties.ElementRole="DecorationsElement">
+                                <TextBlock Text="{TemplateBinding Title}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Margin="80,0"
+                                           FontSize="13"
+                                           IsHitTestVisible="False"/>
+                                <StackPanel HorizontalAlignment="Right"
+                                            Orientation="Horizontal"
+                                            Margin="0,0,6,0">
+                                    <Button Name="PART_PopoverFullScreenButton"
+                                            Theme="{StaticResource GnomeCaptionButton}"
+                                            WindowDecorationProperties.ElementRole="FullScreenButton">
+                                        <Viewbox Width="10" Height="10">
+                                            <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  Stretch="Uniform"
+                                                  Data="M205 1024h819v-819h-205v469l-674 -674l-145 145l674 674h-469v205zM1374 1229h469v-205h-819v819h205v-469l674 674l145 -145z"/>
+                                        </Viewbox>
+                                    </Button>
+                                    <Button Name="PART_PopoverCloseButton"
+                                            Theme="{StaticResource GnomeCloseButton}"
+                                            WindowDecorationProperties.ElementRole="CloseButton">
+                                        <Viewbox Width="10" Height="10">
+                                            <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  Stretch="Uniform"
+                                                  Data="M1169 1024l879 -879l-145 -145l-879 879l-879 -879l-145 145l879 879l-879 879l145 145l879 -879l879 879l145 -145z"/>
+                                        </Viewbox>
+                                    </Button>
+                                </StackPanel>
+                            </Panel>
+                        </WindowDrawnDecorationsContent.FullscreenPopover>
+                    </WindowDrawnDecorationsContent>
+                </WindowDrawnDecorationsTemplate>
+            </Setter>
+            <Style Selector="^:has-shadow /template/ Panel#PART_UnderlayWrapper">
+                <Setter Property="Margin" Value="{TemplateBinding ShadowThickness}"/>
+            </Style>
+            <Style Selector="^:has-shadow /template/ Border#PART_WindowBorder">
+                <Setter Property="BoxShadow" Value="0 8 24 0 #40000000"/>
+            </Style>
+            <Style Selector="^:has-shadow /template/ Panel#PART_OverlayWrapper">
+                <Setter Property="Margin" Value="{TemplateBinding ShadowThickness}"/>
+            </Style>
+            <Style Selector="^:has-border /template/ Panel#PART_TitleTextPanel">
+                <Setter Property="Margin" Value="1,1,1,0"/>
+            </Style>
+            <Style Selector="^:has-border /template/ Border#PART_TitleBar">
+                <Setter Property="Margin" Value="1,1,1,0"/>
+            </Style>
+            <Style Selector="^:has-border /template/ local|GnomeCaptionBar#PART_CaptionBar">
+                <Setter Property="Margin" Value="7,1,7,0"/>
+            </Style>
+            <Style Selector="^:maximized /template/ Path#RestoreButtonPath">
+                <Setter Property="Data" Value="M2048 410h-410v-410h-1638v1638h410v410h1638v-1638zM1434 1434h-1229v-1229h1229v1229zM1843 1843h-1229v-205h1024v-1024h205v1229z"/>
+            </Style>
+            <Style Selector="^:not(:has-minimize) /template/ Button#PART_MinimizeButton">
+                <Setter Property="IsVisible" Value="False"/>
+            </Style>
+            <Style Selector="^:not(:has-maximize) /template/ Button#PART_MaximizeButton">
+                <Setter Property="IsVisible" Value="False"/>
+            </Style>
+            <Style Selector="^:not(:has-fullscreen) /template/ Button#PART_PopoverFullScreenButton">
+                <Setter Property="IsVisible" Value="False"/>
+            </Style>
+            <Style Selector="^:fullscreen /template/ Panel#PART_TitleTextPanel">
+                <Setter Property="IsVisible" Value="False"/>
+            </Style>
+            <Style Selector="^:fullscreen /template/ local|GnomeCaptionBar#PART_CaptionBar">
+                <Setter Property="IsVisible" Value="False"/>
+            </Style>
+            <Style Selector="^:fullscreen /template/ Border#PART_TitleBar">
+                <Setter Property="IsVisible" Value="False"/>
+            </Style>
+        </ControlTheme>
+    </Styles.Resources>
+    <Style Selector="Window">
+        <Setter Property="WindowDecorationsTheme" Value="{StaticResource GnomeWindowDecorations}"/>
+    </Style>
+</Styles>

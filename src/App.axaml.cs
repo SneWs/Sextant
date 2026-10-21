@@ -18,6 +18,7 @@ public partial class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+        GnomeWindowChrome.ApplyCurrent(this);
     }
 
     public override void OnFrameworkInitializationCompleted()
