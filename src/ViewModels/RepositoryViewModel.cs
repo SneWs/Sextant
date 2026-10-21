@@ -2170,7 +2170,7 @@ public partial class RepositoryViewModel : ViewModelBase
             });
         }
 
-        _locationRoots.Add(Section("h:branches", "Branches", GroupLocations(branches, "b"), branches.Count));
+        _locationRoots.Add(Section("h:branches", "Branches", GroupLocations(branches, "b", splitEverySlash: true), branches.Count));
 
         var trackedRefs = state.Refs.Where(reference =>
             reference.Name.StartsWith("refs/remotes/", StringComparison.Ordinal)
@@ -2210,7 +2210,7 @@ public partial class RepositoryViewModel : ViewModelBase
                 });
             }
 
-            _locationRoots.Add(Section("h:remote:" + group.Key, group.Key, GroupLocations(tracked, "r:" + group.Key), tracked.Count));
+            _locationRoots.Add(Section("h:remote:" + group.Key, group.Key, GroupLocations(tracked, "r:" + group.Key, splitEverySlash: true), tracked.Count));
         }
 
         var tags = new List<LocationItem>();
@@ -2465,12 +2465,12 @@ public partial class RepositoryViewModel : ViewModelBase
         }
     }
 
-    private List<LocationItem> GroupLocations(IReadOnlyList<LocationItem> leaves, string scope)
+    private List<LocationItem> GroupLocations(IReadOnlyList<LocationItem> leaves, string scope, bool splitEverySlash = false)
     {
         var byPath = new Dictionary<string, LocationItem>(StringComparer.Ordinal);
         foreach (var leaf in leaves)
             byPath[leaf.Label] = leaf;
-        return MapNodes(PathGrouping.Group(byPath.Keys), byPath, scope);
+        return MapNodes(PathGrouping.Group(byPath.Keys, splitEverySlash), byPath, scope);
     }
 
     private List<LocationItem> MapNodes(

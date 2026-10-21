@@ -30,7 +30,7 @@ View → Save layout… writes the current arrangement to a file. View → Resto
 
 Expand all and Collapse all sit to the left of the filter. Expand all opens every section and folder. Collapse all closes them, including a folder inside a section that was already closed. Sextant remembers that choice for the repository. Text in the filter matches branches, tags, stashes, and the other rows. A filter that already has text still shows the rows that match.
 
-Sections group themselves by name. `release/1.2` is a folder of tags or branches, not a flat list.
+Branches, and each remote's branches, split on every `/`. `fix/create` is a `fix` folder with a `create` row even when no other branch uses `fix`. A longer name nests the same way, so `topic/only/leaf` is `topic`, then `only`, then `leaf`. Tags share a folder when more than one tag starts with the same `/` prefix. One tag named `release/1.2` stays a single row.
 
 A double-click checks out a local branch, checks out a remote branch into a local one, or opens a worktree or a checked-out submodule. An uninitialized submodule is not opened, and Sextant does not run `git submodule update`.
 

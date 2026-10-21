@@ -362,6 +362,62 @@ public class LocationPanelTests
         }, CancellationToken.None);
     }
 
+    [Fact]
+    public async Task A_single_slashed_branch_is_a_folder_under_branches_and_origin()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "root\n");
+        repo.CommitAll("root");
+        var trunk = repo.CurrentBranch();
+        repo.Run("switch", "-c", "fix/create");
+        repo.WriteFile("a.txt", "fix\n");
+        repo.CommitAll("fix");
+        var tip = repo.RunCapture("rev-parse", "HEAD").Trim();
+        repo.Run("update-ref", "refs/remotes/origin/fix/create", tip);
+        repo.Run("switch", "-c", "topic/only/leaf");
+        repo.Run("tag", "release/1.2");
+        repo.Run("switch", trunk);
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new LocationsHost(repo.Git), repo.Directory);
+            await vm.EnsureLoadedAsync();
+
+            var localFolder = vm.Locations.Single(item => item.Key == "g:b:fix");
+            Assert.Equal("fix (1)", localFolder.Label);
+            Assert.Equal(LocationIcons.Folder, localFolder.IconName);
+            Assert.True(localFolder.IsExpanded);
+            var local = vm.Locations.Single(item => item.Key == "b:fix/create");
+            Assert.Equal("create", local.Label);
+            Assert.True(local.Depth > localFolder.Depth);
+            Assert.Contains(vm.Locations, item => item.Key == "b:" + trunk && item.Label == trunk);
+
+            var topic = vm.Locations.Single(item => item.Key == "g:b:topic");
+            var only = vm.Locations.Single(item => item.Key == "g:b:topic/only");
+            var leaf = vm.Locations.Single(item => item.Key == "b:topic/only/leaf");
+            Assert.Equal("topic (1)", topic.Label);
+            Assert.Equal("only (1)", only.Label);
+            Assert.Equal("leaf", leaf.Label);
+            Assert.Equal(LocationIcons.Folder, topic.IconName);
+            Assert.Equal(LocationIcons.Folder, only.IconName);
+            Assert.True(topic.Depth < only.Depth && only.Depth < leaf.Depth);
+
+            var remoteFolder = vm.Locations.Single(item => item.Key == "g:r:origin:fix");
+            Assert.Equal("fix (1)", remoteFolder.Label);
+            Assert.Equal(LocationIcons.Folder, remoteFolder.IconName);
+            var remote = vm.Locations.Single(item => item.Key == "r:origin/fix/create");
+            Assert.Equal("create", remote.Label);
+            Assert.True(remote.Depth > remoteFolder.Depth);
+
+            var tag = vm.Locations.Single(item => item.Key == "t:release/1.2");
+            Assert.Equal("release/1.2", tag.Label);
+            Assert.DoesNotContain(vm.Locations, item => item.Key == "g:t:release");
+
+            await vm.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
     private static Point Origin(Control control, Visual relative)
     {
         var point = control.TranslatePoint(default, relative);

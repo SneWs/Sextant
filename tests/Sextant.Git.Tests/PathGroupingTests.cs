@@ -29,6 +29,40 @@ public class PathGroupingTests
     }
 
     [Fact]
+    public void Every_slash_becomes_a_folder_for_a_single_name()
+    {
+        var nodes = PathGrouping.Group(["main", "fix/create"], splitEverySlash: true);
+
+        Assert.Equal(["fix", "main"], nodes.Select(node => node.Label).ToArray());
+        Assert.Null(nodes[0].RefPath);
+        Assert.Equal("fix", nodes[0].FullName);
+        var child = Assert.Single(nodes[0].Children);
+        Assert.Equal("create", child.Label);
+        Assert.Equal("fix/create", child.RefPath);
+        Assert.Empty(child.Children);
+        Assert.Equal("main", nodes[1].RefPath);
+    }
+
+    [Fact]
+    public void Every_slash_nests_a_lone_tail()
+    {
+        var nodes = PathGrouping.Group(["a/b/c", "a/b/d", "a/e", "a/z/only"], splitEverySlash: true);
+
+        var root = Assert.Single(nodes);
+        Assert.Equal("a", root.Label);
+        Assert.Null(root.RefPath);
+        Assert.Equal(["b", "e", "z"], root.Children.Select(node => node.Label).ToArray());
+        Assert.Equal(["c", "d"], root.Children[0].Children.Select(node => node.Label).ToArray());
+        Assert.Equal("a/e", root.Children[1].RefPath);
+        Assert.Empty(root.Children[1].Children);
+        var z = root.Children[2];
+        Assert.Null(z.RefPath);
+        var only = Assert.Single(z.Children);
+        Assert.Equal("only", only.Label);
+        Assert.Equal("a/z/only", only.RefPath);
+    }
+
+    [Fact]
     public void A_branch_with_the_folder_name_keeps_that_ref_and_its_children()
     {
         var nodes = PathGrouping.Group(["feature", "feature/grass", "feature/figma-ui"]);
