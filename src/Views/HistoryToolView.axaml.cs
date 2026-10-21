@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -52,6 +53,8 @@ public partial class HistoryToolView : UserControl
         _watched.PropertyChanged += OnViewModelPropertyChanged;
         _watched.Rows.CollectionChanged += OnGraphRowsChanged;
         QueueFileCounts(_watched);
+        if (_watched.GraphScrollRow is { } row)
+            ScrollGraphTo(row, 0);
     }
 
     private void Unwatch()
@@ -69,6 +72,33 @@ public partial class HistoryToolView : UserControl
             return;
         if (e.PropertyName == nameof(RepositoryViewModel.RepositoryFilesTabOn) && vm.HistoryTabOn)
             QueueFileCounts(vm);
+        else if (e.PropertyName == nameof(RepositoryViewModel.GraphScrollRow) && vm.GraphScrollRow is { } row)
+            ScrollGraphTo(row, 0);
+    }
+
+    /// <summary>Brings the clicked commit to the top of the graph once the list has been laid out.</summary>
+    private void ScrollGraphTo(GraphRowViewModel row, int pass)
+    {
+        if (!ReferenceEquals(_watched?.GraphScrollRow, row))
+            return;
+        GraphList.ScrollIntoView(row);
+        var scroll = GraphList.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+        var container = GraphList.ContainerFromItem(row) as Control;
+        if (scroll is null || container is null || scroll.Viewport.Height < 1 || container.Bounds.Height < 1)
+        {
+            if (pass < 12)
+                Dispatcher.UIThread.Post(() => ScrollGraphTo(row, pass + 1), DispatcherPriority.Loaded);
+            return;
+        }
+
+        var point = container.TranslatePoint(default, scroll);
+        if (point is null)
+            return;
+        var y = Math.Max(0, scroll.Offset.Y + point.Value.Y);
+        if (Math.Abs(scroll.Offset.Y - y) > 0.5)
+            scroll.Offset = new Vector(scroll.Offset.X, y);
+        if (pass < 3)
+            Dispatcher.UIThread.Post(() => ScrollGraphTo(row, pass + 1), DispatcherPriority.Background);
     }
 
     private int _fileCountsQueued;

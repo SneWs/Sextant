@@ -3,7 +3,6 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
-using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
@@ -113,7 +112,7 @@ public class LocationPanelTests
     }
 
     [Fact]
-    public async Task Locations_header_opens_the_filter_and_rows_show_an_eye()
+    public async Task Locations_filter_is_shown_and_rows_show_an_eye()
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
         using var repo = new TempRepo();
@@ -130,17 +129,10 @@ public class LocationPanelTests
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
 
-            Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Locations");
+            Assert.NotNull(view.GetVisualDescendants().OfType<LocationsToolView>().Single());
             var filter = view.FindControl<TextBox>("LocationFilterBox");
             Assert.NotNull(filter);
-            Assert.False(filter.IsVisible);
-            var search = view.FindControl<Button>("LocationSearchButton");
-            Assert.NotNull(search);
-            search.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Dispatcher.UIThread.RunJobs();
-            Assert.True(vm.LocationFilterOpen);
             Assert.True(filter.IsVisible);
-            Assert.True(filter.IsFocused);
 
             var eyes = view.GetVisualDescendants().OfType<Button>().Where(button => button.Classes.Contains("eye") && button.IsVisible).ToList();
             var branch = vm.Locations.Single(item => item.ShowEye && item.Key.StartsWith("b:", StringComparison.Ordinal));
@@ -244,6 +236,145 @@ public class LocationPanelTests
             await vm.DisposeAsync();
             await again.DisposeAsync();
         }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Expand_and_collapse_all_locations_sit_left_of_the_filter()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "root\n");
+        repo.CommitAll("root");
+        var trunk = repo.CurrentBranch();
+        repo.Run("switch", "-c", "feature/a");
+        repo.WriteFile("a.txt", "feature a\n");
+        repo.CommitAll("feature a");
+        repo.Run("switch", "-c", "feature/b");
+        repo.WriteFile("a.txt", "feature b\n");
+        repo.CommitAll("feature b");
+        repo.Run("tag", "v1");
+        repo.Run("update-ref", "refs/remotes/origin/side", "HEAD");
+        repo.Run("switch", trunk);
+        repo.WriteFile("a.txt", "wip\n");
+        repo.Run("stash", "push", "-m", "wip note");
+
+        await session.Dispatch(async () =>
+        {
+            var host = new LocationsHost(repo.Git);
+            var vm = new RepositoryViewModel(host, repo.Directory);
+            IReadOnlyList<string>? saved = null;
+            host.OnSave = () => saved = vm.CollapsedLocationNames.ToArray();
+            await vm.EnsureLoadedAsync();
+
+            Assert.Contains(vm.Locations, item => item.Key == "b:feature/a");
+            Assert.Contains(vm.Locations, item => item.Key == "t:v1");
+            Assert.True(vm.Locations.Single(item => item.Key == "g:b:feature").IsExpanded);
+
+            var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 700 };
+            var window = new Window { Content = view, Width = 1100, Height = 700 };
+            window.Show();
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            var expand = view.FindControl<Button>("ExpandLocationsButton");
+            var collapse = view.FindControl<Button>("CollapseLocationsButton");
+            var filter = view.FindControl<TextBox>("LocationFilterBox");
+            Assert.NotNull(expand);
+            Assert.NotNull(collapse);
+            Assert.NotNull(filter);
+            Assert.True(expand.IsEffectivelyVisible);
+            Assert.True(collapse.IsEffectivelyVisible);
+            Assert.True(filter.IsVisible);
+            Assert.Same(vm.ExpandAllLocationsCommand, expand.Command);
+            Assert.Same(vm.CollapseAllLocationsCommand, collapse.Command);
+            Assert.Equal("Expand all", ToolTip.GetTip(expand));
+            Assert.Equal("Collapse all", ToolTip.GetTip(collapse));
+            Assert.Equal("Expand all", AutomationProperties.GetName(expand));
+            Assert.Equal("Collapse all", AutomationProperties.GetName(collapse));
+            Assert.True(expand.Bounds.Width is >= 16 and <= 22, $"expand width {expand.Bounds.Width}");
+            Assert.True(expand.Bounds.Height is >= 16 and <= 22, $"expand height {expand.Bounds.Height}");
+            Assert.True(collapse.Bounds.Width is >= 16 and <= 22, $"collapse width {collapse.Bounds.Width}");
+            Assert.True(collapse.Bounds.Height is >= 16 and <= 22, $"collapse height {collapse.Bounds.Height}");
+
+            var expandAt = Origin(expand, view);
+            var collapseAt = Origin(collapse, view);
+            var filterAt = Origin(filter, view);
+            var collapseRight = collapse.TranslatePoint(new Point(collapse.Bounds.Width, 0), view);
+            Assert.NotNull(collapseRight);
+            Assert.True(expandAt.X < collapseAt.X, "Expand all is left of Collapse all");
+            Assert.True(collapseRight.Value.X <= filterAt.X + 0.5, "Collapse all is left of the filter");
+            Assert.True(Math.Abs(expandAt.Y - filterAt.Y) < 16, "Expand all shares the filter row");
+            Assert.True(Math.Abs(collapseAt.Y - filterAt.Y) < 16, "Collapse all shares the filter row");
+
+            Click(window, collapse);
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.DoesNotContain(vm.Locations, item => item.Key is "b:feature/a" or "b:feature/b" or "g:b:feature" or "t:v1" or "r:origin/side");
+            Assert.DoesNotContain(vm.Locations, item => item.Key.StartsWith("s:", StringComparison.Ordinal));
+            Assert.Contains(vm.Locations, item => item.Key == "h:branches");
+            Assert.Contains(vm.Locations, item => item.Key == "h:tags");
+            Assert.Contains(vm.Locations, item => item.Key == "h:stashes");
+            Assert.Contains(vm.Locations, item => item.Key == "h:submodules");
+            Assert.NotNull(saved);
+            var collapsed = saved.ToArray();
+            Assert.Contains("h:branches", collapsed);
+            Assert.Contains("h:tags", collapsed);
+            Assert.Contains("h:stashes", collapsed);
+            Assert.Contains("h:remote:origin", collapsed);
+            Assert.Contains("b:feature", collapsed);
+            Assert.DoesNotContain("h:submodules", collapsed);
+
+            vm.ToggleLocation(Header(vm, "h:branches"));
+            Assert.Contains(vm.Locations, item => item.Key == "g:b:feature");
+            Assert.False(vm.Locations.Single(item => item.Key == "g:b:feature").IsExpanded);
+            Assert.DoesNotContain(vm.Locations, item => item.Key == "b:feature/a");
+            Assert.Contains("b:feature", vm.CollapsedLocationNames);
+
+            Click(window, expand);
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            Assert.Contains(vm.Locations, item => item.Key == "b:feature/a");
+            Assert.Contains(vm.Locations, item => item.Key == "t:v1");
+            Assert.Contains(vm.Locations, item => item.Key.StartsWith("s:", StringComparison.Ordinal));
+            Assert.Empty(vm.CollapsedLocationNames);
+            Assert.Empty(saved);
+
+            vm.LocationFilter = "v1";
+            Click(window, collapse);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Contains(vm.Locations, item => item.Key == "t:v1");
+            vm.LocationFilter = "";
+            Assert.DoesNotContain(vm.Locations, item => item.Key == "t:v1");
+            Assert.DoesNotContain(vm.Locations, item => item.Key == "b:feature/a");
+
+            var again = new RepositoryViewModel(host, repo.Directory);
+            again.UseCollapsedLocations(collapsed);
+            await again.EnsureLoadedAsync();
+            Assert.False(Header(again, "h:tags").IsExpanded);
+            Assert.False(Header(again, "h:branches").IsExpanded);
+            Assert.DoesNotContain(again.Locations, item => item.Key is "g:b:feature" or "b:feature/a" or "t:v1");
+            Assert.Contains(again.Locations, item => item.Key == "h:submodules");
+
+            window.Close();
+            await vm.DisposeAsync();
+            await again.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
+    private static Point Origin(Control control, Visual relative)
+    {
+        var point = control.TranslatePoint(default, relative);
+        Assert.NotNull(point);
+        return point.Value;
+    }
+
+    private static void Click(Window window, Control control)
+    {
+        var point = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window);
+        Assert.NotNull(point);
+        window.MouseDown(point.Value, MouseButton.Left);
+        window.MouseUp(point.Value, MouseButton.Left);
     }
 
     private static LocationItem Header(RepositoryViewModel vm, string key) =>

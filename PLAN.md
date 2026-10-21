@@ -166,6 +166,10 @@ On 2026-10-19 a click on a stash in Locations selects that stash and shows its f
 
 On 2026-10-19 the Changes file list selects more than one file. A click selects one file. Command-click or Ctrl-click adds or removes a file, and Shift-click selects the range. Stage selected, Unstage selected, and Stash selected sit on the Changes command bar, to the right of Discard all. Stash selected saves those paths with `git stash push` and leaves the other files. An untracked file in the selection is included. A path that is both staged and unstaged is saved as a whole. Stash selected is unavailable before the first commit or while a file is conflicted. `Stash_push_paths_leaves_the_other_files`, `Stash_push_path_saves_a_staged_file_and_a_partial_file`, `Selecting_files_stages_and_stashes_only_those`, and the bulk stage button tests passed. The desktop window was not launched.
 
+On 2026-10-21 Expand all and Collapse all sit to the left of the Locations filter. They open or close every section and folder, including a folder inside a closed section, and that choice is remembered for the repository. Text already in the filter still shows the rows that match. `Expand_and_collapse_all_locations_sit_left_of_the_filter` and the other Locations panel tests passed. The desktop window was not launched.
+
+On 2026-10-21 a click on a branch, a tag, or a stash shows the History pane when it is closed or another tab is in front, and scrolls that graph to the commit the row points at. The checked-out branch stays checked out. A double-click still checks out a branch. Show in graph does the same scroll. `Clicking_a_branch_tag_or_stash_shows_history_and_scrolls_to_that_commit` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
