@@ -2318,7 +2318,10 @@ public partial class RepositoryViewModel : ViewModelBase
                 var name = tree.Bare
                     ? "bare"
                     : tree.Detached ? "detached " + Short(tree.Head) : ShortHead(tree.Branch ?? "");
+                if (tree.Locked)
+                    name += string.IsNullOrEmpty(tree.LockReason) ? " locked" : " locked: " + tree.LockReason;
                 var pending = tracked is null ? "" : UpstreamTrackParser.Suffix(tracked.Ahead, tracked.Behind);
+                var linked = !tree.Main && !tree.Bare;
                 trees.Add(new LocationItem
                 {
                     Key = "w:" + tree.Path,
@@ -2326,7 +2329,15 @@ public partial class RepositoryViewModel : ViewModelBase
                     SearchText = shown + " " + tree.Path,
                     IsCurrent = current,
                     ShowOpen = !current,
+                    ShowRemove = linked && !current,
+                    ShowLock = linked && !tree.Locked,
+                    ShowUnlock = linked && tree.Locked,
+                    ShowMove = linked && !current && !tree.Locked,
                     OpenCommand = new AsyncRelayCommand(() => _host.OpenRepositoryAsync(tree.Path)),
+                    RemoveCommand = new AsyncRelayCommand(() => RemoveWorktreeAsync(tree)),
+                    LockCommand = new AsyncRelayCommand(() => LockWorktreeAsync(tree)),
+                    UnlockCommand = new AsyncRelayCommand(() => UnlockWorktreeAsync(tree)),
+                    MoveCommand = new AsyncRelayCommand(() => MoveWorktreeAsync(tree)),
                 });
             }
 
@@ -4121,7 +4132,12 @@ public partial class RepositoryViewModel : ViewModelBase
         foreach (var module in state.Submodules)
             builder.Append('u').Append(module.Path).Append(module.Sha).Append((int)module.State).Append(module.Describe).Append('|');
         foreach (var tree in state.Worktrees)
-            builder.Append('w').Append(tree.Path).Append(tree.Head).Append(tree.Branch).Append(tree.Detached ? 'd' : ' ').Append('|');
+            builder.Append('w').Append(tree.Path).Append(tree.Head).Append(tree.Branch)
+                .Append(tree.Detached ? 'd' : ' ')
+                .Append(tree.Locked ? 'l' : ' ')
+                .Append(tree.Main ? 'm' : ' ')
+                .Append(tree.LockReason)
+                .Append('|');
         foreach (var name in state.HiddenBranches.OrderBy(name => name, StringComparer.Ordinal))
             builder.Append('h').Append(name).Append('|');
         return builder.ToString();

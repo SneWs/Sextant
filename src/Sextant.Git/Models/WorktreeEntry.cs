@@ -7,4 +7,5 @@ public sealed record WorktreeEntry(
     bool Detached,
     bool Bare,
     bool Locked,
-    string? LockReason);
+    string? LockReason,
+    bool Main = false);

@@ -23,5 +23,6 @@ static class MenuOpen
     private static bool HasLocationMenu(LocationItem item) =>
         item.ShowCheckout || item.ShowMerge || item.ShowRebase || item.ShowDelete || item.ShowSetUpstream || item.ShowReveal
         || item.ShowHide || item.ShowAllBranches
-        || item.ShowRename || item.ShowPop || item.ShowApply || item.ShowDrop || item.ShowOpen || item.ShowTag;
+        || item.ShowRename || item.ShowPop || item.ShowApply || item.ShowDrop || item.ShowOpen || item.ShowTag
+        || item.ShowRemove || item.ShowLock || item.ShowUnlock || item.ShowMove;
 }

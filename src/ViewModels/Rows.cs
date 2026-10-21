@@ -200,9 +200,25 @@ public partial class LocationItem : ObservableObject
 
     public bool ShowOpen { get; init; }
 
+    public bool ShowRemove { get; init; }
+
+    public bool ShowLock { get; init; }
+
+    public bool ShowUnlock { get; init; }
+
+    public bool ShowMove { get; init; }
+
     public bool ShowTag { get; init; }
 
     public ICommand OpenCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand RemoveCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand LockCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand UnlockCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand MoveCommand { get; init; } = UiCommands.Disabled;
 
     public ICommand CreateBranchFromTagCommand { get; init; } = UiCommands.Disabled;
 

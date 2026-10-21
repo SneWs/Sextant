@@ -130,6 +130,9 @@ public interface IWorkspaceHost
 
     Task Close(RepositoryViewModel tab);
 
+    /// <summary>Closes other tabs open on this worktree. The tab that asked stays open.</summary>
+    Task CloseOtherRepositoriesAsync(RepositoryViewModel caller, string path) => Task.CompletedTask;
+
     void NoteLoaded(RepositoryViewModel tab);
 
     void Save();

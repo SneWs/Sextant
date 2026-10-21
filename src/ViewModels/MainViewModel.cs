@@ -260,6 +260,13 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         }
     }
 
+    public async Task CloseOtherRepositoriesAsync(RepositoryViewModel caller, string path)
+    {
+        var matches = Tabs.Where(tab => !ReferenceEquals(tab, caller) && SameTab(tab, path)).ToArray();
+        foreach (var tab in matches)
+            await Close(tab);
+    }
+
     public void NoteLoaded(RepositoryViewModel tab)
     {
         if (tab.Toplevel is not { Length: > 0 } top)

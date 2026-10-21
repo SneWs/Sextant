@@ -10,6 +10,7 @@ using System.Windows.Input;
 using Sextant.Git.Diff;
 using Sextant.Git.Models;
 using Sextant.Git.Repo;
+using Sextant.Git.Wsl;
 
 namespace Sextant.ViewModels;
 
@@ -79,6 +80,106 @@ public partial class RepositoryViewModel
             await RunAsync("Adding worktree…", ct => _session.AddWorktreeAsync(path, branch, start, ct));
         });
     }
+
+    private Task RemoveWorktreeAsync(WorktreeEntry tree)
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)
+            return Task.CompletedTask;
+        var shown = WorktreeLabel(tree);
+        return HoldFocus(async () =>
+        {
+            var ok = await dialogs.ConfirmAsync(
+                "Remove worktree",
+                $"Remove {shown}? Git deletes that folder. The branch it has checked out stays.",
+                "Remove");
+            if (!ok || _session is null)
+                return;
+            var locked = false;
+            var needsForce = false;
+            var removed = await RunAsync("Removing worktree…", async ct =>
+            {
+                try
+                {
+                    await _session.RemoveWorktreeAsync(tree.Path, force: false, locked: false, ct);
+                }
+                catch (GitCommandFailedException exception) when (WorktreeNeedsForce(exception))
+                {
+                    needsForce = true;
+                    locked = exception.StandardError.Contains("locked", StringComparison.OrdinalIgnoreCase);
+                }
+            });
+            if (removed && !needsForce)
+            {
+                await _host.CloseOtherRepositoriesAsync(this, tree.Path);
+                return;
+            }
+
+            if (!needsForce || _session is null)
+                return;
+            var force = await dialogs.ConfirmAsync(
+                "Remove worktree",
+                locked
+                    ? $"{shown} is locked. Remove it anyway? The folder and any changes in it are deleted."
+                    : $"{shown} has changes or submodules. Remove it anyway? Those changes are deleted.",
+                "Remove");
+            if (!force || _session is null)
+                return;
+            if (await RunAsync("Removing worktree…", ct => _session.RemoveWorktreeAsync(tree.Path, force: true, locked, ct)))
+                await _host.CloseOtherRepositoriesAsync(this, tree.Path);
+        });
+    }
+
+    private static bool WorktreeNeedsForce(GitCommandFailedException exception)
+    {
+        var error = exception.StandardError;
+        return error.Contains("use --force", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("locked working tree", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("submodule", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private Task LockWorktreeAsync(WorktreeEntry tree)
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)
+            return Task.CompletedTask;
+        var shown = WorktreeLabel(tree);
+        return HoldFocus(async () =>
+        {
+            var reason = await dialogs.PromptAsync(
+                "Lock worktree",
+                $"Reason for locking {shown}. Leave it blank to lock without a reason.",
+                allowEmpty: true);
+            if (reason is null || _session is null)
+                return;
+            var text = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+            await RunAsync("Locking worktree…", ct => _session.LockWorktreeAsync(tree.Path, text, ct));
+        });
+    }
+
+    private Task UnlockWorktreeAsync(WorktreeEntry tree)
+    {
+        if (_session is null || IsBusy)
+            return Task.CompletedTask;
+        return RunAsync("Unlocking worktree…", ct => _session.UnlockWorktreeAsync(tree.Path, ct));
+    }
+
+    private Task MoveWorktreeAsync(WorktreeEntry tree)
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)
+            return Task.CompletedTask;
+        var shown = WorktreeLabel(tree);
+        return HoldFocus(async () =>
+        {
+            var destination = await dialogs.PromptAsync(
+                "Move worktree",
+                $"New folder for {shown}. It must not exist yet.");
+            if (string.IsNullOrWhiteSpace(destination) || _session is null)
+                return;
+            await RunAsync("Moving worktree…", ct => _session.MoveWorktreeAsync(tree.Path, destination.Trim(), ct));
+        });
+    }
+
+    private static string WorktreeLabel(WorktreeEntry tree) =>
+        WslPath.TryParseUnc(tree.Path, out _, out var linux) ? linux : tree.Path;
 
     [RelayCommand]
     private Task FetchLfs()

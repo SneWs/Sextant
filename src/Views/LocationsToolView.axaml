@@ -88,6 +88,14 @@
                                 <MenuItem Header="Delete tag from origin" Command="{Binding DeleteRemoteTagCommand}"
                                           IsVisible="{Binding ShowTag}" />
                                 <MenuItem Header="Open" Command="{Binding OpenCommand}" IsVisible="{Binding ShowOpen}" />
+                                <MenuItem Header="Remove worktree" Command="{Binding RemoveCommand}"
+                                          IsVisible="{Binding ShowRemove}" />
+                                <MenuItem Header="Lock worktree…" Command="{Binding LockCommand}"
+                                          IsVisible="{Binding ShowLock}" />
+                                <MenuItem Header="Unlock worktree" Command="{Binding UnlockCommand}"
+                                          IsVisible="{Binding ShowUnlock}" />
+                                <MenuItem Header="Move worktree…" Command="{Binding MoveCommand}"
+                                          IsVisible="{Binding ShowMove}" />
                                 <MenuItem Header="Checkout" Command="{Binding CheckoutCommand}"
                                           IsVisible="{Binding ShowCheckout}" />
                                 <MenuItem Header="{Binding MergeLabel}" Command="{Binding MergeCommand}"
