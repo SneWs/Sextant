@@ -4,17 +4,17 @@ public static class PathGrouping
 {
     public sealed record Node(string Label, string FullName, string? RefPath, IReadOnlyList<Node> Children);
 
-    public static IReadOnlyList<Node> Group(IEnumerable<string> paths)
+    public static IReadOnlyList<Node> Group(IEnumerable<string> paths, bool splitEverySlash = false)
     {
         var list = paths
             .Where(path => !string.IsNullOrEmpty(path))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToList();
-        return GroupLevel(list, "");
+        return GroupLevel(list, "", splitEverySlash);
     }
 
-    private static List<Node> GroupLevel(List<string> paths, string prefix)
+    private static List<Node> GroupLevel(List<string> paths, string prefix, bool splitEverySlash)
     {
         var result = new List<Node>();
         var index = 0;
@@ -48,10 +48,10 @@ public static class PathGrouping
             var full = Join(prefix, head);
             if (nested.Count == 0)
                 result.Add(new Node(head, full, full, []));
-            else if (nested.Count == 1 && !exact)
+            else if (!splitEverySlash && nested.Count == 1 && !exact)
                 result.Add(Leaf(paths[index], prefix));
             else
-                result.Add(new Node(head, full, exact ? full : null, GroupLevel(nested, full)));
+                result.Add(new Node(head, full, exact ? full : null, GroupLevel(nested, full, splitEverySlash)));
 
             index = end;
         }

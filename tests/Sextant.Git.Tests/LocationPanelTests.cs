@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Media;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Threading;
@@ -360,6 +361,117 @@ public class LocationPanelTests
             await vm.DisposeAsync();
             await again.DisposeAsync();
         }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task A_single_slashed_branch_is_a_folder_under_branches_and_origin()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "root\n");
+        repo.CommitAll("root");
+        var trunk = repo.CurrentBranch();
+        repo.Run("switch", "-c", "fix/create");
+        repo.WriteFile("a.txt", "fix\n");
+        repo.CommitAll("fix");
+        var tip = repo.RunCapture("rev-parse", "HEAD").Trim();
+        repo.Run("update-ref", "refs/remotes/origin/fix/create", tip);
+        repo.Run("switch", "-c", "topic/only/leaf");
+        repo.Run("tag", "release/1.2");
+        repo.Run("switch", trunk);
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new LocationsHost(repo.Git), repo.Directory);
+            await vm.EnsureLoadedAsync();
+
+            var localFolder = vm.Locations.Single(item => item.Key == "g:b:fix");
+            Assert.Equal("fix (1)", localFolder.Label);
+            Assert.Equal(LocationIcons.Folder, localFolder.IconName);
+            Assert.True(localFolder.IsExpanded);
+            var local = vm.Locations.Single(item => item.Key == "b:fix/create");
+            Assert.Equal("create", local.Label);
+            Assert.True(local.Depth > localFolder.Depth);
+            Assert.Contains(vm.Locations, item => item.Key == "b:" + trunk && item.Label == trunk);
+
+            var topic = vm.Locations.Single(item => item.Key == "g:b:topic");
+            var only = vm.Locations.Single(item => item.Key == "g:b:topic/only");
+            var leaf = vm.Locations.Single(item => item.Key == "b:topic/only/leaf");
+            Assert.Equal("topic (1)", topic.Label);
+            Assert.Equal("only (1)", only.Label);
+            Assert.Equal("leaf", leaf.Label);
+            Assert.Equal(LocationIcons.Folder, topic.IconName);
+            Assert.Equal(LocationIcons.Folder, only.IconName);
+            Assert.True(topic.Depth < only.Depth && only.Depth < leaf.Depth);
+
+            var remoteFolder = vm.Locations.Single(item => item.Key == "g:r:origin:fix");
+            Assert.Equal("fix (1)", remoteFolder.Label);
+            Assert.Equal(LocationIcons.Folder, remoteFolder.IconName);
+            var remote = vm.Locations.Single(item => item.Key == "r:origin/fix/create");
+            Assert.Equal("create", remote.Label);
+            Assert.True(remote.Depth > remoteFolder.Depth);
+
+            var tag = vm.Locations.Single(item => item.Key == "t:release/1.2");
+            Assert.Equal("release/1.2", tag.Label);
+            Assert.DoesNotContain(vm.Locations, item => item.Key == "g:t:release");
+
+            await vm.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Location_icons_can_be_drawn_again_in_the_next_headless_session()
+    {
+        await DrawIcons();
+        await DrawIcons();
+
+        static async Task DrawIcons()
+        {
+            // Leave the dispatcher thread before Dispose. That call waits for the
+            // session thread, and the dispatch continuation is still on it.
+            var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+            try
+            {
+                await session.Dispatch(() =>
+                {
+                    var panel = new StackPanel();
+                    foreach (var name in new[]
+                             {
+                                 LocationIcons.Branches,
+                                 LocationIcons.Remote,
+                                 LocationIcons.Tags,
+                                 LocationIcons.Stashes,
+                                 LocationIcons.Submodules,
+                                 LocationIcons.Worktrees,
+                                 LocationIcons.Folder,
+                             })
+                    {
+                        var geometry = new LocationItem { IconName = name }.Icon;
+                        Assert.NotNull(geometry);
+                        panel.Children.Add(new Avalonia.Controls.Shapes.Path
+                        {
+                            Data = geometry,
+                            Stroke = Brushes.Black,
+                            StrokeThickness = 1,
+                            Width = 16,
+                            Height = 16,
+                        });
+                    }
+
+                    var window = new Window { Width = 80, Height = 200, Content = panel };
+                    window.Show();
+                    window.UpdateLayout();
+                    Dispatcher.UIThread.RunJobs();
+                    window.Close();
+                    return 0;
+                }, CancellationToken.None);
+            }
+            finally
+            {
+                await Task.Yield();
+                session.Dispose();
+            }
+        }
     }
 
     private static Point Origin(Control control, Visual relative)
