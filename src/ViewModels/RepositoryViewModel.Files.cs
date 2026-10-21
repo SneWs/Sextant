@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sextant.Git;
 using Sextant.Git.Models;
+using Sextant.Git.Workspace;
 
 namespace Sextant.ViewModels;
 
@@ -23,7 +24,65 @@ public partial class RepositoryViewModel
     public partial bool RepositoryFilesTabOn { get; set; }
 
     public bool HistoryTabOn => !RepositoryFilesTabOn;
-    public bool RepositoryTreeEmpty => _repositoryFiles.Count == 0 && !IsBusy;
+    public bool RepositoryTreeEmpty => RepositoryFileTree.Count == 0 && !IsBusy;
+    public string RepositoryTreeEmptyText => RepositoryFilesChangesOnly
+        ? "No staged, unstaged, or untracked files."
+        : "No repository files.";
+
+    [ObservableProperty]
+    public partial bool RepositoryFilesChangesOnly { get; set; }
+
+    partial void OnRepositoryFilesChangesOnlyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(RepositoryTreeEmptyText));
+        if (_repositoryFiles.Count == 0 || _session is null)
+            return;
+        var roots = ComposeRepositoryTree(
+            _repositoryFiles, _expandedRepositoryDirectories, _repositoryLocks, _repositoryLocksKnown,
+            CurrentStatusFilter());
+        InstallRepositoryTree(_repositoryFiles, roots);
+    }
+
+    /// <summary>
+    /// Re-filters the cached file tree after the status changed. Only runs while the
+    /// changes-only toggle is on; the full list needs no re-composition.
+    /// </summary>
+    private void RefreshRepositoryFilesFilter()
+    {
+        if (!RepositoryFilesChangesOnly || _repositoryFiles.Count == 0 || _session is null)
+            return;
+        var roots = ComposeRepositoryTree(
+            _repositoryFiles, _expandedRepositoryDirectories, _repositoryLocks, _repositoryLocksKnown,
+            CurrentStatusFilter());
+        InstallRepositoryTree(_repositoryFiles, roots);
+    }
+
+    private IReadOnlyDictionary<string, StatusEntry>? CurrentStatusFilter() =>
+        RepositoryFilesChangesOnly && _session is not null ? StatusChanges() : null;
+
+    private Dictionary<string, StatusEntry> StatusChanges()
+    {
+        var session = _session;
+        if (session is null)
+            return [];
+        var entries = session.Snapshot().Entries;
+        var map = new Dictionary<string, StatusEntry>(entries.Count, StringComparer.Ordinal);
+        foreach (var entry in entries)
+            map[entry.Path] = entry;
+        return map;
+    }
+
+    private static string StatusTextFor(StatusEntry entry)
+    {
+        if (entry.Kind == ChangeKind.Unmerged)
+            return "U";
+        var text = "";
+        if (entry.Staged)
+            text += entry.IndexStatus;
+        if (entry.Unstaged || entry.Kind == ChangeKind.Untracked)
+            text = text.Length == 0 ? entry.WorkTreeStatus.ToString() : text + " " + entry.WorkTreeStatus;
+        return text;
+    }
 
     partial void OnRepositoryFilesTabOnChanged(bool value)
     {
@@ -64,7 +123,8 @@ public partial class RepositoryViewModel
             return;
         // Directory nodes for the whole work tree are built away from the dispatcher.
         // The UI thread only swaps the visible list.
-        var tree = ComposeRepositoryTree(files, inputs.Expanded, inputs.Locks, inputs.LocksKnown);
+        var status = CurrentStatusFilter();
+        var tree = ComposeRepositoryTree(files, inputs.Expanded, inputs.Locks, inputs.LocksKnown, status);
         await InstallRepositoryTreeAsync(generation, files, tree).ConfigureAwait(false);
         if (!refreshLocks || generation != Volatile.Read(ref _repositoryFilesGeneration))
             return;
@@ -109,7 +169,7 @@ public partial class RepositoryViewModel
             foreach (var item in locks)
                 locked[item.Path] = item;
             var expanded = await ReadTreeInputsAsync(clearLockKnowledge: false).ConfigureAwait(false);
-            var withLocks = ComposeRepositoryTree(files, expanded.Expanded, locked, locksKnown: true);
+            var withLocks = ComposeRepositoryTree(files, expanded.Expanded, locked, locksKnown: true, status);
             await OnUi(() =>
             {
                 if (generation != _repositoryFilesGeneration)
@@ -174,12 +234,16 @@ public partial class RepositoryViewModel
         IReadOnlyList<RepositoryFile> files,
         HashSet<string> expanded,
         IReadOnlyDictionary<string, LfsLock> locks,
-        bool locksKnown)
+        bool locksKnown,
+        IReadOnlyDictionary<string, StatusEntry>? status = null)
     {
         var roots = new List<RepositoryFileTreeItem>();
         var directories = new Dictionary<string, RepositoryFileTreeItem>(StringComparer.Ordinal);
         foreach (var file in files)
         {
+            StatusEntry? entry = null;
+            if (status is not null && !status.TryGetValue(file.Path, out entry))
+                continue;
             var parts = file.Path.Split('/');
             var children = roots;
             var prefix = "";
@@ -194,7 +258,8 @@ public partial class RepositoryViewModel
                         Label = parts[depth],
                         Depth = depth,
                         IsDirectory = true,
-                        IsExpanded = expanded.Contains(prefix),
+                        // In changes-only mode every directory is opened so a changed file nested at any depth stays visible. This does not touch the saved expansion set, so turning the toggle off restores it.
+                        IsExpanded = RepositoryFilesChangesOnly || expanded.Contains(prefix),
                     };
                     directories.Add(prefix, directory);
                     children.Add(directory);
@@ -211,6 +276,7 @@ public partial class RepositoryViewModel
                 Path = path,
                 Label = parts[^1],
                 Depth = parts.Length - 1,
+                StatusText = entry is null ? "" : StatusTextFor(entry),
                 LfsTracked = tracked,
                 LocksKnown = locksKnown,
                 Lock = fileLock,
@@ -259,6 +325,16 @@ public partial class RepositoryViewModel
         RepositoryFileTree.Reset(rows);
         SelectedRepositoryFile = selected is null ? null
             : rows.FirstOrDefault(item => item.Path == selected.Path && item.IsDirectory == selected.IsDirectory);
+    }
+
+    /// <summary>
+    /// A click on a file while changes-only is on opens that file's section in the diff and brings the Diff dock to focus unless it already has it. The working-copy all-files diff keeps one expandable section per changed file, so this reveals exactly what was clicked without switching away from the list of changes.
+    /// </summary>
+    public async Task RevealChangedFileInDiffAsync(string path)
+    {
+        _host.FocusDock(DockIds.Diff);
+        await OpenAllSectionsForPath(path).ConfigureAwait(false);
+        JumpToFile?.Invoke(path, null);
     }
 
     public void ToggleRepositoryDirectory(RepositoryFileTreeItem item)
@@ -335,7 +411,8 @@ public partial class RepositoryViewModel
                 _repositoryFiles,
                 _expandedRepositoryDirectories,
                 _repositoryLocks,
-                locksKnown: false);
+                locksKnown: false,
+                CurrentStatusFilter());
             InstallRepositoryTree(_repositoryFiles, roots);
         }
     }

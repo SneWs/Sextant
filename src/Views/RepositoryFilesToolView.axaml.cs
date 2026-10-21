@@ -24,6 +24,20 @@ public partial class RepositoryFilesToolView : UserControl
 
     private void OnLocationExpandDoubleTapped(object? sender, TappedEventArgs e) => e.Handled = true;
 
+    /// <summary>A click on a changed file opens its section in the diff and focuses that dock.</summary>
+    private async void OnRepositoryFilePointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (e.InitialPressMouseButton != MouseButton.Left)
+            return;
+        // A press on the expand arrow or context menu is not a request to reveal the file.
+        if (e.Source is Visual source && source.FindAncestorOfType<Button>(includeSelf: true) is not null)
+            return;
+        if (DataContext is not RepositoryViewModel vm || !vm.RepositoryFilesChangesOnly)
+            return;
+        if (vm.SelectedRepositoryFile is { IsDirectory: false } item)
+            await vm.RevealChangedFileInDiffAsync(item.Path);
+    }
+
     private void OnRepositoryFileDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (e.Source is Visual source && source.FindAncestorOfType<Button>(includeSelf: true) is not null)

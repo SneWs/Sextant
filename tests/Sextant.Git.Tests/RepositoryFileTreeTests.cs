@@ -119,6 +119,140 @@ public class RepositoryFileTreeTests
     }
 
     [Fact]
+    public async Task Changes_only_expands_every_directory_node()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a/b/c/deep.txt", "one\n");
+        repo.WriteFile("root.txt", "one\n");
+        repo.CommitAll("first");
+        // A change nested three levels deep, plus an untracked file in a fresh directory.
+        repo.WriteFile("a/b/c/deep.txt", "two\n");
+        repo.WriteFile("x/y/new.txt", "new\n");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new TreeHost(repo.Git), repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
+                Assert.False(vm.RepositoryFilesChangesOnly);
+                // The full tree keeps its directories collapsed until the user opens them.
+                var rootDir = vm.RepositoryFileTree.Single(item => item.Path == "a");
+                Assert.False(rootDir.IsExpanded);
+
+                vm.RepositoryFilesChangesOnly = true;
+                Dispatcher.UIThread.RunJobs();
+                // Every directory that leads to a change is opened, so nested files stay visible.
+                foreach (var path in new[] { "a", "a/b", "a/b/c", "x", "x/y" })
+                    Assert.True(vm.RepositoryFileTree.Single(item => item.Path == path).IsExpanded, $"{path} should be expanded");
+                Assert.Contains(vm.RepositoryFileTree, item => item.Path == "a/b/c/deep.txt");
+                Assert.Contains(vm.RepositoryFileTree, item => item.Path == "x/y/new.txt");
+
+                // Turning the toggle off restores the saved expansion set rather than leaving everything open.
+                vm.RepositoryFilesChangesOnly = false;
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(vm.RepositoryFileTree.Single(item => item.Path == "a").IsExpanded);
+            }
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+        }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Clicking_a_changed_file_reveals_its_diff_section()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("docs/readme.txt", "one\n");
+        repo.CommitAll("first");
+        repo.WriteFile("docs/readme.txt", "two\n");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new TreeHost(repo.Git), repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                string? jumpedPath = null;
+                vm.JumpToFile += (path, _) => jumpedPath = path;
+
+                // Collapse every section first so the reveal has to open it.
+                vm.CollapseAllSectionsCommand.Execute(null);
+                var header = Assert.Single(vm.DiffRows.OfType<DiffFileRow>());
+                Assert.False(header.Expanded);
+
+                await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
+                vm.RepositoryFilesChangesOnly = true;
+                Dispatcher.UIThread.RunJobs();
+                var file = vm.RepositoryFileTree.Single(item => item.Path == "docs/readme.txt");
+                Assert.False(file.IsDirectory);
+
+                await vm.RevealChangedFileInDiffAsync("docs/readme.txt");
+                Assert.True(header.Expanded, "the clicked file's section should be expanded in the diff");
+                Assert.Equal("docs/readme.txt", jumpedPath);
+            }
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+        }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Clicking_a_partially_staged_file_reveals_both_sides()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        // One file with both a staged and an unstaged change shows as two diff sections.
+        repo.WriteFile("a.txt", "base\n");
+        repo.CommitAll("first");
+        repo.WriteFile("a.txt", "base\nstaged\n");
+        repo.Run("add", "a.txt");
+        repo.WriteFile("a.txt", "base\nstaged\nunstaged\n");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new TreeHost(repo.Git), repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                string? jumpedPath = null;
+                vm.JumpToFile += (path, _) => jumpedPath = path;
+
+                var headers = vm.DiffRows.OfType<DiffFileRow>().Where(row => row.Path == "a.txt").ToArray();
+                Assert.Equal(2, headers.Length);
+                Assert.Contains(headers, row => row.StagingFile?.FromStagedList == true);
+                Assert.Contains(headers, row => row.StagingFile?.FromStagedList == false);
+                // The working copy starts collapsed, so neither side is open yet.
+                Assert.All(headers, header => Assert.False(header.Expanded));
+
+                await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
+                vm.RepositoryFilesChangesOnly = true;
+                Dispatcher.UIThread.RunJobs();
+                var file = vm.RepositoryFileTree.Single(item => item.Path == "a.txt");
+                Assert.False(file.IsDirectory);
+
+                await vm.RevealChangedFileInDiffAsync("a.txt");
+
+                // Both the staged and the unstaged section must be revealed by one click.
+                Assert.True(vm.DiffRows.OfType<DiffFileRow>().Single(row => row.StagingFile?.FromStagedList == true).Expanded,
+                    "the staged side should be expanded");
+                Assert.True(vm.DiffRows.OfType<DiffFileRow>().Single(row => row.StagingFile?.FromStagedList == false).Expanded,
+                    "the unstaged side should be expanded");
+                Assert.Equal("a.txt", jumpedPath);
+            }
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+        }, CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Startup_populates_repository_files_when_that_pane_is_open()
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));

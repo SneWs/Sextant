@@ -135,4 +135,9 @@ public interface IWorkspaceHost
     void Save();
 
     Task OpenRepositoryAsync(string path);
+
+    /// <summary>
+    /// Opens and selects a tool dock for the active repository unless it is already selected, so a click can bring a pane to focus without stealing it when it is on screen. The default does nothing; hosts that own docks override it.
+    /// </summary>
+    void FocusDock(string id) { }
 }
