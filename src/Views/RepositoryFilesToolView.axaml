@@ -10,12 +10,20 @@
              x:Class="Sextant.Views.RepositoryFilesToolView"
              x:DataType="vm:RepositoryViewModel">
     <Grid RowDefinitions="Auto,*">
-                    <TextBlock Grid.Row="1" Text="No repository files." Margin="8"
+                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="8,6,8,2">
+                        <ToggleButton Grid.Column="1" Content="Changes only"
+                                      IsChecked="{Binding RepositoryFilesChangesOnly}"
+                                      Padding="10,2" MinWidth="0" MinHeight="0"
+                                      ToolTip.Tip="Show only staged, unstaged, and untracked files"
+                                      AutomationProperties.Name="Show only changed files"/>
+                    </Grid>
+                    <TextBlock Grid.Row="1" Text="{Binding RepositoryTreeEmptyText}" Margin="8"
                                IsVisible="{Binding RepositoryTreeEmpty}" Opacity="0.65"/>
                     <ListBox x:Name="RepositoryFileList" Grid.Row="1" ItemsSource="{Binding RepositoryFileTree}"
                              SelectedItem="{Binding SelectedRepositoryFile}"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             DoubleTapped="OnRepositoryFileDoubleTapped" KeyDown="OnRepositoryFileKeyDown">
+                             DoubleTapped="OnRepositoryFileDoubleTapped" KeyDown="OnRepositoryFileKeyDown"
+                             PointerReleased="OnRepositoryFilePointerReleased">
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <VirtualizingStackPanel/>
@@ -47,7 +55,7 @@
                                             <MenuItem Header="Remove file…" Command="{Binding RemoveCommand}"/>
                                         </ContextMenu>
                                     </Border.ContextMenu>
-                                    <Grid ColumnDefinitions="16,18,*,Auto,Auto" Margin="{Binding Indent}">
+                                    <Grid ColumnDefinitions="16,18,Auto,*,Auto,Auto" Margin="{Binding Indent}">
                                         <Button Classes="flat" Width="16" Height="16" Padding="0" MinWidth="0"
                                                 IsVisible="{Binding IsDirectory}" Background="Transparent"
                                                 VerticalAlignment="Center" Click="OnRepositoryDirectoryExpand"
@@ -67,13 +75,16 @@
                                         <Path Grid.Column="1" Data="M3,1 L10,1 L14,5 L14,15 L3,15 Z M10,1 L10,5 L14,5"
                                               Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}" StrokeThickness="1"
                                               IsVisible="{Binding IsFile}" VerticalAlignment="Center" Opacity="0.5"/>
-                                        <TextBlock Grid.Column="2" Text="{Binding Label}" TextTrimming="CharacterEllipsis"
+                                        <TextBlock Grid.Column="2" Text="{Binding StatusText}" FontWeight="SemiBold"
+                                                   IsVisible="{Binding HasStatus}"
+                                                   Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding Label}" TextTrimming="CharacterEllipsis"
                                                    Margin="4,0" VerticalAlignment="Center"/>
-                                        <Border Grid.Column="3" IsVisible="{Binding IsFile}" Padding="4,0" CornerRadius="3"
+                                        <Border Grid.Column="4" IsVisible="{Binding IsFile}" Padding="4,0" CornerRadius="3"
                                                 Background="{DynamicResource SystemControlHighlightListLowBrush}" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding StorageText}" FontSize="10" Opacity="0.75"/>
                                         </Border>
-                                        <TextBlock Grid.Column="4" Text="{Binding LockText}" FontSize="11"
+                                        <TextBlock Grid.Column="5" Text="{Binding LockText}" FontSize="11"
                                                    IsVisible="{Binding HasLockInfo}"
                                                    Margin="6,0,2,0" VerticalAlignment="Center" Opacity="0.75"
                                                    MaxWidth="170" TextTrimming="CharacterEllipsis"/>

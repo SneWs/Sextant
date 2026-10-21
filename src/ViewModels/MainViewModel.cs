@@ -877,6 +877,14 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     public Task OpenRepositoryAsync(string path) => OpenPathAsync(path);
 
+    /// <summary>Brings a tool dock on screen for the active tab, leaving it alone when it is already selected.</summary>
+    public void FocusDock(string id)
+    {
+        if (Dock.IsSelected(id))
+            return;
+        Dock.Show(id);
+    }
+
     private async Task OpenFolderAsync()
     {
         if (!CanUseGit || Dialogs is null)

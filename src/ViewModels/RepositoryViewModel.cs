@@ -1734,6 +1734,10 @@ public partial class RepositoryViewModel : ViewModelBase
                 RebuildFiles(state);
             }
 
+            // The files pane may be filtered to the staging area. A status change adds or
+            // removes files from that view, so re-compose the cached tree.
+            RefreshRepositoryFilesFilter();
+
             var refSignature = RefSignature(state);
             if (refSignature != _refSignature)
             {
@@ -3559,6 +3563,25 @@ public partial class RepositoryViewModel : ViewModelBase
 
         ApplyImageFolds();
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Opens every diff section for a file across both staging sides. A partially-staged change shows as one row in the changes-only tree but two sections here, so revealing it must open all of them rather than stopping at the first match.
+    /// </summary>
+    private async Task OpenAllSectionsForPath(string path)
+    {
+        var tasks = new List<Task>();
+        foreach (var section in _sections)
+        {
+            // staged is null, so SectionMatches matches this path on either side.
+            if (!SectionMatches(section, path, null))
+                continue;
+            SetFold(section.Key, true);
+            tasks.Add(SetExpanded(section, true));
+        }
+
+        ApplyImageFolds();
+        await Task.WhenAll(tasks).ConfigureAwait(false);
     }
 
     private static bool SectionMatches(DiffSection section, string path, string? original, bool? staged = null) =>

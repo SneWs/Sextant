@@ -1394,6 +1394,33 @@ public class DockLayoutTests
         Assert.True(bottom <= pane.Bounds.Height + 1, $"{item.GetType().Name} bottom {bottom} pane {pane.Bounds.Height}");
     }
 
+    [Fact]
+    public void Focus_dock_opens_and_selects_a_closed_pane()
+    {
+        using var host = Open(new WorkspaceState());
+        host.View.Dock.SetOpen(DockIds.Diff, false);
+        Assert.False(host.View.Dock.IsSelected(DockIds.Diff));
+
+        host.View.FocusDock(DockIds.Diff);
+
+        Assert.True(host.View.Dock.IsOpen(DockIds.Diff));
+        Assert.True(host.View.Dock.IsSelected(DockIds.Diff));
+    }
+
+    [Fact]
+    public void Focus_dock_leaves_an_already_selected_pane_untouched()
+    {
+        using var host = Open(new WorkspaceState());
+        // The default layout selects the diff. Focusing it again must not disturb the arrangement.
+        Assert.True(host.View.Dock.IsSelected(DockIds.Diff));
+        var before = host.View.Dock.PaneOrder();
+
+        host.View.FocusDock(DockIds.Diff);
+
+        Assert.Equal(before, host.View.Dock.PaneOrder());
+        Assert.True(host.View.Dock.IsSelected(DockIds.Diff));
+    }
+
     private static Host Open(WorkspaceState state)
     {
         var directory = Path.Combine(Path.GetTempPath(), "sextant-dock-" + Guid.NewGuid().ToString("N"));

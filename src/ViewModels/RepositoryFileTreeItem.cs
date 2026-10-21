@@ -20,6 +20,8 @@ public partial class RepositoryFileTreeItem : ObservableObject
     public int Depth { get; init; }
     public bool IsDirectory { get; init; }
     public bool IsFile => !IsDirectory;
+    public string StatusText { get; init; } = "";
+    public bool HasStatus => StatusText.Length > 0;
     public bool LfsTracked { get; init; }
     public bool LocksKnown { get; init; }
     public LfsLock? Lock { get; init; }
@@ -32,6 +34,7 @@ public partial class RepositoryFileTreeItem : ObservableObject
         : Lock.Owner.Length == 0 ? "Locked" : $"Locked by {Lock.Owner}";
     public string Tip => IsDirectory ? Path
         : $"{Path} - {(LfsTracked ? "tracked with Git LFS" : "not tracked with Git LFS")}"
+            + (StatusText.Length == 0 ? "" : $" - {StatusText}")
             + (LockText.Length == 0 ? "" : $" - {LockText}");
     public bool ShowLock => IsFile && LocksKnown && Lock is null;
     public bool ShowUnlock => IsFile && LocksKnown && Lock is not null;
