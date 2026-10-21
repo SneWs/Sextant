@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using Sextant.Git.AskPass;
 
 namespace Sextant.Git.Wsl;
@@ -7,6 +8,8 @@ namespace Sextant.Git.Wsl;
 /// WSL ssh cannot prompt, and a Windows executable started from the distribution
 /// does not see Linux environment variables. The askpass program is a script in
 /// the distribution that runs the Windows helper with the pipe name on its command.
+/// A Store install's helper is copied out of WindowsApps first, because the
+/// distribution cannot execute a file there.
 /// </summary>
 public static class WslAskPass
 {
@@ -22,7 +25,17 @@ public static class WslAskPass
     {
         if (!OperatingSystem.IsWindows() || !wsl.CanRun || string.IsNullOrWhiteSpace(windowsExecutable))
             return null;
-        var linuxExecutable = WslPath.ToLinux(wsl.Distribution, windowsExecutable);
+        var runnable = windowsExecutable;
+        try
+        {
+            runnable = await Task.Run(() => AskPassPackageCopy.Stage(windowsExecutable), cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            runnable = windowsExecutable;
+        }
+
+        var linuxExecutable = WslPath.ToLinux(wsl.Distribution, runnable);
         var script = "/tmp/sextant-askpass-" + pipeName;
         var body = Script(linuxExecutable, pipeName);
         if (!await WriteAsync(wsl, script, body, cancellationToken).ConfigureAwait(false))

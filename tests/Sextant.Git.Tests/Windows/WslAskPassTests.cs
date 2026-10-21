@@ -17,6 +17,64 @@ public class WslAskPassTests
     }
 
     [Fact]
+    public void Unpackaged_askpass_stays_beside_the_app()
+    {
+        var path = @"C:\Apps\Sextant\Sextant.AskPass.exe";
+        Assert.Equal(path, AskPassPackageCopy.Stage(path, Path.Combine(Path.GetTempPath(), "sextant-askpass-unused")));
+    }
+
+    [Fact]
+    public void Store_askpass_is_copied_out_of_windowsapps_for_wsl()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "sextant-askpass-" + Guid.NewGuid().ToString("n"));
+        var package = Path.Combine(root, "Program Files", "WindowsApps", "20817M.Grenangen.SextantGit_1.0.8.0_x64__nr8zhaqknvty0");
+        var cache = Path.Combine(root, "cache");
+        try
+        {
+            Directory.CreateDirectory(package);
+            var stale = Path.Combine(cache, "old-package");
+            Directory.CreateDirectory(stale);
+            File.WriteAllText(Path.Combine(stale, "stale.txt"), "x");
+            var executable = Path.Combine(package, "Sextant.AskPass.exe");
+            File.WriteAllText(executable, "exe");
+            File.WriteAllText(Path.Combine(package, "Sextant.AskPass.dll"), "dll");
+            File.WriteAllText(Path.Combine(package, "Sextant.AskPass.runtimeconfig.json"), "{}");
+            File.WriteAllText(Path.Combine(package, "hostfxr.dll"), "host");
+            File.WriteAllText(Path.Combine(package, "Sextant.exe"), "app");
+            File.WriteAllText(Path.Combine(package, "Sextant.AskPass.deps.json"),
+                """
+                {
+                  "targets": {
+                    ".NETCoreApp,Version=v10.0/win-x64": {
+                      "Sextant.AskPass/1.0.8": {
+                        "runtime": { "Sextant.AskPass.dll": {} },
+                        "native": { "hostfxr.dll": {} }
+                      }
+                    }
+                  }
+                }
+                """);
+
+            var staged = AskPassPackageCopy.Stage(executable, cache);
+            var stagedDir = Path.GetDirectoryName(staged)!;
+            Assert.Equal(Path.Combine(cache, "20817M.Grenangen.SextantGit_1.0.8.0_x64__nr8zhaqknvty0", "Sextant.AskPass.exe"), staged);
+            Assert.Equal("host", File.ReadAllText(Path.Combine(stagedDir, "hostfxr.dll")));
+            Assert.Equal("{}", File.ReadAllText(Path.Combine(stagedDir, "Sextant.AskPass.runtimeconfig.json")));
+            Assert.False(File.Exists(Path.Combine(stagedDir, "Sextant.exe")));
+            Assert.False(Directory.Exists(stale));
+
+            File.Delete(Path.Combine(package, "hostfxr.dll"));
+            Assert.Equal(staged, AskPassPackageCopy.Stage(executable, cache));
+            Assert.Equal("host", File.ReadAllText(Path.Combine(stagedDir, "hostfxr.dll")));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Wsl_launch_forwards_ssh_askpass_and_not_path()
     {
         var environment = AskPassEnvironment.ForWslGit("/tmp/sextant-askpass-pipe");
