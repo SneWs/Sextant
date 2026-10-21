@@ -10,6 +10,7 @@ using Sextant.Docking;
 using Sextant.Services;
 using Sextant.ViewModels;
 using System.ComponentModel;
+using System.Runtime.InteropServices;
 
 namespace Sextant.Views;
 
@@ -27,6 +28,11 @@ public partial class MainWindow : Window
         PropertyChanged += OnWindowPropertyChanged;
         DataContextChanged += (_, _) => AttachViewModel();
         Activated += OnWindowActivated;
+        // A taskbar click activates the window while it is still minimized. Avalonia
+        // runs that activation, and the dock focus inside it, before Windows finishes
+        // the restore. The icon then needs a second click. Ignore the iconic message.
+        if (OperatingSystem.IsWindows())
+            Win32Properties.AddWndProcHookCallback(this, IgnoreIconicActivation);
     }
 
     private MainViewModel? _watched;
@@ -68,10 +74,39 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void OnWindowActivated(object? sender, EventArgs e)
+    private async void OnWindowActivated(object? sender, EventArgs e) => await RefreshAfterActivationAsync();
+
+    /// <summary>
+    /// Refreshes the open repositories. A minimized window waits until it is visible:
+    /// refreshing here would run inside the iconic activation and cancel the restore.
+    /// A visible activation stays synchronous so a dialog can still hold the refresh
+    /// until its confirmed command has run.
+    /// </summary>
+    internal Task RefreshAfterActivationAsync()
     {
-        if (DataContext is MainViewModel vm)
-            await vm.OnWindowActivated();
+        if (WindowState == WindowState.Minimized || DataContext is not MainViewModel vm)
+            return Task.CompletedTask;
+        return vm.OnWindowActivated();
+    }
+
+    // WM_ACTIVATE packs WA_* in the low word and fMinimized in the high word.
+    internal static bool IsIconicActivation(uint msg, nint wParam)
+    {
+        const uint activate = 0x0006;
+        if (msg != activate)
+            return false;
+        var word = unchecked((uint)wParam);
+        var activating = (word & 0xFFFF) != 0;
+        var iconic = word >> 16 != 0;
+        return activating && iconic;
+    }
+
+    private static nint IgnoreIconicActivation(nint hWnd, uint msg, nint wParam, nint lParam, ref bool handled)
+    {
+        if (!IsIconicActivation(msg, wParam))
+            return 0;
+        handled = true;
+        return 0;
     }
 
     protected override async void OnOpened(EventArgs e)
@@ -246,8 +281,43 @@ public partial class MainWindow : Window
         if (e.Property == DataContextProperty && e.NewValue is MainViewModel vm)
             ApplySavedWindow(vm);
         else if (e.Property == WindowStateProperty)
+        {
             RememberWindow();
+            if (e.OldValue is WindowState.Minimized && WindowState != WindowState.Minimized)
+                Dispatcher.UIThread.Post(ResumeAfterMinimize, DispatcherPriority.Background);
+        }
     }
+
+    // The ignored activation can leave Windows treating the window as active while
+    // Avalonia still has it inactive, and it does not send another message once the
+    // window is visible. Ask again after the restore, then refresh.
+    private async void ResumeAfterMinimize()
+    {
+        if (WindowState == WindowState.Minimized)
+            return;
+        if (!IsActive)
+        {
+            Activate();
+            if (!IsActive && WindowState != WindowState.Minimized)
+                DeliverVisibleActivation();
+        }
+
+        if (WindowState != WindowState.Minimized)
+            await RefreshAfterActivationAsync();
+    }
+
+    private void DeliverVisibleActivation()
+    {
+        var platform = TryGetPlatformHandle();
+        if (platform is null || !string.Equals(platform.HandleDescriptor, "HWND", StringComparison.Ordinal) || platform.Handle == 0)
+            return;
+        const uint activate = 0x0006;
+        const int active = 1;
+        SendMessage(platform.Handle, activate, active, 0);
+    }
+
+    [DllImport("user32.dll")]
+    private static extern nint SendMessage(nint hWnd, uint msg, nint wParam, nint lParam);
 
     private void ApplySavedWindow(MainViewModel vm)
     {
