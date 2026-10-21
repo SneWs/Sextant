@@ -14,6 +14,7 @@ using System.Windows.Input;
 using Sextant.Git.Diff;
 using Sextant.Git.Models;
 using Sextant.Git.Repo;
+using Sextant.Git.Workspace;
 using Sextant.Git.Wsl;
 
 namespace Sextant.ViewModels;
@@ -2352,6 +2353,32 @@ public partial class RepositoryViewModel : ViewModelBase
         _host.Save();
     }
 
+    [RelayCommand]
+    private void ExpandAllLocations() => SetEveryLocationExpanded(true);
+
+    [RelayCommand]
+    private void CollapseAllLocations() => SetEveryLocationExpanded(false);
+
+    private void SetEveryLocationExpanded(bool expanded)
+    {
+        FoldLocations(_locationRoots, expanded);
+        _collapsedLocations.Clear();
+        if (!expanded)
+            RememberCollapsed();
+        PublishLocations(SelectedLocation?.Key);
+        _host.Save();
+    }
+
+    private static void FoldLocations(IEnumerable<LocationItem> items, bool expanded)
+    {
+        foreach (var item in items)
+        {
+            if (item.Children.Count > 0)
+                item.IsExpanded = expanded;
+            FoldLocations(item.Children, expanded);
+        }
+    }
+
     private void PublishLocations(string? selectedKey)
     {
         var flat = new List<LocationItem>();
@@ -2644,11 +2671,23 @@ public partial class RepositoryViewModel : ViewModelBase
         });
     }
 
+    /// <summary>The graph row a branch, tag, or stash click asked History to show. The history list scrolls to it.</summary>
+    public GraphRowViewModel? GraphScrollRow { get; private set; }
+
+    private void ShowInHistory(GraphRowViewModel row)
+    {
+        _host.FocusDock(DockIds.History);
+        SelectedGraphRow = row;
+        GraphScrollRow = row;
+        OnPropertyChanged(nameof(GraphScrollRow));
+    }
+
     private async Task RevealAsync(string oid, string? revision = null)
     {
         if (_session is null || _lifetime.IsCancellationRequested)
             return;
         using var pending = new PendingRepositoryWork(this);
+        _host.FocusDock(DockIds.History);
         RepositoryFilesTabOn = false;
         IsLoadingHistory = true;
         try
@@ -2658,7 +2697,7 @@ public partial class RepositoryViewModel : ViewModelBase
                 var found = Rows.FirstOrDefault(row => string.Equals(row.Sha, oid, StringComparison.OrdinalIgnoreCase));
                 if (found is not null)
                 {
-                    SelectedGraphRow = found;
+                    ShowInHistory(found);
                     return;
                 }
 
@@ -2689,7 +2728,7 @@ public partial class RepositoryViewModel : ViewModelBase
             if (row is null)
                 Fail("That commit is not in the loaded history.");
             else
-                SelectedGraphRow = row;
+                ShowInHistory(row);
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {

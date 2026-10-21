@@ -26,15 +26,15 @@ View → Save layout… writes the current arrangement to a file. View → Resto
 
 ## Locations
 
-The filter icon under the Locations heading opens a box. Text there filters branches, tags, stashes, and the other rows. Escape closes that box and clears the text.
+Expand all and Collapse all sit to the left of the filter. Expand all opens every section and folder. Collapse all closes them, including a folder inside a section that was already closed. Sextant remembers that choice for the repository. Text in the filter matches branches, tags, stashes, and the other rows. A filter that already has text still shows the rows that match.
 
 Sections group themselves by name. `release/1.2` is a folder of tags or branches, not a flat list.
 
 A double-click checks out a local branch, checks out a remote branch into a local one, or opens a worktree or a checked-out submodule. An uninitialized submodule is not opened, and Sextant does not run `git submodule update`.
 
-A tag is different. One click selects the commit that tag points at, including an annotated tag. When that commit is not in the loaded history, for example on a hidden branch, Sextant loads the history up to that commit instead of reporting an error, and this pane names that revision until you close the filter. The same action is Show in graph on other rows that have it.
+A click on a branch, a tag, or a stash shows the History pane when that pane is closed or another tab is in front, and scrolls the graph to the commit that row points at. The checked-out branch stays checked out. A tag or a hidden branch that is not in the loaded history is loaded up to that commit instead of reporting an error, and this pane names that revision until you close the filter. Show in graph does the same. An annotated tag uses the commit the tag points at.
 
-A stash uses that same click. It selects the stash and shows the files it holds, with the diff of those files. Untracked files are included when the stash was made with Stash (include untracked). A double-click shows that same stash and leaves the checked-out branch as it is. Pop, Apply, and Drop stay on the row menu.
+A stash click also shows the files that stash holds, with the diff of those files. Untracked files are included when the stash was made with Stash (include untracked). A double-click shows that same stash and leaves the checked-out branch as it is. Pop, Apply, and Drop stay on the row menu.
 
 The row menu is the rest of the branch work: merge, rebase, delete, rename, set upstream, push or delete a tag, hide a branch, and the stash actions. Hide branch keeps the row in the list at reduced opacity and drops that branch from the graph. Hidden names are stored for that repository. Show all branches brings them back. A stash can be hidden the same way.
 
@@ -160,5 +160,5 @@ The command key is Command on macOS and Ctrl on Windows and Linux, except where 
 | Refresh | F5 |
 | Settings | Command+, on macOS |
 
-Escape in the history search box hides it and clears the query. Escape in the locations filter closes that box. Shift+Esc shows the Commit pane, selects the working copy at the top of the history list, and focuses the commit message. Pressing Escape twice within half a second selects that same top row and scrolls the history list there. History's tab is selected when it shares a group. The Diff, Blame, and LFS locks group selects its first tab. An open Commit pane is selected and the commit message takes focus. Pane sizes stay as they are, and a closed pane stays closed. A locations filter, a history search, and hidden branches stay as they are.
+Escape in the history search box hides it and clears the query. Shift+Esc shows the Commit pane, selects the working copy at the top of the history list, and focuses the commit message. Pressing Escape twice within half a second selects that same top row and scrolls the history list there. History's tab is selected when it shares a group. The Diff, Blame, and LFS locks group selects its first tab. An open Commit pane is selected and the commit message takes focus. Pane sizes stay as they are, and a closed pane stays closed. A locations filter, a history search, and hidden branches stay as they are.
 In the command palette, Up and Down move through the matches, Enter runs the selected command, and Escape closes the palette.

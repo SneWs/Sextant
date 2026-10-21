@@ -1339,6 +1339,192 @@ public class DockLayoutTests
         }
     }
 
+    [Fact]
+    public async Task Clicking_a_branch_tag_or_stash_shows_history_and_scrolls_to_that_commit()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "anchor\n");
+        repo.CommitAll("anchor");
+        var anchorOid = repo.RunCapture("rev-parse", "HEAD").Trim();
+        repo.Run("tag", "v1");
+        repo.Run("branch", "side");
+        repo.WriteFile("a.txt", "later\n");
+        repo.CommitAll("later");
+        var tipOid = repo.RunCapture("rev-parse", "HEAD").Trim();
+        var trunk = repo.CurrentBranch();
+        repo.WriteFile("a.txt", "wip\n");
+        repo.Run("stash", "push", "-m", "wip note");
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-reveal-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var vm = new MainViewModel(new WorkspaceStore(directory), new WorkspaceState(), new AppSettings(), new GitProcessRunner())
+                {
+                    GitExecutable = repo.Git,
+                    GitReady = true,
+                };
+                var tab = new RepositoryViewModel(vm, repo.Directory);
+                vm.Tabs.Add(tab);
+                var window = new MainWindow { DataContext = vm, Width = 1200, Height = 800 };
+                window.Show();
+                await vm.Activate(tab);
+                await WaitIdle(tab);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                var anchor = tab.Rows.Single(row => string.Equals(row.Sha, anchorOid, StringComparison.OrdinalIgnoreCase));
+                var tip = tab.Rows.Single(row => string.Equals(row.Sha, tipOid, StringComparison.OrdinalIgnoreCase));
+                var stash = tab.Locations.Single(item => item.ShowPop);
+                var stashRow = tab.Rows.Single(row => string.Equals(row.Sha, stash.Oid, StringComparison.OrdinalIgnoreCase));
+                var anchorIndex = tab.Rows.IndexOf(anchor);
+                for (var i = 0; i < 40; i++)
+                    tab.Rows.Insert(anchorIndex, new GraphRowViewModel { Subject = "pad " + i, Sha = "pad" + i });
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                var graph = Graph(window);
+                var scroll = graph.GetVisualDescendants().OfType<ScrollViewer>().First();
+                scroll.Offset = new Vector(scroll.Offset.X, 0);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(scroll.Viewport.Height > 20, $"viewport {scroll.Viewport.Height}");
+                AssertOffScreen(graph, scroll, anchor);
+
+                vm.Dock.Show(DockIds.Files);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(vm.Dock.IsSelected(DockIds.Files));
+                Assert.False(vm.Dock.IsSelected(DockIds.History));
+
+                ClickLocation(window, tab.Locations.Single(item => item.Key == "b:side"));
+                await WaitForRow(tab, anchorOid);
+                Assert.True(vm.Dock.IsOpen(DockIds.History));
+                Assert.True(vm.Dock.IsSelected(DockIds.History));
+                Assert.False(vm.Dock.IsSelected(DockIds.Files));
+                Assert.Equal(trunk, repo.CurrentBranch());
+                await AssertScrolledTo(window, anchor);
+
+                vm.Dock.SetOpen(DockIds.History, false);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(vm.Dock.IsOpen(DockIds.History));
+
+                ClickLocation(window, tab.Locations.Single(item => item.Key == "t:v1"));
+                await WaitForRow(tab, anchorOid);
+                Assert.True(vm.Dock.IsOpen(DockIds.History));
+                Assert.True(vm.Dock.IsSelected(DockIds.History));
+                await AssertScrolledTo(window, anchor);
+
+                graph = Graph(window);
+                scroll = graph.GetVisualDescendants().OfType<ScrollViewer>().First();
+                scroll.Offset = new Vector(scroll.Offset.X, Math.Max(scroll.Extent.Height, 2000));
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(scroll.Offset.Y > 40, $"offset {scroll.Offset.Y}");
+
+                ClickLocation(window, stash);
+                await WaitForRow(tab, stash.Oid!);
+                Assert.True(vm.Dock.IsSelected(DockIds.History));
+                Assert.Equal(trunk, repo.CurrentBranch());
+                await AssertScrolledTo(window, stashRow);
+
+                scroll = Graph(window).GetVisualDescendants().OfType<ScrollViewer>().First();
+                scroll.Offset = new Vector(scroll.Offset.X, Math.Max(scroll.Extent.Height, 2000));
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                ClickLocation(window, tab.Locations.Single(item => item.Key == "b:" + trunk));
+                await WaitForRow(tab, tipOid);
+                Assert.Equal(trunk, repo.CurrentBranch());
+                await AssertScrolledTo(window, tip);
+
+                await vm.Shutdown();
+                window.DataContext = null;
+                window.Close();
+                return 0;
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static void AssertOffScreen(ListBox graph, ScrollViewer scroll, GraphRowViewModel row)
+    {
+        if (graph.ContainerFromItem(row) is not Control container || !container.IsEffectivelyVisible)
+            return;
+        var point = container.TranslatePoint(default, scroll);
+        Assert.NotNull(point);
+        Assert.True(point.Value.Y > scroll.Viewport.Height, $"row y {point.Value.Y} viewport {scroll.Viewport.Height}");
+    }
+
+    private static async Task WaitForRow(RepositoryViewModel tab, string oid)
+    {
+        var until = DateTime.UtcNow.AddSeconds(5);
+        while (!string.Equals(tab.SelectedGraphRow?.Sha, oid, StringComparison.OrdinalIgnoreCase) && DateTime.UtcNow < until)
+        {
+            Dispatcher.UIThread.RunJobs();
+            await Task.Delay(20);
+        }
+
+        Assert.Equal(oid, tab.SelectedGraphRow?.Sha, ignoreCase: true);
+    }
+
+    private static async Task AssertScrolledTo(Window window, GraphRowViewModel row)
+    {
+        var until = DateTime.UtcNow.AddSeconds(4);
+        var why = "the history row was not scrolled into view";
+        while (DateTime.UtcNow < until)
+        {
+            window.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            var graph = window.GetVisualDescendants().OfType<ListBox>().FirstOrDefault(list => list.Name == "GraphList");
+            var scroll = graph?.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+            var container = graph?.ContainerFromItem(row) as Control;
+            if (graph is null || scroll is null || container is null || !container.IsEffectivelyVisible || scroll.Viewport.Height < 20)
+            {
+                why = $"graph {graph is not null} scroll {scroll is not null} container {container is not null} viewport {scroll?.Viewport.Height}";
+                await Task.Delay(20);
+                continue;
+            }
+
+            var point = container.TranslatePoint(default, scroll);
+            if (point is null)
+            {
+                why = "the row has no position in the history list";
+                await Task.Delay(20);
+                continue;
+            }
+
+            var bottom = point.Value.Y + container.Bounds.Height;
+            if (point.Value.Y >= -1 && bottom <= scroll.Viewport.Height + 1)
+                return;
+            why = $"y {point.Value.Y} bottom {bottom} viewport {scroll.Viewport.Height} offset {scroll.Offset.Y}";
+            await Task.Delay(20);
+        }
+
+        Assert.Fail(why);
+    }
+
+    private static void ClickLocation(Window window, object item)
+    {
+        var list = window.GetVisualDescendants().OfType<ListBox>().First(candidate => candidate.Name == "LocationList");
+        list.ScrollIntoView(item);
+        window.UpdateLayout();
+        Dispatcher.UIThread.RunJobs();
+        var row = list.ContainerFromItem(item) as ListBoxItem;
+        Assert.NotNull(row);
+        var point = row.TranslatePoint(new Point(72, row.Bounds.Height / 2), window);
+        Assert.NotNull(point);
+        window.MouseDown(point.Value, MouseButton.Left);
+        window.MouseUp(point.Value, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+    }
+
     /// <summary>Which tools are open, and the split proportion of every dock node.</summary>
     private static string Arrangement(MainViewModel vm)
     {

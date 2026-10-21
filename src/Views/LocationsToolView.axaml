@@ -10,8 +10,30 @@
              x:Class="Sextant.Views.LocationsToolView"
              x:DataType="vm:RepositoryViewModel">
     <Grid RowDefinitions="Auto,Auto,*">
-        <Grid Grid.Row="0" ColumnDefinitions="*" Margin="8,2,4,2">
-            <TextBox x:Name="LocationFilterBox" Margin="4,0,4,4"
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*" Margin="8,2,4,2">
+            <Button x:Name="ExpandLocationsButton" Classes="flat" Width="22" Height="22" Padding="0" MinWidth="0"
+                    Margin="0,0,2,4"
+                    Command="{Binding ExpandAllLocationsCommand}"
+                    ToolTip.Tip="Expand all"
+                    AutomationProperties.Name="Expand all"
+                    Background="Transparent" VerticalAlignment="Center">
+                <Path Data="M1,1 L6,5 L11,1 M1,6 L6,10 L11,6"
+                      Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                      StrokeThickness="1.4"
+                      StrokeLineCap="Round" StrokeJoin="Round" Stretch="None"/>
+            </Button>
+            <Button x:Name="CollapseLocationsButton" Grid.Column="1" Classes="flat" Width="22" Height="22" Padding="0" MinWidth="0"
+                    Margin="0,0,2,4"
+                    Command="{Binding CollapseAllLocationsCommand}"
+                    ToolTip.Tip="Collapse all"
+                    AutomationProperties.Name="Collapse all"
+                    Background="Transparent" VerticalAlignment="Center">
+                <Path Data="M1,5 L6,1 L11,5 M1,10 L6,6 L11,10"
+                      Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                      StrokeThickness="1.4"
+                      StrokeLineCap="Round" StrokeJoin="Round" Stretch="None"/>
+            </Button>
+            <TextBox x:Name="LocationFilterBox" Grid.Column="2" Margin="2,0,4,4"
                      PlaceholderText="Filter" Text="{Binding LocationFilter}"
                      IsVisible="True" KeyDown="OnLocationFilterKeyDown" />
         </Grid>
