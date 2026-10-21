@@ -147,13 +147,13 @@ The command key is Command on macOS and Ctrl on Windows and Linux, except where 
 | History and commit | Escape, Escape |
 | Pull | Command/Ctrl+Shift+U |
 | Push | Command/Ctrl+Shift+P |
-| Create branch | Command/Ctrl+B |
+| Create branch | Command/Ctrl+Shift+C |
 | Stash | Command/Ctrl+S |
 | Pop latest stash | Command/Ctrl+Shift+S |
 | Stage all | Command/Ctrl+Shift+A |
 | Unstage all | Command/Ctrl+Shift+R |
 | Expand all diff sections | Command/Ctrl+Shift+E |
-| Collapse all diff sections | Command/Ctrl+Shift+C |
+| Collapse all diff sections | Command/Ctrl+Shift+- |
 | Close tab | Command/Ctrl+W |
 | Next tab | Ctrl+Tab |
 | Switch to tab by number | Command/Ctrl+0 to Command/Ctrl+9 |

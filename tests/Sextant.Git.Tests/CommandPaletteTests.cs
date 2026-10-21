@@ -423,6 +423,16 @@ public class CommandPaletteTests
         return (vm, tab, window);
     }
 
+    private static async Task FinishCreateBranch(MainViewModel vm, RepositoryViewModel tab)
+    {
+        if (vm.CreateBranchCommand.ExecutionTask is { } menu)
+            await menu;
+        if (tab.CreateBranchCommand.ExecutionTask is { } created)
+            await created;
+        Dispatcher.UIThread.RunJobs();
+        await WaitUntilIdle(tab);
+    }
+
     private static async Task WaitUntilIdle(RepositoryViewModel tab)
     {
         var until = DateTime.UtcNow.AddSeconds(5);
