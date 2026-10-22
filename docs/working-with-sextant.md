@@ -1,6 +1,6 @@
 # Working with Sextant
 
-A repository is a tab. The active tab is the one Sextant loads. History, the file watcher, and diffs run there. An inactive tab stays unloaded until you select it. Close a tab with the × on the tab, or with Ctrl+W (Command+W on macOS). Ctrl+Tab moves to the next tab on every platform. Command+Tab is left to macOS.
+A repository is a tab. The active tab is the one Sextant loads. History, the file watcher, and diffs run there. An inactive tab stays unloaded until you select it. Drag a tab sideways to change the order. That order is restored the next time Sextant opens. Close a tab with the × on the tab, or with Ctrl+W (Command+W on macOS). Ctrl+Tab moves to the next tab on every platform. Command+Tab is left to macOS.
 
 The tab shows a green dot when the working tree is clean, an amber dot when it is dirty, and a red dot during a conflict.
 

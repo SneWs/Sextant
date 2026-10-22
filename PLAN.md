@@ -181,6 +181,8 @@ On 2026-10-21 Branches and each remote split every `/` into a folder, including 
 
 On 2026-10-21 location icons are built for the dispatcher that draws them. A geometry kept from an earlier headless session made `Double_escape_activates_tabs_and_focuses_the_commit_message` throw because a different thread owned it: on Linux while the compositor committed the shape, and on macOS while that shape was measured. `Location_icons_can_be_drawn_again_in_the_next_headless_session` passed, and DockLayoutTests passed 29/29. The desktop window was not launched.
 
+On 2026-10-21 a repository tab can be dragged sideways to a new place in the strip. The new order is written with the open tabs, and the close button does not start a drag. Moving a tab no longer treats that repository as closed. `Dragging_a_repository_tab_reorders_it_and_keeps_that_order` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

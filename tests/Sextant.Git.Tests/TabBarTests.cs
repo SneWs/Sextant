@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Sextant.Git;
@@ -75,6 +76,79 @@ public class TabBarTests
             if (Directory.Exists(directory))
                 Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task Dragging_a_repository_tab_reorders_it_and_keeps_that_order()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-tab-drag-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var store = new WorkspaceStore(directory);
+                var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner());
+                var window = new MainWindow { DataContext = vm, Width = 1000, Height = 700 };
+                window.Show();
+                var alpha = new RepositoryViewModel(vm, Path.Combine(directory, "alpha"));
+                var beta = new RepositoryViewModel(vm, Path.Combine(directory, "beta"));
+                var gamma = new RepositoryViewModel(vm, Path.Combine(directory, "gamma"));
+                vm.Tabs.Add(alpha);
+                vm.Tabs.Add(beta);
+                vm.Tabs.Add(gamma);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                var shown = VisibleTabs(window).Where(item => item.IsEffectivelyVisible).ToList();
+                Assert.Equal(3, shown.Count);
+                var start = Center(shown[0], window);
+                window.MouseDown(start, MouseButton.Left);
+                window.MouseMove(start + new Point(2, 0));
+                window.MouseUp(start + new Point(2, 0), MouseButton.Left);
+                Assert.Equal([alpha, beta, gamma], vm.Tabs);
+
+                shown = VisibleTabs(window).Where(item => item.IsEffectivelyVisible).ToList();
+                start = Center(shown[0], window);
+                var close = shown[2].GetVisualDescendants().OfType<Button>().First();
+                var closeAt = Center(close, window);
+                window.MouseDown(closeAt, MouseButton.Left);
+                window.MouseMove(start);
+                window.MouseUp(start, MouseButton.Left);
+                Assert.Equal([alpha, beta, gamma], vm.Tabs);
+
+                shown = VisibleTabs(window).Where(item => item.IsEffectivelyVisible).ToList();
+                start = Center(shown[0], window);
+                var target = Center(shown[2], window);
+                window.MouseDown(start, MouseButton.Left);
+                window.MouseMove(target);
+                window.MouseUp(target, MouseButton.Left);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.Equal([beta, gamma, alpha], vm.Tabs);
+                Assert.Equal(
+                    [beta.RequestedPath, gamma.RequestedPath, alpha.RequestedPath],
+                    store.LoadWorkspace().OpenTabs);
+
+                await vm.Shutdown();
+                window.DataContext = null;
+                window.Close();
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static Point Center(Control control, Visual relative)
+    {
+        var point = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), relative);
+        Assert.NotNull(point);
+        return point.Value;
     }
 
     private static IEnumerable<TabStripItem> VisibleTabs(Visual root) =>
