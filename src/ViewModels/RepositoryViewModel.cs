@@ -94,26 +94,46 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private WslGit? _wsl;
 
-    public RepositoryViewModel(IWorkspaceHost host, string requestedPath, WslGit? wsl = null)
+    private string? _wslDistribution;
+
+    public RepositoryViewModel(IWorkspaceHost host, string requestedPath, WslGit? wsl = null, string? distribution = null)
     {
         _host = host;
         RequestedPath = requestedPath;
         _wsl = wsl is { Distribution.Length: > 0 } ? wsl : null;
+        _wslDistribution = _wsl?.Distribution ?? SavedTab.NormalizeDistribution(distribution);
+        if (string.IsNullOrWhiteSpace(_wslDistribution) && WslPath.TryParseUnc(requestedPath, out var fromPath, out _))
+            _wslDistribution = fromPath;
         Title = TabTitle(FolderName(requestedPath));
     }
 
     public WslGit? Wsl => _wsl;
 
+    /// <summary>Distribution shown on the tab. Set before git inside that distribution is bound.</summary>
+    public string? WslDistribution =>
+        _wsl is { Distribution: { Length: > 0 } distribution } ? distribution : _wslDistribution;
+
     /// <summary>
-    /// Binds a saved UNC tab once its distribution is known. A session that has
-    /// already opened keeps the git it started with.
+    /// Binds git for a saved tab once its distribution is known. A session that
+    /// has already opened keeps the git it started with. The label still gains
+    /// the distribution when the tab was not tagged yet.
     /// </summary>
     internal void UseWsl(WslGit wsl)
     {
-        if (_session is not null || _wsl is not null || wsl.Distribution.Length == 0)
+        if (wsl.Distribution.Length == 0)
             return;
-        _wsl = wsl;
-        Title = TabTitle(FolderName(RequestedPath));
+        if (_wsl is null && _session is null)
+        {
+            _wsl = wsl;
+            _wslDistribution = wsl.Distribution;
+        }
+        else if (string.IsNullOrWhiteSpace(_wslDistribution))
+            _wslDistribution = wsl.Distribution;
+
+        var name = _session is { DisplayName: { Length: > 0 } display }
+            ? display
+            : FolderName(RequestedPath);
+        Title = TabTitle(name);
     }
 
     private static string FolderName(string path)
@@ -122,8 +142,13 @@ public partial class RepositoryViewModel : ViewModelBase
         return string.IsNullOrWhiteSpace(name) ? path : name;
     }
 
-    private string TabTitle(string name) =>
-        _wsl is null || string.IsNullOrWhiteSpace(name) ? name : name + " (" + _wsl.Distribution + ")";
+    private string TabTitle(string name)
+    {
+        var distribution = WslDistribution;
+        if (string.IsNullOrWhiteSpace(distribution) || string.IsNullOrWhiteSpace(name))
+            return name;
+        return name + " (" + distribution + ")";
+    }
 
     public string RequestedPath { get; }
 

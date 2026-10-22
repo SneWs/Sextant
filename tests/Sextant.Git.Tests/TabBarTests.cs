@@ -130,7 +130,7 @@ public class TabBarTests
                 Assert.Equal([beta, gamma, alpha], vm.Tabs);
                 Assert.Equal(
                     [beta.RequestedPath, gamma.RequestedPath, alpha.RequestedPath],
-                    store.LoadWorkspace().OpenTabs);
+                    store.LoadWorkspace().OpenTabs.Select(tab => tab.Path));
 
                 await vm.Shutdown();
                 window.DataContext = null;
@@ -278,7 +278,12 @@ public class TabBarTests
         {
             var store = new WorkspaceStore(directory);
             var workspace = store.LoadWorkspace();
-            workspace.OpenTabs = [activeRepo.Directory, missing, idleRepo.Directory];
+            workspace.OpenTabs =
+            [
+                new SavedTab { Path = activeRepo.Directory },
+                new SavedTab { Path = missing },
+                new SavedTab { Path = idleRepo.Directory },
+            ];
             workspace.ActiveTab = activeRepo.Directory;
             store.SaveWorkspace(workspace);
 
@@ -352,7 +357,7 @@ public class TabBarTests
                     await shutdown;
                     Dispatcher.UIThread.RunJobs();
                     Assert.True(closed);
-                    Assert.True(RepoPath.Same(repo.Directory, Assert.Single(store.LoadWorkspace().OpenTabs)));
+                    Assert.True(RepoPath.Same(repo.Directory, Assert.Single(store.LoadWorkspace().OpenTabs).Path));
                 }
                 finally
                 {

@@ -208,8 +208,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         await Dispatcher.Yield(DispatcherPriority.Background);
         if (!Tabs.Contains(tab) || _lifetime.IsCancellationRequested)
             return;
-        // A saved UNC path has no distribution binding yet. Only the tab being
-        // opened pays for that WSL lookup.
+        // The tab label already shows the saved distribution. Binding git inside
+        // that distribution waits until this tab is the one being opened.
         await EnsureTabWslAsync(tab);
         if (!Tabs.Contains(tab) || _lifetime.IsCancellationRequested)
             return;
@@ -289,7 +289,11 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     public void Save()
     {
-        _workspace.OpenTabs = Tabs.Select(tab => tab.Toplevel ?? tab.RequestedPath).ToList();
+        _workspace.OpenTabs = Tabs.Select(tab => new SavedTab
+        {
+            Path = tab.Toplevel ?? tab.RequestedPath,
+            Wsl = SavedTab.NormalizeDistribution(tab.WslDistribution),
+        }).ToList();
         _workspace.ActiveTab = ActiveTab is null ? null : ActiveTab.Toplevel ?? ActiveTab.RequestedPath;
         foreach (var tab in Tabs)
         {
@@ -714,16 +718,16 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         }
     }
 
-    private RepositoryViewModel? RestoreSavedTabs()
+    internal RepositoryViewModel? RestoreSavedTabs()
     {
-        foreach (var path in _workspace.OpenTabs)
+        foreach (var saved in _workspace.OpenTabs)
         {
-            if (string.IsNullOrWhiteSpace(path))
+            if (string.IsNullOrWhiteSpace(saved.Path))
                 continue;
-            var openPath = WslPath.CanonicalWindows(path);
-            if (Tabs.Any(tab => SameTab(tab, openPath) || SameTab(tab, path)))
+            var openPath = WslPath.CanonicalWindows(saved.Path);
+            if (Tabs.Any(tab => SameTab(tab, openPath) || SameTab(tab, saved.Path)))
                 continue;
-            Tabs.Add(CreateTab(openPath));
+            Tabs.Add(CreateTab(openPath, distribution: DistributionOf(saved, openPath)));
         }
 
         RepositoryViewModel? active = null;
@@ -1261,9 +1265,17 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         }
     }
 
-    private RepositoryViewModel CreateTab(string path, WslGit? wsl = null)
+    private static string? DistributionOf(SavedTab saved, string openPath)
     {
-        var tab = new RepositoryViewModel(this, path, wsl);
+        var named = SavedTab.NormalizeDistribution(saved.Wsl);
+        if (named is not null)
+            return named;
+        return WslPath.TryParseUnc(openPath, out var distribution, out _) ? distribution : null;
+    }
+
+    private RepositoryViewModel CreateTab(string path, WslGit? wsl = null, string? distribution = null)
+    {
+        var tab = new RepositoryViewModel(this, path, wsl, distribution);
         var layout = RepoLayouts.Resolve(_workspace, path);
         tab.LocationsWidth = layout.LocationsWidth;
         tab.GraphWidth = layout.GraphWidth;
