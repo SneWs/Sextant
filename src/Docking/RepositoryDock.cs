@@ -70,7 +70,8 @@ public partial class RepositoryDock : ObservableObject
             return;
         }
 
-        if (change.OldItems is null)
+        // Move keeps the same tab. Treating it as a removal dropped the open repository.
+        if (change.Action != NotifyCollectionChangedAction.Remove || change.OldItems is null)
             return;
         foreach (var tab in change.OldItems.OfType<RepositoryViewModel>())
             _live.Remove(tab);

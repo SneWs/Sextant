@@ -28,6 +28,9 @@ public partial class MainWindow : Window
         PropertyChanged += OnWindowPropertyChanged;
         DataContextChanged += (_, _) => AttachViewModel();
         Activated += OnWindowActivated;
+        RepositoryTabs.AddHandler(PointerPressedEvent, OnRepositoryTabPressed, RoutingStrategies.Tunnel);
+        AddHandler(PointerMovedEvent, OnWindowPointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
+        AddHandler(PointerReleasedEvent, OnWindowPointerReleased, RoutingStrategies.Tunnel, handledEventsToo: true);
         // A taskbar click activates the window while it is still minimized. Avalonia
         // runs that activation, and the dock focus inside it, before Windows finishes
         // the restore. The icon then needs a second click. Ignore the iconic message.
@@ -37,6 +40,9 @@ public partial class MainWindow : Window
 
     private MainViewModel? _watched;
     private bool _syncingTabs;
+    private RepositoryViewModel? _dragTab;
+    private Point _dragStart;
+    private bool _dragMoved;
 
     private void AttachViewModel()
     {
@@ -50,7 +56,7 @@ public partial class MainWindow : Window
 
     private void OnRepositoryTabSelected(object? sender, SelectionChangedEventArgs e)
     {
-        if (_syncingTabs || sender is not TabStrip strip || strip.SelectedItem is not RepositoryViewModel tab || DataContext is not MainViewModel vm)
+        if (_syncingTabs || _dragMoved || sender is not TabStrip strip || strip.SelectedItem is not RepositoryViewModel tab || DataContext is not MainViewModel vm)
             return;
         if (ReferenceEquals(vm.ActiveTab, tab) || (!strip.IsPointerOver && !strip.IsKeyboardFocusWithin))
             return;
@@ -72,6 +78,140 @@ public partial class MainWindow : Window
         {
             _syncingTabs = false;
         }
+    }
+
+    private void OnRepositoryTabPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || CloseButton(e.Source) || TabOf(e.Source) is not { } tab)
+            return;
+        _dragTab = tab;
+        _dragStart = e.GetPosition(this);
+        _dragMoved = false;
+    }
+
+    private void OnWindowPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_dragTab is null || DataContext is not MainViewModel vm)
+            return;
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            EndDrag();
+            return;
+        }
+
+        var point = e.GetPosition(this);
+        if (!_dragMoved)
+        {
+            if (Math.Abs(point.X - _dragStart.X) < 6 && Math.Abs(point.Y - _dragStart.Y) < 6)
+                return;
+            _dragMoved = true;
+            e.Pointer.Capture(this);
+            Cursor = new Cursor(StandardCursorType.SizeWestEast);
+        }
+
+        var index = TabIndexAt(e.GetPosition(RepositoryTabs));
+        if (index >= 0)
+            vm.MoveTab(_dragTab, index);
+        SyncRepositoryTabs();
+        NudgeTabScroll(e.GetPosition(TabScroll));
+        e.Handled = true;
+    }
+
+    private void OnWindowPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_dragTab is null)
+            return;
+        if (_dragMoved)
+            e.Handled = true;
+        EndDrag();
+        if (e.Pointer.Captured == this)
+            e.Pointer.Capture(null);
+    }
+
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        EndDrag();
+    }
+
+    private void EndDrag()
+    {
+        if (_dragTab is null)
+            return;
+        var moved = _dragMoved;
+        _dragTab = null;
+        _dragMoved = false;
+        if (!moved)
+            return;
+        Cursor = null;
+        if (DataContext is MainViewModel vm)
+            vm.Save();
+    }
+
+    private void NudgeTabScroll(Point point)
+    {
+        var offset = TabScroll.Offset;
+        if (point.X < 24)
+            TabScroll.Offset = new Vector(Math.Max(0, offset.X - 16), offset.Y);
+        else if (point.X > TabScroll.Bounds.Width - 24)
+            TabScroll.Offset = new Vector(offset.X + 16, offset.Y);
+    }
+
+    private int TabIndexAt(Point point)
+    {
+        if (DataContext is not MainViewModel vm || vm.Tabs.Count == 0)
+            return -1;
+        var first = TabBounds(0);
+        var last = TabBounds(vm.Tabs.Count - 1);
+        if (first is null || last is null)
+            return -1;
+        if (point.X < first.Value.X)
+            return 0;
+        if (point.X >= last.Value.X + last.Value.Width)
+            return vm.Tabs.Count - 1;
+        for (var i = 0; i < vm.Tabs.Count; i++)
+        {
+            if (TabBounds(i) is not Rect bounds)
+                continue;
+            if (point.X >= bounds.X && point.X < bounds.X + bounds.Width)
+                return i;
+        }
+
+        return -1;
+    }
+
+    private Rect? TabBounds(int index)
+    {
+        if (RepositoryTabs.ContainerFromIndex(index) is not Visual visual)
+            return null;
+        var origin = visual.TranslatePoint(default, RepositoryTabs);
+        return origin is null ? null : new Rect(origin.Value, visual.Bounds.Size);
+    }
+
+    private static RepositoryViewModel? TabOf(object? source)
+    {
+        var visual = source as Visual;
+        while (visual is not null)
+        {
+            if (visual is TabStripItem { DataContext: RepositoryViewModel tab })
+                return tab;
+            visual = visual.GetVisualParent();
+        }
+
+        return null;
+    }
+
+    private static bool CloseButton(object? source)
+    {
+        var visual = source as Visual;
+        while (visual is not null)
+        {
+            if (visual is Button)
+                return true;
+            visual = visual.GetVisualParent();
+        }
+
+        return false;
     }
 
     private async void OnWindowActivated(object? sender, EventArgs e) => await RefreshAfterActivationAsync();
