@@ -15,7 +15,11 @@ public class WorkspaceStoreTests
             var state = new WorkspaceState
             {
                 ActiveTab = @"C:\repos\sextant",
-                OpenTabs = [@"C:\repos\sextant", @"C:\repos\other"],
+                OpenTabs =
+                [
+                    new SavedTab { Path = @"C:\repos\sextant" },
+                    new SavedTab { Path = @"C:\repos\other" },
+                ],
                 LocationsWidth = 200,
                 GraphWidth = 480,
                 FilesHeight = 160,
@@ -45,7 +49,8 @@ public class WorkspaceStoreTests
             var loaded = store.LoadWorkspace();
             var settings = store.LoadSettings();
             Assert.Equal(@"C:\repos\sextant", loaded.ActiveTab);
-            Assert.Equal([@"C:\repos\sextant", @"C:\repos\other"], loaded.OpenTabs);
+            Assert.Equal([@"C:\repos\sextant", @"C:\repos\other"], loaded.OpenTabs.Select(tab => tab.Path));
+            Assert.All(loaded.OpenTabs, tab => Assert.Null(tab.Wsl));
             Assert.Equal(200, loaded.LocationsWidth);
             Assert.Equal(480, loaded.GraphWidth);
             Assert.Equal(160, loaded.FilesHeight);
@@ -101,7 +106,9 @@ public class WorkspaceStoreTests
                 """);
             var legacy = store.LoadWorkspace();
             Assert.Equal(@"C:\repos\kept", legacy.ActiveTab);
-            Assert.Equal([@"C:\repos\kept"], legacy.OpenTabs);
+            var kept = Assert.Single(legacy.OpenTabs);
+            Assert.Equal(@"C:\repos\kept", kept.Path);
+            Assert.Null(kept.Wsl);
             Assert.Equal(0, legacy.WindowWidth);
             Assert.Equal(0, legacy.WindowHeight);
             Assert.Null(legacy.WindowX);
@@ -112,6 +119,50 @@ public class WorkspaceStoreTests
             Assert.Equal(520, migrated.GraphWidth);
             Assert.Equal(180, migrated.FilesHeight);
             Assert.True(migrated.ShowLocations);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Wsl_distribution_round_trips_with_the_tab_and_older_files_stay_paths()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-ws-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new WorkspaceStore(directory);
+            var ubuntu = @"\\wsl.localhost\Ubuntu\home\user\repo";
+            store.SaveWorkspace(new WorkspaceState
+            {
+                OpenTabs =
+                [
+                    new SavedTab { Path = ubuntu, Wsl = " Ubuntu " },
+                    new SavedTab { Path = @"C:\repos\windows" },
+                ],
+                ActiveTab = ubuntu,
+            });
+
+            var loaded = store.LoadWorkspace();
+            Assert.Equal(ubuntu, loaded.OpenTabs[0].Path);
+            Assert.Equal("Ubuntu", loaded.OpenTabs[0].Wsl);
+            Assert.Equal(@"C:\repos\windows", loaded.OpenTabs[1].Path);
+            Assert.Null(loaded.OpenTabs[1].Wsl);
+
+            File.WriteAllText(Path.Combine(directory, "workspace.json"), """
+                {
+                  "openTabs": [
+                    "\\\\wsl.localhost\\Debian\\home\\user\\other",
+                    { "path": "\\\\wsl.localhost\\Alpine\\home\\user\\tree", "wsl": "Alpine" }
+                  ]
+                }
+                """);
+            var mixed = store.LoadWorkspace();
+            Assert.Equal(@"\\wsl.localhost\Debian\home\user\other", mixed.OpenTabs[0].Path);
+            Assert.Null(mixed.OpenTabs[0].Wsl);
+            Assert.Equal("Alpine", mixed.OpenTabs[1].Wsl);
         }
         finally
         {

@@ -7,7 +7,7 @@ namespace Sextant.Git.Workspace;
 
 public sealed class WorkspaceState
 {
-    public List<string> OpenTabs { get; set; } = [];
+    public List<SavedTab> OpenTabs { get; set; } = [];
 
     public string? ActiveTab { get; set; }
 
@@ -31,6 +31,71 @@ public sealed class WorkspaceState
 
     /// <summary>Global tool arrangement. Missing or unusable values are seeded from the legacy pane sizes.</summary>
     public DockLayout? DockLayout { get; set; }
+}
+
+/// <summary>
+/// One reopened tab. Older files store a path string. A WSL tab also stores
+/// the distribution so the label can show it before that repository loads.
+/// </summary>
+[JsonConverter(typeof(SavedTabConverter))]
+public sealed class SavedTab
+{
+    public string Path { get; set; } = "";
+
+    /// <summary>WSL distribution name. Missing for a Windows repository and for older saves.</summary>
+    public string? Wsl { get; set; }
+
+    public static string? NormalizeDistribution(string? name)
+    {
+        var trimmed = name?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
+    }
+}
+
+public sealed class SavedTabConverter : JsonConverter<SavedTab>
+{
+    public override SavedTab? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.String)
+            return new SavedTab { Path = reader.GetString() ?? "" };
+        if (reader.TokenType != JsonTokenType.StartObject)
+            throw new JsonException();
+
+        var tab = new SavedTab();
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.EndObject)
+                return tab;
+            if (reader.TokenType != JsonTokenType.PropertyName)
+                throw new JsonException();
+            var name = reader.GetString();
+            if (!reader.Read())
+                throw new JsonException();
+            if (name is not null && name.Equals("path", StringComparison.OrdinalIgnoreCase) && reader.TokenType == JsonTokenType.String)
+                tab.Path = reader.GetString() ?? "";
+            else if (name is not null && name.Equals("wsl", StringComparison.OrdinalIgnoreCase) && reader.TokenType == JsonTokenType.String)
+                tab.Wsl = SavedTab.NormalizeDistribution(reader.GetString());
+            else if (reader.TokenType is JsonTokenType.StartObject or JsonTokenType.StartArray)
+                reader.Skip();
+        }
+
+        throw new JsonException();
+    }
+
+    public override void Write(Utf8JsonWriter writer, SavedTab value, JsonSerializerOptions options)
+    {
+        var distribution = SavedTab.NormalizeDistribution(value.Wsl);
+        if (distribution is null)
+        {
+            writer.WriteStringValue(value.Path);
+            return;
+        }
+
+        writer.WriteStartObject();
+        writer.WriteString("path", value.Path);
+        writer.WriteString("wsl", distribution);
+        writer.WriteEndObject();
+    }
 }
 
 public sealed class RepoLayout
