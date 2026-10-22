@@ -35,6 +35,10 @@ public partial class RepositoryViewModel : ViewModelBase
     private bool _askedPerformance;
     private int _holdFocusRefresh;
     private bool _watcherFailed;
+    private int _watcherRefs;
+    private int _watcherGate;
+    private int _watcherAgain;
+    private DispatcherPriority _uiPriority = DispatcherPriority.Background;
     private bool _loadingMore;
     private int _historyGeneration;
     private int _seenCommits;
@@ -1318,7 +1322,20 @@ public partial class RepositoryViewModel : ViewModelBase
         _watcher = null;
         try
         {
-            _watcher = new GitDirectoryWatcher(_session.GitDirectory, () => Dispatcher.UIThread.Post(() => RefreshFromWatcherCommand.Execute(null)));
+            _watcher = new GitDirectoryWatcher(
+                _session.GitDirectory,
+                refsChanged =>
+                {
+                    if (refsChanged)
+                        Interlocked.Exchange(ref _watcherRefs, 1);
+                    // Render still runs while this window is not the foreground window.
+                    // Background work does not: Windows keeps reporting input, and the
+                    // dispatcher holds it until the window is activated.
+                    Dispatcher.UIThread.Post(
+                        () => RefreshFromWatcherCommand.Execute(null),
+                        DispatcherPriority.Render);
+                },
+                _session.Toplevel);
             _watcher.Failed += () => Dispatcher.UIThread.Post(OnWatcherFailed);
         }
         catch (Exception) when (_wsl is not null)
@@ -1333,25 +1350,43 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         if (_session is null || IsBusy || _lifetime.IsCancellationRequested)
             return;
-        using var pending = new PendingRepositoryWork(this);
+        // Overlapping watcher ticks share one refresh. A tick dropped because a
+        // command owns IsBusy is left alone: that command publishes its own result.
+        if (Interlocked.CompareExchange(ref _watcherGate, 1, 0) != 0)
+        {
+            Interlocked.Exchange(ref _watcherAgain, 1);
+            return;
+        }
+
+        var previous = _uiPriority;
+        _uiPriority = DispatcherPriority.Render;
         try
         {
-            await _session.RefreshStatusAsync(_lifetime.Token).ConfigureAwait(false);
-            if (_lifetime.IsCancellationRequested || _session is null)
+            using var pending = new PendingRepositoryWork(this);
+            var refsChanged = Interlocked.Exchange(ref _watcherRefs, 0) == 1;
+            if (refsChanged)
+                await _session.RefreshRefsAndStatusAsync(_lifetime.Token).ConfigureAwait(false);
+            else
+                await _session.RefreshStatusAsync(_lifetime.Token).ConfigureAwait(false);
+            if (_lifetime.IsCancellationRequested || _session is null || IsBusy)
                 return;
             // Status ran on a pool thread. Bindings are published on the UI thread.
             // Diff parsing and the file tree stay off this hop so a watcher tick cannot freeze the window.
             await OnUi(() =>
             {
-                if (_session is null || _lifetime.IsCancellationRequested)
+                if (_session is null || _lifetime.IsCancellationRequested || IsBusy)
                     return;
                 Apply(_session.Snapshot());
+                PresentOpenWindows();
             }).ConfigureAwait(false);
-            if (_lifetime.IsCancellationRequested || _session is null)
+            if (_lifetime.IsCancellationRequested || _session is null || IsBusy)
                 return;
             await LoadDetailsAsync().ConfigureAwait(false);
-            if (RepositoryFilesTabOn && _session is not null && !_lifetime.IsCancellationRequested)
+            if (RepositoryFilesTabOn && _session is not null && !_lifetime.IsCancellationRequested && !IsBusy)
                 await LoadRepositoryFilesAsync(_lifetime.Token, refreshLocks: false).ConfigureAwait(false);
+            if (_lifetime.IsCancellationRequested || _session is null)
+                return;
+            await OnUi(PresentOpenWindows).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -1369,11 +1404,26 @@ public partial class RepositoryViewModel : ViewModelBase
                 Fail(message);
                 if (_session is not null && !_lifetime.IsCancellationRequested)
                     Apply(_session.Snapshot());
-            });
+                PresentOpenWindows();
+            }).ConfigureAwait(false);
         }
         catch (Win32Exception)
         {
             // Windows can still fail CreateProcess with a missing directory before the check above.
+        }
+        finally
+        {
+            _uiPriority = previous;
+            Interlocked.Exchange(ref _watcherGate, 0);
+            if (Interlocked.Exchange(ref _watcherAgain, 0) == 1
+                && _session is not null
+                && !IsBusy
+                && !_lifetime.IsCancellationRequested)
+            {
+                Dispatcher.UIThread.Post(
+                    () => RefreshFromWatcherCommand.Execute(null),
+                    DispatcherPriority.Render);
+            }
         }
     }
 

@@ -1,3 +1,6 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -628,6 +631,24 @@ public partial class RepositoryViewModel
         NoteMissingPreview(row.Path, row.StagingFile?.FromStagedList);
     }
 
+    /// <summary>
+    /// Asks each visible window to paint. A window on another screen is not the
+    /// foreground window. A minimized window stays stopped so restoring it from
+    /// the taskbar still takes one click.
+    /// </summary>
+    private static void PresentOpenWindows()
+    {
+        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+            return;
+        foreach (var window in desktop.Windows.ToArray())
+        {
+            if (!window.IsVisible || window.WindowState == WindowState.Minimized)
+                continue;
+            window.InvalidateMeasure();
+            window.RequestAnimationFrame(static _ => { });
+        }
+    }
+
     private async Task OnUi(Action action)
     {
         if (Dispatcher.UIThread.CheckAccess())
@@ -640,6 +661,8 @@ public partial class RepositoryViewModel
         // tree building would land back on the UI thread.
         // Background is below render. Normal is above it, and a burst of those posts used to
         // keep the tab strip from presenting until the whole load had finished.
+        // A watcher refresh raises _uiPriority to Render so the same posts still run
+        // while this window is not the foreground window.
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         Dispatcher.UIThread.Post(() =>
         {
@@ -652,7 +675,7 @@ public partial class RepositoryViewModel
             {
                 done.TrySetException(exception);
             }
-        }, DispatcherPriority.Background);
+        }, _uiPriority);
         await done.Task.ConfigureAwait(false);
     }
 
@@ -664,7 +687,7 @@ public partial class RepositoryViewModel
             return;
         }
 
-        await Dispatcher.UIThread.InvokeAsync(action, DispatcherPriority.Background).ConfigureAwait(false);
+        await Dispatcher.UIThread.InvokeAsync(action, _uiPriority).ConfigureAwait(false);
     }
 
     /// <summary>
