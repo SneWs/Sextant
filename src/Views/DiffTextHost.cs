@@ -212,9 +212,19 @@ public sealed class DiffTextHost : Grid
             editor.TextArea.LeftMargins.Add(new MetaMargin(lines));
         else
             editor.TextArea.LeftMargins.Add(new MarkerMargin(lines));
-        if (!row.Blame && !row.SideBySide && lines.Any(line => line.ShowAction))
+        if (!row.Blame && lines.Any(line => line.ShowAction))
             editor.TextArea.LeftMargins.Add(new ActionMargin(lines));
 
+        AttachMenu(editor, row, lines);
+
+        TryInstallGrammar(editor, row.Path);
+        editor.Document = new TextDocument(DiffEditorRow.Document(lines));
+        _editors.Add(editor);
+        return editor;
+    }
+
+    private static void AttachMenu(TextEditor editor, DiffEditorRow row, IReadOnlyList<EditorLine> lines)
+    {
         var copy = new MenuItem { Header = "Copy" };
         copy.Click += (_, _) => editor.Copy();
         var all = new MenuItem { Header = "Select all" };
@@ -223,12 +233,126 @@ public sealed class DiffTextHost : Grid
             editor.Focus();
             editor.SelectAll();
         };
-        editor.ContextMenu = new ContextMenu { Items = { copy, all } };
 
-        TryInstallGrammar(editor, row.Path);
-        editor.Document = new TextDocument(DiffEditorRow.Document(lines));
-        _editors.Add(editor);
-        return editor;
+        // The gutter stages the line it sits on. This menu stages each chosen change, including one line.
+        // A blank line has no characters to drag, so an empty selection uses the line under the pointer.
+        // Side by side uses the same actions on the column that holds the change.
+        if (row.Blame || !lines.Any(line => line.ShowAction))
+        {
+            editor.ContextMenu = new ContextMenu { Items = { copy, all } };
+            return;
+        }
+
+        var stage = new MenuItem { Header = "Stage line", IsVisible = false };
+        var rule = new Separator { IsVisible = false };
+        var menu = new ContextMenu { Items = { stage, rule, copy, all } };
+        int? requestedLine = null;
+        editor.AddHandler(InputElement.ContextRequestedEvent, (_, request) =>
+        {
+            requestedLine = LineUnderRequest(editor, request);
+        }, RoutingStrategies.Tunnel);
+        menu.Opening += (_, _) =>
+        {
+            var index = requestedLine ?? editor.TextArea.Caret.Line - 1;
+            PrepareStageItem(editor, row, lines, stage, rule, index);
+            requestedLine = null;
+        };
+        editor.ContextMenu = menu;
+    }
+
+    private static int LineUnderRequest(TextEditor editor, ContextRequestedEventArgs request)
+    {
+        var view = editor.TextArea.TextView;
+        if (request.TryGetPosition(view, out var point))
+        {
+            var documentLine = view.GetDocumentLineByVisualTop(point.Y + view.VerticalOffset);
+            return documentLine is null ? -1 : documentLine.LineNumber - 1;
+        }
+
+        return editor.TextArea.Caret.Line - 1;
+    }
+
+    private static void PrepareStageItem(
+        TextEditor editor,
+        DiffEditorRow row,
+        IReadOnlyList<EditorLine> lines,
+        MenuItem stage,
+        Separator rule,
+        int requestedLine)
+    {
+        var selection = ReadSelection(editor, lines);
+        if (selection.DocumentLines == 0)
+            selection = RequestedLine(lines, requestedLine);
+        var show = selection.PatchLines.Count > 0;
+        stage.IsVisible = show;
+        rule.IsVisible = show;
+        if (!show)
+        {
+            stage.Command = null;
+            stage.CommandParameter = null;
+            return;
+        }
+
+        stage.Header = StageHeader(lines, selection.PatchLines[0], selection.PatchLines.Count);
+        stage.CommandParameter = selection.PatchLines.ToArray();
+        stage.Command = row.ApplyLinesCommand;
+    }
+
+    private static SelectedLines RequestedLine(IReadOnlyList<EditorLine> lines, int index)
+    {
+        if ((uint)index >= (uint)lines.Count)
+            return new SelectedLines([], 0);
+        var patchLine = lines[index].PatchLine;
+        if (patchLine < 0)
+            return new SelectedLines([], 0);
+        return new SelectedLines([patchLine], 1);
+    }
+
+    private static string StageHeader(IReadOnlyList<EditorLine> lines, int patchLine, int count)
+    {
+        var several = count > 1;
+        foreach (var line in lines)
+        {
+            if (line.PatchLine != patchLine || line.ActionLabel.Length == 0)
+                continue;
+            if (!several)
+                return line.ActionLabel;
+            return line.ActionLabel == "Unstage line" ? "Unstage selected lines" : "Stage selected lines";
+        }
+
+        return several ? "Stage selected lines" : "Stage line";
+    }
+
+    private readonly record struct SelectedLines(List<int> PatchLines, int DocumentLines);
+
+    private static SelectedLines ReadSelection(TextEditor editor, IReadOnlyList<EditorLine> lines)
+    {
+        var picked = new List<int>();
+        var seen = new HashSet<int>();
+        var documents = new HashSet<int>();
+        if (editor.Document is not { } document || editor.TextArea.Selection.IsEmpty)
+            return new SelectedLines(picked, 0);
+
+        foreach (var segment in editor.TextArea.Selection.Segments)
+        {
+            if (segment.Length <= 0)
+                continue;
+            var startOffset = Math.Min(segment.StartOffset, segment.EndOffset);
+            var endOffset = Math.Max(segment.StartOffset, segment.EndOffset);
+            var start = document.GetLineByOffset(startOffset).LineNumber - 1;
+            var end = document.GetLineByOffset(endOffset - 1).LineNumber - 1;
+            for (var index = start; index <= end; index++)
+            {
+                documents.Add(index);
+                if ((uint)index >= (uint)lines.Count)
+                    continue;
+                var patchLine = lines[index].PatchLine;
+                if (patchLine >= 0 && seen.Add(patchLine))
+                    picked.Add(patchLine);
+            }
+        }
+
+        return new SelectedLines(picked, documents.Count);
     }
 
     private void TryInstallGrammar(TextEditor editor, string? path)

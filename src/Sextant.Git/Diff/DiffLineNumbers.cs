@@ -11,6 +11,7 @@ public static class DiffLineNumbers
 
     /// <summary>
     /// One side-by-side row. A null side is not in this row. An empty string is a blank line.
+    /// LeftPatch and RightPatch are hunk-body indexes, or -1 when that side is not a change.
     /// </summary>
     public readonly record struct SideLine(
         string? LeftText,
@@ -18,7 +19,9 @@ public static class DiffLineNumbers
         bool LeftRemoved,
         string? RightText,
         string RightNumber,
-        bool RightAdded);
+        bool RightAdded,
+        int LeftPatch = -1,
+        int RightPatch = -1);
 
     public static LineNumber For(DiffLineKind kind, ref int oldLine, ref int newLine) => kind switch
     {
@@ -31,26 +34,27 @@ public static class DiffLineNumbers
     public static List<SideLine> SideBySide(DiffHunk hunk)
     {
         var rows = new List<SideLine>();
-        var removed = new Queue<(string Text, string Number)>();
+        var removed = new Queue<(string Text, string Number, int Patch)>();
         var oldLine = hunk.OldStart;
         var newLine = hunk.NewStart;
-        foreach (var line in hunk.Lines)
+        for (var index = 0; index < hunk.Lines.Count; index++)
         {
+            var line = hunk.Lines[index];
             switch (line.Kind)
             {
                 case DiffLineKind.Removed:
-                    removed.Enqueue((line.Text, Take(ref oldLine)));
+                    removed.Enqueue((line.Text, Take(ref oldLine), index));
                     break;
                 case DiffLineKind.Added:
                     var added = Take(ref newLine);
                     if (removed.Count > 0)
                     {
                         var prior = removed.Dequeue();
-                        rows.Add(new SideLine(prior.Text, prior.Number, true, line.Text, added, true));
+                        rows.Add(new SideLine(prior.Text, prior.Number, true, line.Text, added, true, prior.Patch, index));
                     }
                     else
                     {
-                        rows.Add(new SideLine(null, "", false, line.Text, added, true));
+                        rows.Add(new SideLine(null, "", false, line.Text, added, true, -1, index));
                     }
 
                     break;
@@ -69,7 +73,7 @@ public static class DiffLineNumbers
             while (removed.Count > 0)
             {
                 var prior = removed.Dequeue();
-                rows.Add(new SideLine(prior.Text, prior.Number, true, null, "", false));
+                rows.Add(new SideLine(prior.Text, prior.Number, true, null, "", false, prior.Patch, -1));
             }
         }
     }

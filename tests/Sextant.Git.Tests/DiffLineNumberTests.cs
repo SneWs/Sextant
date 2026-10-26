@@ -55,10 +55,10 @@ public class DiffLineNumberTests
         var rows = DiffLineNumbers.SideBySide(hunk);
         Assert.Equal(
         [
-            new DiffLineNumbers.SideLine("keep", "1", false, "keep", "1", false),
-            new DiffLineNumbers.SideLine("old-a", "2", true, "new-a", "2", true),
-            new DiffLineNumbers.SideLine("old-b", "3", true, null, "", false),
-            new DiffLineNumbers.SideLine("tail", "4", false, "tail", "3", false),
+            new DiffLineNumbers.SideLine("keep", "1", false, "keep", "1", false, -1, -1),
+            new DiffLineNumbers.SideLine("old-a", "2", true, "new-a", "2", true, 1, 3),
+            new DiffLineNumbers.SideLine("old-b", "3", true, null, "", false, 2, -1),
+            new DiffLineNumbers.SideLine("tail", "4", false, "tail", "3", false, -1, -1),
         ],
         rows);
     }
@@ -74,8 +74,8 @@ public class DiffLineNumberTests
 
         Assert.Equal(
         [
-            new DiffLineNumbers.SideLine(null, "", false, "one", "1", true),
-            new DiffLineNumbers.SideLine(null, "", false, "", "2", true),
+            new DiffLineNumbers.SideLine(null, "", false, "one", "1", true, -1, 0),
+            new DiffLineNumbers.SideLine(null, "", false, "", "2", true, -1, 1),
         ],
         DiffLineNumbers.SideBySide(hunk));
     }
