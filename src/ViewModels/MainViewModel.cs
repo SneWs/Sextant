@@ -308,7 +308,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
                 tab.FilesHeight,
                 tab.ShowLocations,
                 tab.HiddenBranchNames,
-                tab.CollapsedLocationNames);
+                tab.CollapsedLocationNames,
+                tab.FavoriteBranchNames);
             if (tab.Toplevel is { Length: > 0 } top && !RepoPath.Same(tab.RequestedPath, top))
                 RepoLayouts.Forget(_workspace, tab.RequestedPath);
         }
@@ -1303,6 +1304,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         tab.ShowLocations = layout.ShowLocations;
         tab.UseHiddenBranches(layout.HiddenBranches);
         tab.UseCollapsedLocations(layout.CollapsedLocations);
+        tab.UseFavoriteBranches(layout.FavoriteBranches);
         tab.SideBySide = _settings.SideBySide;
         tab.IgnoreWhitespace = _settings.IgnoreWhitespace;
         return tab;

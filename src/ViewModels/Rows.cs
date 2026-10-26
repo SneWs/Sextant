@@ -129,6 +129,9 @@ public partial class LocationItem : ObservableObject
 
     public string Label { get; set; } = "";
 
+    /// <summary>Sibling path segment. Folder labels also carry a count, so ordering uses this.</summary>
+    public string SortName { get; set; } = "";
+
     /// <summary>Text the locations filter matches. Headers use the section title, without the count.</summary>
     public string SearchText { get; set; } = "";
 
@@ -179,6 +182,12 @@ public partial class LocationItem : ObservableObject
     public bool ShowHideOthers { get; init; }
 
     public bool ShowEye { get; init; }
+
+    public bool ShowFavorite { get; init; }
+
+    public bool IsFavorite { get; init; }
+
+    public string FavoriteLabel { get; init; } = "Favorite";
 
     public bool EyeHidden { get; init; }
 
@@ -241,6 +250,8 @@ public partial class LocationItem : ObservableObject
     public ICommand RevealCommand { get; init; } = UiCommands.Disabled;
 
     public ICommand HideCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand FavoriteCommand { get; init; } = UiCommands.Disabled;
 
     public ICommand HideOthersCommand { get; init; } = UiCommands.Disabled;
 

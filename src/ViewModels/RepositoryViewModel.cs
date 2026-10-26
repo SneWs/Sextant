@@ -186,6 +186,21 @@ public partial class RepositoryViewModel : ViewModelBase
     public IReadOnlyList<string> CollapsedLocationNames =>
         _collapsedLocations.OrderBy(name => name, StringComparer.Ordinal).ToArray();
 
+    public void UseFavoriteBranches(IEnumerable<string>? names)
+    {
+        _favoriteBranches.Clear();
+        if (names is null)
+            return;
+        foreach (var name in names)
+        {
+            if (BranchVisibility.IsGraphBranch(name))
+                _favoriteBranches.Add(name);
+        }
+    }
+
+    public IReadOnlyList<string> FavoriteBranchNames =>
+        _favoriteBranches.OrderBy(name => name, StringComparer.Ordinal).ToArray();
+
     private double _locationsWidth = 220;
 
     private double _graphWidth = 520;
@@ -276,6 +291,8 @@ public partial class RepositoryViewModel : ViewModelBase
     private readonly HashSet<string> _collapsedLocations = new(StringComparer.Ordinal);
 
     private readonly HashSet<string> _hiddenBranches = new(StringComparer.Ordinal);
+
+    private readonly HashSet<string> _favoriteBranches = new(StringComparer.Ordinal);
 
     public ResetCollection<FileRowViewModel> Files { get; } = [];
 
@@ -2199,6 +2216,7 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         var selected = SelectedLocation?.Key;
         RememberCollapsed();
+        PruneFavorites(state);
         _locationRoots.Clear();
 
         var head = HeadLabel(state.Branch);
@@ -2228,11 +2246,15 @@ public partial class RepositoryViewModel : ViewModelBase
                 ShowHide = true,
                 ShowHideOthers = true,
                 ShowEye = true,
+                ShowFavorite = true,
+                IsFavorite = _favoriteBranches.Contains(branch.Name),
+                FavoriteLabel = _favoriteBranches.Contains(branch.Name) ? "Unfavorite" : "Favorite",
                 EyeHidden = hidden,
                 EyeOpen = !hidden,
                 HideLabel = hidden ? "Show branch" : "Hide branch",
                 ShowAllBranches = anyBranchHidden,
                 LabelOpacity = hidden ? 0.45 : 1,
+                FavoriteCommand = new RelayCommand(() => ToggleFavorite(branch.Name)),
                 CheckoutCommand = new AsyncRelayCommand(() => RunAsync("Checking out…", ct => Session.SwitchAsync(name, ct))),
                 MergeCommand = new AsyncRelayCommand(() => MergeNamedAsync(name)),
                 RebaseCommand = new AsyncRelayCommand(() => RebaseOntoAsync(name)),
@@ -2271,11 +2293,15 @@ public partial class RepositoryViewModel : ViewModelBase
                     ShowHide = true,
                     ShowHideOthers = true,
                     ShowEye = true,
+                    ShowFavorite = true,
+                    IsFavorite = _favoriteBranches.Contains(remote.Name),
+                    FavoriteLabel = _favoriteBranches.Contains(remote.Name) ? "Unfavorite" : "Favorite",
                     EyeHidden = hidden,
                     EyeOpen = !hidden,
                     HideLabel = hidden ? "Show branch" : "Hide branch",
                     ShowAllBranches = anyBranchHidden,
                     LabelOpacity = hidden ? 0.45 : 1,
+                    FavoriteCommand = new RelayCommand(() => ToggleFavorite(remote.Name)),
                     CheckoutCommand = new AsyncRelayCommand(() => RunAsync("Checking out…", ct => Session.SwitchTrackAsync(name, ct))),
                     DeleteCommand = new AsyncRelayCommand(() => DeleteRemoteBranchAsync(remoteName, branchName)),
                     RevealCommand = new AsyncRelayCommand(() => RevealAsync(remote.Oid, name)),
@@ -2551,6 +2577,37 @@ public partial class RepositoryViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// A favorite whose ref is gone, locally or as a remote-tracking branch, leaves the saved set.
+    /// The opening snapshot can paint before refs are read, with an empty list and history generation 0.
+    /// That list is not "every favorite is gone".
+    /// </summary>
+    private void PruneFavorites(SessionState state)
+    {
+        if (state.HistoryGeneration == 0 || _favoriteBranches.Count == 0)
+            return;
+        var live = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var reference in state.Refs)
+        {
+            if (BranchVisibility.IsGraphBranch(reference.Name))
+                live.Add(reference.Name);
+        }
+
+        if (_favoriteBranches.RemoveWhere(name => !live.Contains(name)) > 0)
+            _host.Save();
+    }
+
+    private void ToggleFavorite(string refName)
+    {
+        if (!BranchVisibility.IsGraphBranch(refName))
+            return;
+        if (!_favoriteBranches.Add(refName))
+            _favoriteBranches.Remove(refName);
+        if (_session is not null)
+            RebuildLocations(_session.Snapshot());
+        _host.Save();
+    }
+
     private List<LocationItem> GroupLocations(IReadOnlyList<LocationItem> leaves, string scope, bool splitEverySlash = false)
     {
         var byPath = new Dictionary<string, LocationItem>(StringComparer.Ordinal);
@@ -2573,6 +2630,7 @@ public partial class RepositoryViewModel : ViewModelBase
             if (node.RefPath is { } path && byPath.TryGetValue(path, out var leaf))
             {
                 leaf.Label = label;
+                leaf.SortName = node.Label;
                 foreach (var child in children)
                     leaf.Children.Add(child);
                 if (children.Count > 0)
@@ -2589,6 +2647,7 @@ public partial class RepositoryViewModel : ViewModelBase
             {
                 Key = "g:" + scope + ":" + node.FullName,
                 Label = label,
+                SortName = node.Label,
                 IconName = children.Count > 0 ? LocationIcons.Folder : "",
             };
             ApplyFold(folder, scope + ":" + node.FullName);
@@ -2597,7 +2656,33 @@ public partial class RepositoryViewModel : ViewModelBase
             list.Add(folder);
         }
 
+        // Favorites, and folders that contain one, stay in this grouped tree and sort ahead of the rest.
+        // The same path still builds the same parent folders. Name breaks ties.
+        if (list.Exists(ContainsFavorite))
+            list.Sort(CompareFavorites);
         return list;
+    }
+
+    private static int CompareFavorites(LocationItem left, LocationItem right)
+    {
+        var leftFavorite = ContainsFavorite(left);
+        var rightFavorite = ContainsFavorite(right);
+        if (leftFavorite != rightFavorite)
+            return leftFavorite ? -1 : 1;
+        return StringComparer.Ordinal.Compare(left.SortName, right.SortName);
+    }
+
+    private static bool ContainsFavorite(LocationItem item)
+    {
+        if (item.IsFavorite)
+            return true;
+        foreach (var child in item.Children)
+        {
+            if (ContainsFavorite(child))
+                return true;
+        }
+
+        return false;
     }
 
     private void ApplyFold(LocationItem item, string collapseKey)
