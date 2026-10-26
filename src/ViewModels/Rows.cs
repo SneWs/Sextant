@@ -129,6 +129,9 @@ public partial class LocationItem : ObservableObject
 
     public string Label { get; set; } = "";
 
+    /// <summary>Sibling path segment. Folder labels also carry a count, so ordering uses this.</summary>
+    public string SortName { get; set; } = "";
+
     /// <summary>Text the locations filter matches. Headers use the section title, without the count.</summary>
     public string SearchText { get; set; } = "";
 

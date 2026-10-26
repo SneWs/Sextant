@@ -491,6 +491,9 @@ public class LocationPanelTests
         repo.Run("switch", "-c", "zebra");
         repo.WriteFile("a.txt", "zebra\n");
         repo.CommitAll("zebra");
+        repo.Run("switch", "-c", "topic/only/leaf");
+        repo.WriteFile("a.txt", "topic\n");
+        repo.CommitAll("topic");
         repo.Run("tag", "v1");
         repo.Run("update-ref", "refs/remotes/origin/alpha", "HEAD");
         repo.Run("update-ref", "refs/remotes/origin/feature/b", "HEAD");
@@ -515,6 +518,7 @@ public class LocationPanelTests
                 "refs/heads/gone",
                 "refs/heads/zebra",
                 "refs/heads/feature/b",
+                "refs/heads/topic/only/leaf",
                 "refs/tags/v1",
                 "refs/remotes/origin/HEAD",
                 "refs/remotes/origin/zebra",
@@ -525,6 +529,7 @@ public class LocationPanelTests
                 [
                     "refs/heads/feature/b",
                     "refs/heads/gone",
+                    "refs/heads/topic/only/leaf",
                     "refs/heads/zebra",
                     "refs/remotes/origin/feature/b",
                     "refs/remotes/origin/zebra",
@@ -535,6 +540,7 @@ public class LocationPanelTests
             Assert.Equal(
                 [
                     "refs/heads/feature/b",
+                    "refs/heads/topic/only/leaf",
                     "refs/heads/zebra",
                     "refs/remotes/origin/feature/b",
                     "refs/remotes/origin/zebra",
@@ -544,21 +550,24 @@ public class LocationPanelTests
             Assert.Equal(1, saves);
 
             var trunkKey = "b:" + trunk;
-            var folderFirst = string.Compare("feature", trunk, StringComparison.Ordinal) < 0;
-            var grouped = new List<string>();
-            if (!folderFirst)
-                grouped.Add(trunkKey);
-            grouped.Add("g:b:feature");
-            grouped.Add("b:feature/a");
-            if (folderFirst)
-                grouped.Add(trunkKey);
-            Assert.Equal(new[] { "b:feature/b", "b:zebra" }.Concat(grouped).ToArray(), SectionKeys(vm, "h:branches"));
+            var topic = new[] { "g:b:topic", "g:b:topic/only", "b:topic/only/leaf" };
             Assert.Equal(
-                ["r:origin/feature/b", "r:origin/zebra", "r:origin/alpha", "r:origin/side"],
+                new[] { "g:b:feature", "b:feature/b", "b:feature/a" }.Concat(topic).Append("b:zebra").Append(trunkKey).ToArray(),
+                SectionKeys(vm, "h:branches"));
+            Assert.Equal(
+                ["g:r:origin:feature", "r:origin/feature/b", "r:origin/zebra", "r:origin/alpha", "r:origin/side"],
                 SectionKeys(vm, "h:remote:origin"));
-            Assert.Equal(["b:feature/a"], vm.Locations.Single(item => item.Key == "g:b:feature").Children.Select(child => child.Key).ToArray());
-            Assert.Equal("feature/b", vm.Locations.Single(item => item.Key == "b:feature/b").Label);
-            Assert.Equal("feature/b", vm.Locations.Single(item => item.Key == "r:origin/feature/b").Label);
+            Assert.Equal(
+                ["b:feature/b", "b:feature/a"],
+                vm.Locations.Single(item => item.Key == "g:b:feature").Children.Select(child => child.Key).ToArray());
+            Assert.Equal(["g:b:topic/only"], vm.Locations.Single(item => item.Key == "g:b:topic").Children.Select(child => child.Key).ToArray());
+            Assert.Equal(["b:topic/only/leaf"], vm.Locations.Single(item => item.Key == "g:b:topic/only").Children.Select(child => child.Key).ToArray());
+            Assert.Equal(LocationIcons.Folder, vm.Locations.Single(item => item.Key == "g:b:topic").IconName);
+            Assert.Equal(LocationIcons.Folder, vm.Locations.Single(item => item.Key == "g:b:topic/only").IconName);
+            Assert.Equal("feature (2)", vm.Locations.Single(item => item.Key == "g:b:feature").Label);
+            Assert.Equal("b", vm.Locations.Single(item => item.Key == "b:feature/b").Label);
+            Assert.Equal("leaf", vm.Locations.Single(item => item.Key == "b:topic/only/leaf").Label);
+            Assert.Equal("b", vm.Locations.Single(item => item.Key == "r:origin/feature/b").Label);
             Assert.Equal(1, vm.Locations.Count(item => item.Key == "b:feature/b"));
 
             var zebra = vm.Locations.Single(item => item.Key == "b:zebra");
@@ -604,8 +613,12 @@ public class LocationPanelTests
             Click(window, Star(view, featureA));
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
-            Assert.Equal(["b:feature/a", "b:feature/b", "b:zebra", trunkKey], SectionKeys(vm, "h:branches"));
-            Assert.DoesNotContain(vm.Locations, item => item.Key == "g:b:feature");
+            Assert.Equal(
+                new[] { "g:b:feature", "b:feature/a", "b:feature/b" }.Concat(topic).Append("b:zebra").Append(trunkKey).ToArray(),
+                SectionKeys(vm, "h:branches"));
+            Assert.Equal(
+                ["b:feature/a", "b:feature/b"],
+                vm.Locations.Single(item => item.Key == "g:b:feature").Children.Select(child => child.Key).ToArray());
             Assert.Equal(2, saves);
             Assert.Contains("refs/heads/feature/a", vm.FavoriteBranchNames);
             featureA = vm.Locations.Single(item => item.Key == "b:feature/a");
@@ -616,7 +629,9 @@ public class LocationPanelTests
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
             var rest = new[] { trunk, "zebra" }.OrderBy(name => name, StringComparer.Ordinal).Select(name => "b:" + name);
-            Assert.Equal(new[] { "b:feature/a", "b:feature/b" }.Concat(rest).ToArray(), SectionKeys(vm, "h:branches"));
+            Assert.Equal(
+                new[] { "g:b:feature", "b:feature/a", "b:feature/b" }.Concat(topic).Concat(rest).ToArray(),
+                SectionKeys(vm, "h:branches"));
             Assert.False(vm.Locations.Single(item => item.Key == "b:zebra").IsFavorite);
             Assert.Equal(3, saves);
             Assert.DoesNotContain("refs/heads/zebra", vm.FavoriteBranchNames);
@@ -624,13 +639,17 @@ public class LocationPanelTests
             Click(window, Star(view, vm.Locations.Single(item => item.Key == "b:zebra")));
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
-            Assert.Equal(["b:feature/a", "b:feature/b", "b:zebra", trunkKey], SectionKeys(vm, "h:branches"));
+            Assert.Equal(
+                new[] { "g:b:feature", "b:feature/a", "b:feature/b" }.Concat(topic).Append("b:zebra").Append(trunkKey).ToArray(),
+                SectionKeys(vm, "h:branches"));
             Assert.Equal(4, saves);
             window.Close();
 
             repo.Run("update-ref", "-d", "refs/heads/feature/b");
             await vm.Refresh();
-            Assert.Equal(["b:feature/a", "b:zebra", trunkKey], SectionKeys(vm, "h:branches"));
+            Assert.Equal(
+                new[] { "g:b:feature", "b:feature/a" }.Concat(topic).Append("b:zebra").Append(trunkKey).ToArray(),
+                SectionKeys(vm, "h:branches"));
             Assert.DoesNotContain(vm.Locations, item => item.Key == "b:feature/b");
             Assert.DoesNotContain("refs/heads/feature/b", vm.FavoriteBranchNames);
             Assert.Contains("refs/heads/feature/a", vm.FavoriteBranchNames);
@@ -641,7 +660,7 @@ public class LocationPanelTests
             repo.Run("update-ref", "-d", "refs/remotes/origin/zebra");
             await vm.Refresh();
             Assert.Equal(
-                ["r:origin/feature/b", "r:origin/alpha", "r:origin/side"],
+                ["g:r:origin:feature", "r:origin/feature/b", "r:origin/alpha", "r:origin/side"],
                 SectionKeys(vm, "h:remote:origin"));
             Assert.DoesNotContain("refs/remotes/origin/zebra", vm.FavoriteBranchNames);
             Assert.Contains("refs/heads/zebra", vm.FavoriteBranchNames);

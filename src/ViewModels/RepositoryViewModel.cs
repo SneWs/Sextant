@@ -2267,11 +2267,7 @@ public partial class RepositoryViewModel : ViewModelBase
             });
         }
 
-        _locationRoots.Add(Section(
-            "h:branches",
-            "Branches",
-            HoistFavorites(branches, "b", item => item.SearchText),
-            branches.Count));
+        _locationRoots.Add(Section("h:branches", "Branches", GroupLocations(branches, "b", splitEverySlash: true), branches.Count));
 
         var trackedRefs = state.Refs.Where(reference =>
             reference.Name.StartsWith("refs/remotes/", StringComparison.Ordinal)
@@ -2315,11 +2311,7 @@ public partial class RepositoryViewModel : ViewModelBase
                 });
             }
 
-            _locationRoots.Add(Section(
-                "h:remote:" + group.Key,
-                group.Key,
-                HoistFavorites(tracked, "r:" + group.Key, item => item.Label),
-                tracked.Count));
+            _locationRoots.Add(Section("h:remote:" + group.Key, group.Key, GroupLocations(tracked, "r:" + group.Key, splitEverySlash: true), tracked.Count));
         }
 
         var tags = new List<LocationItem>();
@@ -2586,31 +2578,6 @@ public partial class RepositoryViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Favorites stay out of path grouping. Grouping sorts every path by name, which would bury them.
-    /// A favorite keeps its full short name and is ordered by that name ahead of the grouped rest.
-    /// </summary>
-    private List<LocationItem> HoistFavorites(List<LocationItem> leaves, string scope, Func<LocationItem, string> name)
-    {
-        var favorites = new List<LocationItem>();
-        var rest = new List<LocationItem>();
-        foreach (var leaf in leaves)
-        {
-            if (leaf.IsFavorite)
-                favorites.Add(leaf);
-            else
-                rest.Add(leaf);
-        }
-
-        if (favorites.Count == 0)
-            return GroupLocations(leaves, scope, splitEverySlash: true);
-
-        favorites.Sort((left, right) => StringComparer.Ordinal.Compare(name(left), name(right)));
-        if (rest.Count > 0)
-            favorites.AddRange(GroupLocations(rest, scope, splitEverySlash: true));
-        return favorites;
-    }
-
-    /// <summary>
     /// A favorite whose ref is gone, locally or as a remote-tracking branch, leaves the saved set.
     /// The opening snapshot can paint before refs are read, with an empty list and history generation 0.
     /// That list is not "every favorite is gone".
@@ -2663,6 +2630,7 @@ public partial class RepositoryViewModel : ViewModelBase
             if (node.RefPath is { } path && byPath.TryGetValue(path, out var leaf))
             {
                 leaf.Label = label;
+                leaf.SortName = node.Label;
                 foreach (var child in children)
                     leaf.Children.Add(child);
                 if (children.Count > 0)
@@ -2679,6 +2647,7 @@ public partial class RepositoryViewModel : ViewModelBase
             {
                 Key = "g:" + scope + ":" + node.FullName,
                 Label = label,
+                SortName = node.Label,
                 IconName = children.Count > 0 ? LocationIcons.Folder : "",
             };
             ApplyFold(folder, scope + ":" + node.FullName);
@@ -2687,7 +2656,33 @@ public partial class RepositoryViewModel : ViewModelBase
             list.Add(folder);
         }
 
+        // Favorites, and folders that contain one, stay in this grouped tree and sort ahead of the rest.
+        // The same path still builds the same parent folders. Name breaks ties.
+        if (list.Exists(ContainsFavorite))
+            list.Sort(CompareFavorites);
         return list;
+    }
+
+    private static int CompareFavorites(LocationItem left, LocationItem right)
+    {
+        var leftFavorite = ContainsFavorite(left);
+        var rightFavorite = ContainsFavorite(right);
+        if (leftFavorite != rightFavorite)
+            return leftFavorite ? -1 : 1;
+        return StringComparer.Ordinal.Compare(left.SortName, right.SortName);
+    }
+
+    private static bool ContainsFavorite(LocationItem item)
+    {
+        if (item.IsFavorite)
+            return true;
+        foreach (var child in item.Children)
+        {
+            if (ContainsFavorite(child))
+                return true;
+        }
+
+        return false;
     }
 
     private void ApplyFold(LocationItem item, string collapseKey)
