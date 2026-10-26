@@ -114,6 +114,9 @@ public sealed class RepoLayout
 
     /// <summary>Location rows left collapsed. Missing values in older files leave every row expanded.</summary>
     public List<string> CollapsedLocations { get; set; } = [];
+
+    /// <summary>Local and remote-tracking branches pinned above the other branches in their section. Missing values in older files pin none.</summary>
+    public List<string> FavoriteBranches { get; set; } = [];
 }
 
 public static class RepoLayouts
@@ -140,6 +143,7 @@ public static class RepoLayouts
                 ShowLocations = pair.Value.ShowLocations,
                 HiddenBranches = CopyHidden(pair.Value.HiddenBranches),
                 CollapsedLocations = CopyCollapsed(pair.Value.CollapsedLocations),
+                FavoriteBranches = CopyFavorites(pair.Value.FavoriteBranches),
             };
         }
 
@@ -154,7 +158,8 @@ public static class RepoLayouts
         double files,
         bool showLocations = true,
         IReadOnlyList<string>? hiddenBranches = null,
-        IReadOnlyList<string>? collapsedLocations = null)
+        IReadOnlyList<string>? collapsedLocations = null,
+        IReadOnlyList<string>? favoriteBranches = null)
     {
         var match = FindKey(state, path);
         var hidden = hiddenBranches is null
@@ -163,6 +168,9 @@ public static class RepoLayouts
         var collapsed = collapsedLocations is null
             ? CopyCollapsed(match is null ? null : state.RepoLayouts[match].CollapsedLocations)
             : CopyCollapsed(collapsedLocations);
+        var favorites = favoriteBranches is null
+            ? CopyFavorites(match is null ? null : state.RepoLayouts[match].FavoriteBranches)
+            : CopyFavorites(favoriteBranches);
         if (match is not null && !string.Equals(match, path, StringComparison.Ordinal))
             state.RepoLayouts.Remove(match);
         state.RepoLayouts[path] = new RepoLayout
@@ -173,6 +181,7 @@ public static class RepoLayouts
             ShowLocations = showLocations,
             HiddenBranches = hidden,
             CollapsedLocations = collapsed,
+            FavoriteBranches = favorites,
         };
     }
 
@@ -192,6 +201,16 @@ public static class RepoLayouts
         if (names is null)
             return [];
         return names.Where(BranchVisibility.IsRemembered)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static List<string> CopyFavorites(IEnumerable<string>? names)
+    {
+        if (names is null)
+            return [];
+        return names.Where(BranchVisibility.IsGraphBranch)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();

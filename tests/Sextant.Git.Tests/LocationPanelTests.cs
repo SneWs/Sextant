@@ -474,6 +474,255 @@ public class LocationPanelTests
         }
     }
 
+    [Fact]
+    public async Task Favorite_branches_sort_first_by_name_and_drop_when_the_ref_is_gone()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "root\n");
+        repo.CommitAll("root");
+        var trunk = repo.CurrentBranch();
+        repo.Run("switch", "-c", "feature/a");
+        repo.WriteFile("a.txt", "feature a\n");
+        repo.CommitAll("feature a");
+        repo.Run("switch", "-c", "feature/b");
+        repo.WriteFile("a.txt", "feature b\n");
+        repo.CommitAll("feature b");
+        repo.Run("switch", "-c", "zebra");
+        repo.WriteFile("a.txt", "zebra\n");
+        repo.CommitAll("zebra");
+        repo.Run("tag", "v1");
+        repo.Run("update-ref", "refs/remotes/origin/alpha", "HEAD");
+        repo.Run("update-ref", "refs/remotes/origin/feature/b", "HEAD");
+        repo.Run("update-ref", "refs/remotes/origin/side", "HEAD");
+        repo.Run("update-ref", "refs/remotes/origin/zebra", "HEAD");
+        repo.Run("update-ref", "refs/remotes/origin/HEAD", "HEAD");
+        repo.Run("switch", trunk);
+
+        await session.Dispatch(async () =>
+        {
+            var host = new LocationsHost(repo.Git);
+            var vm = new RepositoryViewModel(host, repo.Directory);
+            var saves = 0;
+            IReadOnlyList<string>? saved = null;
+            host.OnSave = () =>
+            {
+                saves++;
+                saved = vm.FavoriteBranchNames.ToArray();
+            };
+            vm.UseFavoriteBranches(
+            [
+                "refs/heads/gone",
+                "refs/heads/zebra",
+                "refs/heads/feature/b",
+                "refs/tags/v1",
+                "refs/remotes/origin/HEAD",
+                "refs/remotes/origin/zebra",
+                "refs/remotes/origin/feature/b",
+                "stash:abc",
+            ]);
+            Assert.Equal(
+                [
+                    "refs/heads/feature/b",
+                    "refs/heads/gone",
+                    "refs/heads/zebra",
+                    "refs/remotes/origin/feature/b",
+                    "refs/remotes/origin/zebra",
+                ],
+                vm.FavoriteBranchNames);
+            await vm.EnsureLoadedAsync();
+
+            Assert.Equal(
+                [
+                    "refs/heads/feature/b",
+                    "refs/heads/zebra",
+                    "refs/remotes/origin/feature/b",
+                    "refs/remotes/origin/zebra",
+                ],
+                vm.FavoriteBranchNames);
+            Assert.Equal(vm.FavoriteBranchNames, saved);
+            Assert.Equal(1, saves);
+
+            var trunkKey = "b:" + trunk;
+            var folderFirst = string.Compare("feature", trunk, StringComparison.Ordinal) < 0;
+            var grouped = new List<string>();
+            if (!folderFirst)
+                grouped.Add(trunkKey);
+            grouped.Add("g:b:feature");
+            grouped.Add("b:feature/a");
+            if (folderFirst)
+                grouped.Add(trunkKey);
+            Assert.Equal(new[] { "b:feature/b", "b:zebra" }.Concat(grouped).ToArray(), SectionKeys(vm, "h:branches"));
+            Assert.Equal(
+                ["r:origin/feature/b", "r:origin/zebra", "r:origin/alpha", "r:origin/side"],
+                SectionKeys(vm, "h:remote:origin"));
+            Assert.Equal(["b:feature/a"], vm.Locations.Single(item => item.Key == "g:b:feature").Children.Select(child => child.Key).ToArray());
+            Assert.Equal("feature/b", vm.Locations.Single(item => item.Key == "b:feature/b").Label);
+            Assert.Equal("feature/b", vm.Locations.Single(item => item.Key == "r:origin/feature/b").Label);
+            Assert.Equal(1, vm.Locations.Count(item => item.Key == "b:feature/b"));
+
+            var zebra = vm.Locations.Single(item => item.Key == "b:zebra");
+            var featureA = vm.Locations.Single(item => item.Key == "b:feature/a");
+            var current = vm.Locations.Single(item => item.Key == trunkKey);
+            Assert.True(zebra.IsFavorite);
+            Assert.True(zebra.ShowFavorite);
+            Assert.Equal("Unfavorite", zebra.FavoriteLabel);
+            Assert.False(featureA.IsFavorite);
+            Assert.Equal("Favorite", featureA.FavoriteLabel);
+            Assert.Equal(FontWeight.Normal, featureA.Weight);
+            Assert.True(current.IsCurrent);
+            Assert.False(current.IsFavorite);
+            Assert.Equal(FontWeight.SemiBold, current.Weight);
+            Assert.False(vm.Locations.Single(item => item.Key == "t:v1").ShowFavorite);
+            Assert.False(Header(vm, "h:branches").ShowFavorite);
+            Assert.True(vm.Locations.Single(item => item.Key == "r:origin/zebra").IsFavorite);
+
+            var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 900 };
+            var window = new Window { Content = view, Width = 1100, Height = 900 };
+            window.Show();
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            var zebraStar = Star(view, zebra);
+            var zebraEye = view.GetVisualDescendants().OfType<Button>()
+                .Single(button => button.Classes.Contains("eye") && button.IsVisible && button.Command == zebra.HideCommand);
+            Assert.Equal("Unfavorite", ToolTip.GetTip(zebraStar));
+            Assert.Equal("Unfavorite", AutomationProperties.GetName(zebraStar));
+            Assert.Equal(2, VisiblePaths(zebraStar));
+            var featureStar = Star(view, featureA);
+            Assert.Equal("Favorite", AutomationProperties.GetName(featureStar));
+            Assert.Equal(1, VisiblePaths(featureStar));
+            var starAt = zebraStar.TranslatePoint(default, view);
+            var eyeAt = zebraEye.TranslatePoint(default, view);
+            Assert.NotNull(starAt);
+            Assert.NotNull(eyeAt);
+            Assert.True(starAt.Value.X < eyeAt.Value.X, "The star sits beside the eye");
+            Assert.True(Math.Abs(starAt.Value.Y - eyeAt.Value.Y) < 4, "The star shares the eye row");
+            AssertMenuHeader(view, zebra, "Unfavorite");
+            AssertMenuHeader(view, featureA, "Favorite");
+
+            Click(window, Star(view, featureA));
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(["b:feature/a", "b:feature/b", "b:zebra", trunkKey], SectionKeys(vm, "h:branches"));
+            Assert.DoesNotContain(vm.Locations, item => item.Key == "g:b:feature");
+            Assert.Equal(2, saves);
+            Assert.Contains("refs/heads/feature/a", vm.FavoriteBranchNames);
+            featureA = vm.Locations.Single(item => item.Key == "b:feature/a");
+            Assert.True(featureA.IsFavorite);
+            Assert.Equal(2, VisiblePaths(Star(view, featureA)));
+
+            Click(window, Star(view, vm.Locations.Single(item => item.Key == "b:zebra")));
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            var rest = new[] { trunk, "zebra" }.OrderBy(name => name, StringComparer.Ordinal).Select(name => "b:" + name);
+            Assert.Equal(new[] { "b:feature/a", "b:feature/b" }.Concat(rest).ToArray(), SectionKeys(vm, "h:branches"));
+            Assert.False(vm.Locations.Single(item => item.Key == "b:zebra").IsFavorite);
+            Assert.Equal(3, saves);
+            Assert.DoesNotContain("refs/heads/zebra", vm.FavoriteBranchNames);
+
+            Click(window, Star(view, vm.Locations.Single(item => item.Key == "b:zebra")));
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(["b:feature/a", "b:feature/b", "b:zebra", trunkKey], SectionKeys(vm, "h:branches"));
+            Assert.Equal(4, saves);
+            window.Close();
+
+            repo.Run("update-ref", "-d", "refs/heads/feature/b");
+            await vm.Refresh();
+            Assert.Equal(["b:feature/a", "b:zebra", trunkKey], SectionKeys(vm, "h:branches"));
+            Assert.DoesNotContain(vm.Locations, item => item.Key == "b:feature/b");
+            Assert.DoesNotContain("refs/heads/feature/b", vm.FavoriteBranchNames);
+            Assert.Contains("refs/heads/feature/a", vm.FavoriteBranchNames);
+            Assert.Contains("refs/heads/zebra", vm.FavoriteBranchNames);
+            Assert.Contains("refs/remotes/origin/feature/b", vm.FavoriteBranchNames);
+            Assert.Equal(5, saves);
+
+            repo.Run("update-ref", "-d", "refs/remotes/origin/zebra");
+            await vm.Refresh();
+            Assert.Equal(
+                ["r:origin/feature/b", "r:origin/alpha", "r:origin/side"],
+                SectionKeys(vm, "h:remote:origin"));
+            Assert.DoesNotContain("refs/remotes/origin/zebra", vm.FavoriteBranchNames);
+            Assert.Contains("refs/heads/zebra", vm.FavoriteBranchNames);
+            Assert.Contains("refs/remotes/origin/feature/b", vm.FavoriteBranchNames);
+            Assert.Equal(6, saves);
+            Assert.Equal(vm.FavoriteBranchNames, saved);
+
+            var again = new RepositoryViewModel(host, repo.Directory);
+            again.UseFavoriteBranches(vm.FavoriteBranchNames);
+            await again.EnsureLoadedAsync();
+            Assert.Equal(vm.FavoriteBranchNames, again.FavoriteBranchNames);
+            Assert.Equal(SectionKeys(vm, "h:branches"), SectionKeys(again, "h:branches"));
+            Assert.Equal(SectionKeys(vm, "h:remote:origin"), SectionKeys(again, "h:remote:origin"));
+            current = again.Locations.Single(item => item.Key == trunkKey);
+            Assert.True(current.IsCurrent);
+            Assert.Equal(FontWeight.SemiBold, current.Weight);
+            current.FavoriteCommand.Execute(null);
+            current = again.Locations.Single(item => item.Key == trunkKey);
+            Assert.True(current.IsCurrent);
+            Assert.True(current.IsFavorite);
+            Assert.Equal(FontWeight.SemiBold, current.Weight);
+
+            await vm.DisposeAsync();
+            await again.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
+    private static string[] SectionKeys(RepositoryViewModel vm, string header)
+    {
+        var keys = new List<string>();
+        var inside = false;
+        foreach (var item in vm.Locations)
+        {
+            if (!inside)
+            {
+                if (item.Key == header)
+                    inside = true;
+                continue;
+            }
+
+            if (item.IsHeader)
+                break;
+            keys.Add(item.Key);
+        }
+
+        return keys.ToArray();
+    }
+
+    private static Button Star(RepositoryView view, LocationItem item)
+    {
+        var list = view.FindControl<ListBox>("LocationList");
+        Assert.NotNull(list);
+        list.ScrollIntoView(item);
+        view.UpdateLayout();
+        Dispatcher.UIThread.RunJobs();
+        return view.GetVisualDescendants().OfType<Button>()
+            .Single(button => button.Classes.Contains("star") && button.IsVisible && button.Command == item.FavoriteCommand);
+    }
+
+    private static int VisiblePaths(Button button) =>
+        button.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Path>().Count(path => path.IsVisible);
+
+    private static void AssertMenuHeader(RepositoryView view, LocationItem row, string header)
+    {
+        var list = view.FindControl<ListBox>("LocationList");
+        Assert.NotNull(list);
+        list.ScrollIntoView(row);
+        view.UpdateLayout();
+        Dispatcher.UIThread.RunJobs();
+        var border = list.GetVisualDescendants().OfType<Border>()
+            .Single(item => item.DataContext == row && item.ContextMenu is not null);
+        var menu = border.ContextMenu;
+        Assert.NotNull(menu);
+        menu.Open(border);
+        Dispatcher.UIThread.RunJobs();
+        var headers = menu.Items.OfType<MenuItem>().Where(item => item.IsVisible).Select(item => item.Header as string).ToArray();
+        Assert.Contains(header, headers);
+        menu.Close();
+        Dispatcher.UIThread.RunJobs();
+    }
+
     private static Point Origin(Control control, Visual relative)
     {
         var point = control.TranslatePoint(default, relative);

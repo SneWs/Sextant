@@ -222,6 +222,7 @@ public class WorkspaceStoreTests
             Assert.True(older.ShowLocations);
             Assert.Empty(older.HiddenBranches);
             Assert.Empty(older.CollapsedLocations);
+            Assert.Empty(older.FavoriteBranches);
         }
         finally
         {
@@ -294,6 +295,53 @@ public class WorkspaceStoreTests
 
             RepoLayouts.Remember(loaded, @"C:\repos\sextant", 310, 520, 180, collapsedLocations: []);
             Assert.Empty(RepoLayouts.Resolve(loaded, @"C:\repos\sextant").CollapsedLocations);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Favorite_branches_are_stored_per_repository()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-ws-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new WorkspaceStore(directory);
+            var state = store.LoadWorkspace();
+            RepoLayouts.Remember(
+                state,
+                @"C:\repos\sextant",
+                220,
+                520,
+                180,
+                favoriteBranches:
+                [
+                    "refs/tags/v1",
+                    "refs/heads/zebra",
+                    "refs/remotes/origin/HEAD",
+                    "refs/heads/feature/b",
+                    "refs/remotes/origin/zebra",
+                    "stash:abc",
+                    "refs/heads/feature/b",
+                ]);
+            RepoLayouts.Remember(state, @"C:\repos\sextant", 310, 520, 180);
+            RepoLayouts.Remember(state, @"C:\repos\other", 180, 640, 220, favoriteBranches: []);
+            store.SaveWorkspace(state);
+
+            var loaded = store.LoadWorkspace();
+            var sextant = RepoLayouts.Resolve(loaded, @"C:\repos\sextant");
+            var other = RepoLayouts.Resolve(loaded, @"C:\repos\other");
+            Assert.Equal(
+                ["refs/heads/feature/b", "refs/heads/zebra", "refs/remotes/origin/zebra"],
+                sextant.FavoriteBranches);
+            Assert.Empty(other.FavoriteBranches);
+            Assert.Empty(RepoLayouts.Resolve(loaded, @"C:\repos\missing").FavoriteBranches);
+
+            RepoLayouts.Remember(loaded, @"C:\repos\sextant", 310, 520, 180, favoriteBranches: []);
+            Assert.Empty(RepoLayouts.Resolve(loaded, @"C:\repos\sextant").FavoriteBranches);
         }
         finally
         {
