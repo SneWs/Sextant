@@ -15,6 +15,12 @@ public static class WindowInput
 {
     public static async void OnTunnel(MainViewModel vm, KeyEventArgs e)
     {
+        if (ArmBranchShortcut(vm, e))
+            return;
+
+        // Any other key cancels a Create Branch chord that has not been released.
+        DisarmBranchShortcut(vm);
+
         if (AppGestures.Matches(e, Key.P))
         {
             vm.TogglePalette();
@@ -50,15 +56,6 @@ public static class WindowInput
         {
             searchTab.ToggleHistorySearchCommand.Execute(null);
             e.Handled = true;
-            return;
-        }
-
-        if (AppGestures.Matches(e, Key.C, KeyModifiers.Shift)
-            && vm.ActiveTab is { } branchTab)
-        {
-            e.Handled = true;
-            if (branchTab.CanRunCommands)
-                await branchTab.CreateBranchCommand.ExecuteAsync(null);
             return;
         }
 
@@ -158,6 +155,45 @@ public static class WindowInput
             e.Handled = true;
             await vm.RefreshActiveCommand.ExecuteAsync(null);
         }
+    }
+
+    /// <summary>
+    /// Create Branch runs when Ctrl/Cmd+Shift+C is released. The prompt is modal, so opening it
+    /// on key-down disables this window. Wayland drops the key-up while the owner is disabled
+    /// and its repeat timer keeps delivering the shortcut, which opens the prompt again after OK.
+    /// </summary>
+    public static async void OnKeyUp(MainViewModel vm, KeyEventArgs e)
+    {
+        if (!TakeBranchShortcut(vm, e))
+            return;
+        e.Handled = true;
+        if (vm.ActiveTab is { CanRunCommands: true } tab)
+            await tab.CreateBranchCommand.ExecuteAsync(null);
+    }
+
+    private static MainViewModel? _branchShortcutOwner;
+
+    private static bool ArmBranchShortcut(MainViewModel vm, KeyEventArgs e)
+    {
+        if (!AppGestures.Matches(e, Key.C, KeyModifiers.Shift) || vm.ActiveTab is not { } tab)
+            return false;
+        e.Handled = true;
+        _branchShortcutOwner = tab.CanRunCommands ? vm : null;
+        return true;
+    }
+
+    private static void DisarmBranchShortcut(MainViewModel vm)
+    {
+        if (ReferenceEquals(_branchShortcutOwner, vm))
+            _branchShortcutOwner = null;
+    }
+
+    private static bool TakeBranchShortcut(MainViewModel vm, KeyEventArgs e)
+    {
+        if (!ReferenceEquals(_branchShortcutOwner, vm) || e.Key != Key.C)
+            return false;
+        _branchShortcutOwner = null;
+        return true;
     }
 
     public static void OnHistoryEscape(MainViewModel vm, KeyEventArgs e)
