@@ -1098,6 +1098,46 @@ public sealed partial class RepositorySession : IAsyncDisposable
     public Task FetchAllPruneAsync(IProgress<string>? progress, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.FetchAllPrune(_toplevel), progress, cancellationToken);
 
+    public Task FetchPruneAsync(IProgress<string>? progress, CancellationToken cancellationToken) =>
+        MutateAsync(GitCommands.FetchPrune(_toplevel), progress, cancellationToken);
+
+    public Task CollectGarbageAsync(bool aggressive, IProgress<string>? progress, CancellationToken cancellationToken) =>
+        MutateAsync(GitCommands.CollectGarbage(_toplevel, aggressive), progress, cancellationToken);
+
+    public Task<IReadOnlyList<string>> MergedBranchNamesAsync(CancellationToken cancellationToken) =>
+        RunAsync(async ct =>
+        {
+            var output = await _scheduler.ReadAsync(
+                inner => ExecuteAsync(GitCommands.MergedBranches(_toplevel), null, inner),
+                ct).ConfigureAwait(false);
+            Track(output);
+            if (output.ExitCode != 0)
+                throw new GitCommandFailedException(output);
+            return GitCommands.ParseMergedBranches(_encoding.GetString(output.Stdout));
+        }, cancellationToken);
+
+    public Task DeleteBranchesAsync(IReadOnlyList<string> names, CancellationToken cancellationToken)
+    {
+        if (names.Count == 0)
+            return Task.CompletedTask;
+        return MutateAsync(GitCommands.DeleteBranches(_toplevel, names), null, cancellationToken);
+    }
+
+    public Task<string> CleanPreviewAsync(CancellationToken cancellationToken) =>
+        RunAsync(async ct =>
+        {
+            var output = await _scheduler.ReadAsync(
+                inner => ExecuteAsync(GitCommands.CleanUntracked(_toplevel, dryRun: true), null, inner),
+                ct).ConfigureAwait(false);
+            Track(output);
+            if (output.ExitCode != 0)
+                throw new GitCommandFailedException(output);
+            return _encoding.GetString(output.Stdout);
+        }, cancellationToken);
+
+    public Task CleanUntrackedAsync(IProgress<string>? progress, CancellationToken cancellationToken) =>
+        MutateAsync(GitCommands.CleanUntracked(_toplevel, dryRun: false), progress, cancellationToken);
+
     public Task PullAsync(IProgress<string>? progress, CancellationToken cancellationToken, bool rebase = true) =>
         MutateAsync(GitCommands.Pull(_toplevel, rebase), progress, cancellationToken);
 

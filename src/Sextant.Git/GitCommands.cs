@@ -693,6 +693,57 @@ public static class GitCommands
     public static IReadOnlyList<string> FetchAllPrune(string toplevel) =>
         ["-C", toplevel, "fetch", "--all", "--prune", "--progress"];
 
+    /// <summary>Fetches the current remote and drops remote-tracking branches it no longer has.</summary>
+    public static IReadOnlyList<string> FetchPrune(string toplevel) =>
+        ["-C", toplevel, "fetch", "--prune", "--progress"];
+
+    public static IReadOnlyList<string> CollectGarbage(string toplevel, bool aggressive) =>
+        aggressive
+            ? ["-C", toplevel, "gc", "--aggressive"]
+            : ["-C", toplevel, "gc"];
+
+    /// <summary>
+    /// Local branches merged into HEAD. A branch checked out in a worktree has a path and is left out.
+    /// </summary>
+    public static IReadOnlyList<string> MergedBranches(string toplevel) =>
+    [
+        "-C", toplevel, "--no-optional-locks", "for-each-ref",
+        "--merged=HEAD",
+        "--format=%(refname:short)\t%(worktreepath)",
+        "refs/heads",
+    ];
+
+    public static IReadOnlyList<string> ParseMergedBranches(string text)
+    {
+        var names = new List<string>();
+        var normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+        foreach (var line in normalized.Split('\n'))
+        {
+            if (line.Length == 0)
+                continue;
+            var split = line.IndexOf('\t');
+            var name = split < 0 ? line : line[..split];
+            var worktree = split < 0 ? "" : line[(split + 1)..];
+            if (name.Length == 0 || worktree.Length > 0)
+                continue;
+            names.Add(name);
+        }
+
+        return names;
+    }
+
+    public static IReadOnlyList<string> DeleteBranches(string toplevel, IReadOnlyList<string> names)
+    {
+        var arguments = new List<string> { "-C", toplevel, "branch", "-d" };
+        arguments.AddRange(names);
+        return arguments;
+    }
+
+    public static IReadOnlyList<string> CleanUntracked(string toplevel, bool dryRun) =>
+        dryRun
+            ? ["-C", toplevel, "--no-optional-locks", "clean", "-fdn"]
+            : ["-C", toplevel, "clean", "-fd"];
+
     // --autostash stashes tracked changes and applies them when the pull finishes.
     // Pull with rebase always passes rebase: true, even when Settings chooses merge.
     public static IReadOnlyList<string> Pull(string toplevel, bool rebase = true)
