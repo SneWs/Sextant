@@ -3409,7 +3409,7 @@ public partial class RepositoryViewModel : ViewModelBase
                     : UiCommands.Disabled,
             });
             if (SideBySide)
-                AppendSideBySide(hunk);
+                AppendSideBySide(hunk, parts, patch, hunkIndex, lineLabel, staged);
             else
                 AppendInline(hunk, parts, patch, hunkIndex, lineLabel, staged);
         }
@@ -3488,14 +3488,18 @@ public partial class RepositoryViewModel : ViewModelBase
                 ? new AsyncRelayCommand(() => ApplyShownLineAsync(patch, hunkIndex, captured, staged))
                 : UiCommands.Disabled;
             var number = DiffLineNumbers.For(line.Kind, ref oldLine, ref newLine);
-            lines.AddRange(FoldEditorLines(line.Text, number.Old, number.New, "", kind, show, lineLabel, command));
+            lines.AddRange(FoldEditorLines(line.Text, number.Old, number.New, "", kind, show, lineLabel, command, patchLine: captured));
         }
 
-        AddEditor(_linePath, lines, []);
+        var applyLines = parts
+            ? new AsyncRelayCommand<IReadOnlyList<int>>(indexes => ApplyShownLinesAsync(patch, hunkIndex, indexes, staged))
+            : UiCommands.Disabled;
+        AddEditor(_linePath, lines, [], applyLines);
     }
 
-    private void AppendSideBySide(DiffHunk hunk)
+    private void AppendSideBySide(DiffHunk hunk, bool parts, string patch, int hunkIndex, string lineLabel, bool staged)
     {
+        // Removals stay on the left and additions on the right. Each side stages its own lines.
         var left = new List<EditorLine>();
         var right = new List<EditorLine>();
         foreach (var line in DiffLineNumbers.SideBySide(hunk))
@@ -3506,8 +3510,16 @@ public partial class RepositoryViewModel : ViewModelBase
             var rightKind = line.RightText is null
                 ? EditorLineKind.Empty
                 : line.RightAdded ? EditorLineKind.Added : EditorLineKind.Context;
-            var leftLines = FoldEditorLines(line.LeftText, line.LeftNumber, "", "", leftKind, false, "", UiCommands.Disabled, line.LeftText is null);
-            var rightLines = FoldEditorLines(line.RightText, "", line.RightNumber, "", rightKind, false, "", UiCommands.Disabled, line.RightText is null);
+            var leftShow = parts && line.LeftPatch >= 0;
+            var rightShow = parts && line.RightPatch >= 0;
+            var leftCommand = leftShow
+                ? new AsyncRelayCommand(() => ApplyShownLineAsync(patch, hunkIndex, line.LeftPatch, staged))
+                : UiCommands.Disabled;
+            var rightCommand = rightShow
+                ? new AsyncRelayCommand(() => ApplyShownLineAsync(patch, hunkIndex, line.RightPatch, staged))
+                : UiCommands.Disabled;
+            var leftLines = FoldEditorLines(line.LeftText, line.LeftNumber, "", "", leftKind, leftShow, lineLabel, leftCommand, line.LeftText is null, line.LeftPatch);
+            var rightLines = FoldEditorLines(line.RightText, "", line.RightNumber, "", rightKind, rightShow, lineLabel, rightCommand, line.RightText is null, line.RightPatch);
             var count = Math.Max(leftLines.Count, rightLines.Count);
             PadEditorLines(leftLines, count);
             PadEditorLines(rightLines, count);
@@ -3515,10 +3527,13 @@ public partial class RepositoryViewModel : ViewModelBase
             right.AddRange(rightLines);
         }
 
-        AddEditor(_linePath, left, right);
+        var applyLines = parts
+            ? new AsyncRelayCommand<IReadOnlyList<int>>(indexes => ApplyShownLinesAsync(patch, hunkIndex, indexes, staged))
+            : UiCommands.Disabled;
+        AddEditor(_linePath, left, right, applyLines);
     }
 
-    private void AddEditor(string? path, List<EditorLine> lines, List<EditorLine> right)
+    private void AddEditor(string? path, List<EditorLine> lines, List<EditorLine> right, ICommand? applyLines = null)
     {
         if (lines.Count == 0 && right.Count == 0)
             return;
@@ -3528,6 +3543,7 @@ public partial class RepositoryViewModel : ViewModelBase
             SideBySide = right.Count > 0,
             Lines = lines,
             RightLines = right,
+            ApplyLinesCommand = applyLines ?? UiCommands.Disabled,
         });
     }
 
@@ -3540,7 +3556,8 @@ public partial class RepositoryViewModel : ViewModelBase
         bool showAction,
         string actionLabel,
         ICommand command,
-        bool skip = false)
+        bool skip = false,
+        int patchLine = -1)
     {
         if (text is null || skip)
             return [new EditorLine { Kind = EditorLineKind.Empty, SkipCopy = true }];
@@ -3560,6 +3577,7 @@ public partial class RepositoryViewModel : ViewModelBase
                 ShowAction = index == 0 && showAction,
                 ActionLabel = index == 0 ? actionLabel : "",
                 ActionCommand = index == 0 ? command : UiCommands.Disabled,
+                PatchLine = showAction ? patchLine : -1,
             });
         }
 
@@ -3612,13 +3630,21 @@ public partial class RepositoryViewModel : ViewModelBase
         });
     }
 
-    private async Task ApplyShownLineAsync(string patch, int hunkIndex, int lineIndex, bool reverse)
+    private Task ApplyShownLineAsync(string patch, int hunkIndex, int lineIndex, bool reverse) =>
+        ApplyShownLinesAsync(patch, hunkIndex, [lineIndex], reverse);
+
+    private async Task ApplyShownLinesAsync(string patch, int hunkIndex, IReadOnlyList<int>? lineIndexes, bool reverse)
     {
-        if (_session is null || string.IsNullOrEmpty(patch))
+        if (_session is null || string.IsNullOrEmpty(patch) || lineIndexes is null || lineIndexes.Count == 0)
             return;
+        string label;
+        if (lineIndexes.Count > 1)
+            label = reverse ? "Unstaging lines…" : "Staging lines…";
+        else
+            label = reverse ? "Unstaging line…" : "Staging line…";
         try
         {
-            await RunAsync(reverse ? "Unstaging line…" : "Staging line…", ct => _session.ApplyLineAsync(patch, hunkIndex, lineIndex, reverse, ct));
+            await RunAsync(label, ct => _session.ApplyLinesAsync(patch, hunkIndex, lineIndexes, reverse, ct));
         }
         catch (InvalidOperationException exception)
         {

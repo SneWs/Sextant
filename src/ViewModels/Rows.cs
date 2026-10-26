@@ -373,6 +373,12 @@ public sealed class EditorLine
 
     public ICommand ActionCommand { get; init; } = UiCommands.Disabled;
 
+    /// <summary>
+    /// Hunk-body index of this change. Pieces of one wrapped line share it.
+    /// Negative when this row is not a stageable change.
+    /// </summary>
+    public int PatchLine { get; init; } = -1;
+
     /// <summary>This side has no line. Copy leaves it out.</summary>
     public bool SkipCopy { get; init; }
 }
@@ -392,6 +398,9 @@ public sealed class DiffEditorRow : DiffRow
     public IReadOnlyList<EditorLine> Lines { get; init; } = [];
 
     public IReadOnlyList<EditorLine> RightLines { get; init; } = [];
+
+    /// <summary>Stages or unstages the hunk lines named by the argument. The argument is patch-line indexes.</summary>
+    public ICommand ApplyLinesCommand { get; init; } = UiCommands.Disabled;
 
     public int LineCount => Math.Max(Lines.Count, RightLines.Count);
 

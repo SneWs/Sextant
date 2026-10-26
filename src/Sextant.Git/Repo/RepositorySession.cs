@@ -915,11 +915,19 @@ public sealed partial class RepositorySession : IAsyncDisposable
     public Task DiscardHunkAsync(string rawPatch, int hunkIndex, CancellationToken cancellationToken) =>
         ApplyPatchTextAsync(HunkPatch.Slice(rawPatch, hunkIndex), reverse: true, cancellationToken, cached: false);
 
-    public Task ApplyLineAsync(string rawPatch, int hunkIndex, int lineIndex, bool reverse, CancellationToken cancellationToken)
+    public Task ApplyLineAsync(string rawPatch, int hunkIndex, int lineIndex, bool reverse, CancellationToken cancellationToken) =>
+        ApplyLinesAsync(rawPatch, hunkIndex, [lineIndex], reverse, cancellationToken);
+
+    /// <summary>Stages or unstages the named lines of one hunk. Other changes in that hunk stay where they are.</summary>
+    public Task ApplyLinesAsync(string rawPatch, int hunkIndex, IReadOnlyList<int> lineIndexes, bool reverse, CancellationToken cancellationToken)
     {
-        var patch = Staging.LinePatch.Slice(rawPatch, hunkIndex, lineIndex);
+        var patch = lineIndexes.Count == 0
+            ? null
+            : Staging.LinePatch.Slice(rawPatch, hunkIndex, lineIndexes, reverse);
         if (patch is null)
-            throw new InvalidOperationException("That line cannot be staged on its own.");
+            throw new InvalidOperationException(lineIndexes.Count == 1
+                ? "That line cannot be staged on its own."
+                : "Those lines cannot be staged on their own.");
         return ApplyPatchTextAsync(patch, reverse, cancellationToken);
     }
 

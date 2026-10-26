@@ -3,13 +3,20 @@ using System.Text.RegularExpressions;
 namespace Sextant.Git.Staging;
 
 /// <summary>
-/// Builds a one-change patch from a single added or removed line inside a hunk.
-/// Unselected deletions stay as context. Unselected additions are left out.
+/// Builds a patch that keeps the chosen added and removed lines of one hunk.
+/// Staging leaves unselected additions out and keeps unselected deletions as context.
+/// Unstaging keeps unselected additions as context, so the index still matches, and leaves unselected deletions out.
 /// </summary>
 public static partial class LinePatch
 {
-    public static string? Slice(string patch, int hunkIndex, int lineIndex)
+    public static string? Slice(string patch, int hunkIndex, int lineIndex) =>
+        Slice(patch, hunkIndex, [lineIndex], reverse: false);
+
+    public static string? Slice(string patch, int hunkIndex, IReadOnlyList<int> lineIndexes, bool reverse)
     {
+        if (lineIndexes.Count == 0)
+            return null;
+
         var normalized = patch.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
         var starts = new List<int>();
         for (var i = 0; i < normalized.Length; i++)
@@ -35,13 +42,8 @@ public static partial class LinePatch
         var match = HunkPattern().Match(hunkHeader);
         if (!match.Success)
             return null;
-        if (lineIndex < 0 || lineIndex + 1 >= hunkLines.Length)
-            return null;
 
-        var chosen = hunkLines[lineIndex + 1];
-        if (chosen.Length == 0 || (chosen[0] != '+' && chosen[0] != '-'))
-            return null;
-
+        var selected = new HashSet<int>(lineIndexes);
         var suffix = match.Groups[5].Value;
         var oldStart = int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
         var newStartText = match.Groups[3].Value;
@@ -66,12 +68,26 @@ public static partial class LinePatch
 
             var index = i - 1;
             var marker = line.Length == 0 ? ' ' : line[0];
-            var selected = index == lineIndex;
-            if (marker == '+' && !selected)
-                continue;
-            if (marker == '-' && !selected)
+            var chosen = selected.Contains(index);
+            if (marker == '+' && !chosen)
             {
-                rebuilt.Add(" " + (line.Length > 0 ? line[1..] : ""));
+                // An unselected addition is not in the index yet. Staging drops it.
+                // Unstaging has to keep it, or the reverse patch cannot find the later lines.
+                if (!reverse)
+                    continue;
+                rebuilt.Add(AsContext(line));
+                oldCount++;
+                newCount++;
+                continue;
+            }
+
+            if (marker == '-' && !chosen)
+            {
+                // An unselected deletion is still in the index. Staging keeps that line as context.
+                // Unstaging leaves it out so the line stays deleted.
+                if (reverse)
+                    continue;
+                rebuilt.Add(AsContext(line));
                 oldCount++;
                 newCount++;
                 continue;
@@ -89,20 +105,21 @@ public static partial class LinePatch
                     newCount++;
                 if (text[0] is '+' or '-')
                     changed = true;
-                continue;
             }
         }
 
         if (!changed)
             return null;
 
-        var result = header
+        return header
             + FormattableString.Invariant($"@@ -{oldStart},{oldCount} +{newStart},{newCount} @@{suffix}")
             + "\n"
             + string.Join('\n', rebuilt)
             + "\n";
-        return result;
     }
+
+    private static string AsContext(string line) =>
+        " " + (line.Length > 0 ? line[1..] : "");
 
     [GeneratedRegex(@"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$", RegexOptions.CultureInvariant)]
     private static partial Regex HunkPattern();
