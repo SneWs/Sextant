@@ -114,9 +114,7 @@ public class DiffHeaderLayoutTests
                 var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 700 };
                 window = new Window { Content = view, Width = 1100, Height = 700 };
                 window.Show();
-                Settle(view);
-                var stage = view.GetVisualDescendants().OfType<Button>()
-                    .Single(button => ReferenceEquals(button.DataContext, header) && button.Content as string == "Stage file");
+                var stage = FileButton(view, header, "Stage file");
                 Assert.True(stage.IsEffectivelyVisible);
                 Assert.Same(header.ActionCommand, stage.Command);
                 var point = stage.TranslatePoint(new Point(stage.Bounds.Width / 2, stage.Bounds.Height / 2), window);
@@ -142,9 +140,7 @@ public class DiffHeaderLayoutTests
                 Assert.Equal("Unstage file", header.ActionLabel);
                 Assert.True(header.ShowAction);
                 Assert.Same(staged.UnstageCommand, header.ActionCommand);
-                Settle(view);
-                var unstage = view.GetVisualDescendants().OfType<Button>()
-                    .Single(button => ReferenceEquals(button.DataContext, header) && button.Content as string == "Unstage file");
+                var unstage = FileButton(view, header, "Unstage file");
                 Assert.True(unstage.IsEffectivelyVisible);
                 Assert.Same(header.ActionCommand, unstage.Command);
                 await Assert.IsAssignableFrom<IAsyncRelayCommand>(header.ActionCommand).ExecuteAsync(null);
@@ -324,6 +320,28 @@ public class DiffHeaderLayoutTests
         CanFold = true,
         StagingFile = new FileRowViewModel { Path = name, ShowStage = true },
     };
+
+    /// <summary>
+    /// The diff list virtualizes rows. A side-by-side file is tall, and staging rebuilds the list
+    /// while the old scroll offset can still point at another file, so the header has to be brought
+    /// into view before its button exists.
+    /// </summary>
+    private static Button FileButton(RepositoryView view, DiffFileRow header, string label)
+    {
+        var list = view.FindControl<CopyListBox>("DiffList");
+        Assert.NotNull(list);
+        Button? button = null;
+        for (var pass = 0; pass < 8 && button is null; pass++)
+        {
+            list.ScrollIntoView(header);
+            Settle(view);
+            button = view.GetVisualDescendants().OfType<Button>().FirstOrDefault(candidate =>
+                ReferenceEquals(candidate.DataContext, header) && candidate.Content as string == label);
+        }
+
+        Assert.NotNull(button);
+        return button;
+    }
 
     private static void Settle(Control view)
     {
