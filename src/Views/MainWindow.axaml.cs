@@ -22,6 +22,7 @@ public partial class MainWindow : Window
             DockChrome.Ensure(app);
         InitializeComponent();
         AddHandler(KeyDownEvent, OnTunnelKey, RoutingStrategies.Tunnel);
+        AddHandler(KeyUpEvent, OnTunnelKeyUp, RoutingStrategies.Tunnel);
         AddHandler(KeyDownEvent, OnBubbleKey, RoutingStrategies.Bubble);
         SizeChanged += (_, _) => RememberWindow();
         PositionChanged += (_, _) => RememberWindow();
@@ -338,6 +339,12 @@ public partial class MainWindow : Window
     {
         if (DataContext is MainViewModel vm)
             WindowInput.OnTunnel(vm, e);
+    }
+
+    private void OnTunnelKeyUp(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is MainViewModel vm)
+            WindowInput.OnKeyUp(vm, e);
     }
 
     private void OnBubbleKey(object? sender, KeyEventArgs e)

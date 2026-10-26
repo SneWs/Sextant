@@ -14,10 +14,13 @@ public sealed class SextantHostWindow : HostWindow
     {
         _dock = dock;
         AddHandler(KeyDownEvent, OnTunnel, RoutingStrategies.Tunnel);
+        AddHandler(KeyUpEvent, OnKeyUp, RoutingStrategies.Tunnel);
         AddHandler(KeyDownEvent, OnBubble, RoutingStrategies.Bubble);
     }
 
     private void OnTunnel(object? sender, KeyEventArgs e) => WindowInput.OnTunnel(_dock.Model, e);
+
+    private void OnKeyUp(object? sender, KeyEventArgs e) => WindowInput.OnKeyUp(_dock.Model, e);
 
     private void OnBubble(object? sender, KeyEventArgs e) => WindowInput.OnHistoryEscape(_dock.Model, e);
 }
