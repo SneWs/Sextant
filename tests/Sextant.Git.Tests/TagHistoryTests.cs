@@ -6,6 +6,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Sextant.Git;
+using Sextant.Git.Models;
 using Sextant.Services;
 using Sextant.ViewModels;
 using Sextant.Views;
@@ -77,10 +78,13 @@ public class TagHistoryTests
             Assert.True(chip.BorderThickness.Left > 0);
             Assert.False(IsClear(chip.Background));
             var subject = commit.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text == "second");
-            Assert.True(Left(chip, commit) > Right(subject, commit), $"chip {Left(chip, commit)} subject {Right(subject, commit)}");
+            var textColumn = subject.Parent as Control;
+            Assert.NotNull(textColumn);
+            Assert.True(Right(textColumn, commit) > Left(chip, commit), $"text {Right(textColumn, commit)} chip {Left(chip, commit)}");
             var count = commit.GetVisualDescendants().OfType<Border>().Single(border => border.Name == "RowFileCountChip");
             Assert.True(Right(chip, commit) < Left(count, commit), $"tag right {Right(chip, commit)} count left {Left(count, commit)}");
-            Assert.True(Right(count, commit) > commit.Bounds.Width - 20, $"count right {Right(count, commit)} row {commit.Bounds.Width}");
+            var scroll = graph.GetVisualDescendants().OfType<ScrollViewer>().First();
+            AssertNearViewportRight(count, scroll);
             var refs = commit.GetVisualDescendants().OfType<Border>().Where(border => border.Classes.Contains("reflabel")).ToList();
             Assert.NotEmpty(refs);
             Assert.True(Right(refs[^1], commit) < Left(chip, commit), "Branch labels should precede the tag and file count.");
@@ -103,6 +107,111 @@ public class TagHistoryTests
             window.Close();
             await vm.DisposeAsync();
         }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Branch_tags_and_file_count_stay_on_the_visible_right()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("alpha");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new TagHost(repo.Git), repo.Directory);
+            await vm.EnsureLoadedAsync();
+            vm.GraphWidth = 240;
+            var wide = new GraphRowViewModel
+            {
+                ShowLanes = true,
+                DrawLanes = true,
+                Subject = new string('s', 80),
+                Detail = "detail",
+                Refs = ["release/this-branch-name-is-intentionally-long"],
+                Tags = ["v9"],
+                FileCountText = "12",
+                Lanes = new LaneGeometry
+                {
+                    NodeLane = 39,
+                    LaneCount = 40,
+                    IncomingLanes = [],
+                    ThroughLanes = [],
+                    Edges = [],
+                },
+            };
+            var other = new GraphRowViewModel
+            {
+                ShowLanes = true,
+                DrawLanes = true,
+                Subject = "short",
+                Refs = ["main"],
+                Tags = ["v1"],
+                FileCountText = "1",
+                Lanes = new LaneGeometry
+                {
+                    NodeLane = 0,
+                    LaneCount = 1,
+                    IncomingLanes = [],
+                    ThroughLanes = [],
+                    Edges = [],
+                },
+            };
+            vm.Rows.Insert(0, wide);
+            vm.Rows.Insert(1, other);
+
+            var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 700 };
+            var window = new Window { Content = view, Width = 1100, Height = 700 };
+            window.Show();
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            var list = view.FindControl<ListBox>("GraphList");
+            Assert.NotNull(list);
+            var scroll = list.GetVisualDescendants().OfType<ScrollViewer>().First();
+            Assert.True(scroll.Extent.Width > scroll.Viewport.Width + 40, $"extent {scroll.Extent.Width} viewport {scroll.Viewport.Width}");
+            var wideItem = list.ContainerFromItem(wide) as ListBoxItem;
+            var otherItem = list.ContainerFromItem(other) as ListBoxItem;
+            Assert.NotNull(wideItem);
+            Assert.NotNull(otherItem);
+
+            var wideCount = Chip(wideItem, "RowFileCountChip");
+            var otherCount = Chip(otherItem, "RowFileCountChip");
+            AssertNearViewportRight(wideCount, scroll);
+            AssertNearViewportRight(otherCount, scroll);
+            Assert.InRange(Math.Abs(Right(wideCount, scroll) - Right(otherCount, scroll)), 0, 1);
+            var branch = wideItem.GetVisualDescendants().OfType<Border>().Single(border => border.Classes.Contains("reflabel"));
+            var tag = wideItem.GetVisualDescendants().OfType<Border>().Single(border => border.Classes.Contains("taglabel"));
+            Assert.True(Right(branch, wideItem) < Left(tag, wideItem));
+            Assert.True(Right(tag, wideItem) < Left(wideCount, wideItem));
+            Assert.True(Left(branch, scroll) < 0, $"branch left {Left(branch, scroll)}");
+            var subject = wideItem.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text == wide.Subject);
+            var textColumn = subject.Parent as Control;
+            Assert.NotNull(textColumn);
+            Assert.True(Right(textColumn, wideItem) > Left(tag, wideItem), $"text {Right(textColumn, wideItem)} tag {Left(tag, wideItem)}");
+
+            var before = Right(wideCount, scroll);
+            scroll.Offset = new Vector(180, scroll.Offset.Y);
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            view.UpdateLayout();
+            Assert.True(scroll.Offset.X > 100, $"offset {scroll.Offset.X}");
+            AssertNearViewportRight(wideCount, scroll);
+            Assert.InRange(Math.Abs(Right(wideCount, scroll) - before), 0, 2);
+            Assert.True(Right(textColumn, wideItem) > Left(tag, wideItem));
+
+            window.Close();
+            await vm.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
+    private static Border Chip(ListBoxItem row, string name) =>
+        row.GetVisualDescendants().OfType<Border>().Single(border => border.Name == name);
+
+    private static void AssertNearViewportRight(Control control, ScrollViewer scroll)
+    {
+        var gap = scroll.Viewport.Width - Right(control, scroll);
+        Assert.InRange(gap, -1, 28);
     }
 
     private static void Click(Window window, ListBox list, object item)

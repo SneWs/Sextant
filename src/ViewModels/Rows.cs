@@ -55,7 +55,9 @@ public partial class GraphRowViewModel : ObservableObject
     /// <summary>Changed-file count drawn as a pill on the right of the history row. Empty until the batch load fills it.</summary>
     [ObservableProperty]
     public partial string FileCountText { get; set; } = "";
-    
+
+    partial void OnFileCountTextChanged(string value) => OnPropertyChanged(nameof(HasLabels));
+
     [ObservableProperty]
     public partial string FileCountTooltip { get; set; } = "";
 
@@ -68,6 +70,9 @@ public partial class GraphRowViewModel : ObservableObject
     public IReadOnlyList<string> Refs { get; init; } = [];
 
     public bool HasRefs => Refs.Count > 0;
+
+    /// <summary>Branch labels, tags, or a file count. The floating plate stays hidden until one of them exists.</summary>
+    public bool HasLabels => HasRefs || HasTags || FileCountText.Length > 0;
 
     [ObservableProperty]
     public partial bool IsHead { get; set; }
