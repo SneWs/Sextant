@@ -162,6 +162,16 @@
                     <NativeMenuItem Header="_Fetch LFS objects" Command="{Binding FetchLfsCommand}"/>
                     <NativeMenuItem Header="_Pull LFS files" Command="{Binding PullLfsCommand}"/>
                     <NativeMenuItemSeparator/>
+                    <NativeMenuItem Header="_Maintenance">
+                        <NativeMenu>
+                            <NativeMenuItem Header="_Git GC" Command="{Binding CollectGarbageCommand}"/>
+                            <NativeMenuItem Header="Git GC _aggressively" Command="{Binding CollectGarbageAggressivelyCommand}"/>
+                            <NativeMenuItem Header="_Delete merged branches" Command="{Binding DeleteMergedBranchesCommand}"/>
+                            <NativeMenuItem Header="_Fetch and prune" Command="{Binding FetchAndPruneCommand}"/>
+                            <NativeMenuItem Header="_Clean untracked files" Command="{Binding CleanUntrackedFilesCommand}"/>
+                        </NativeMenu>
+                    </NativeMenuItem>
+                    <NativeMenuItemSeparator/>
                     <NativeMenuItem Header="_Search" Command="{Binding ToggleHistorySearchCommand}" Gesture="{app:CommandGesture Key=F}"/>
                 </NativeMenu>
             </NativeMenuItem>

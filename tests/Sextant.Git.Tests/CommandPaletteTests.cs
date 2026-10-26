@@ -210,6 +210,11 @@ public class CommandPaletteTests
                 Assert.Contains(vm.PaletteMatches, item => item.Title == "Command log");
                 Assert.Contains(vm.PaletteMatches, item => item.Title == "Save layout");
                 Assert.Contains(vm.PaletteMatches, item => item.Title == "Restore layout");
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Git GC");
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Git GC aggressively");
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Delete merged branches");
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Fetch and prune");
+                Assert.Contains(vm.PaletteMatches, item => item.Title == "Clean untracked files");
 
                 vm.ClosePalette();
                 tab.ShowingWorkingCopy = false;

@@ -417,6 +417,21 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     private Task FetchLfs() => ActiveTab?.FetchLfsCommand.ExecuteAsync(null) ?? Task.CompletedTask;
 
     [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
+    private Task CollectGarbage() => ActiveTab?.CollectGarbageCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+
+    [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
+    private Task CollectGarbageAggressively() => ActiveTab?.CollectGarbageAggressivelyCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+
+    [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
+    private Task FetchAndPrune() => ActiveTab?.FetchAndPruneCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+
+    [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
+    private Task DeleteMergedBranches() => ActiveTab?.DeleteMergedBranchesCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+
+    [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
+    private Task CleanUntrackedFiles() => ActiveTab?.CleanUntrackedFilesCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+
+    [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
     private Task PullLfs() => ActiveTab?.PullLfsCommand.ExecuteAsync(null) ?? Task.CompletedTask;
 
     [RelayCommand(CanExecute = nameof(CanRunRepositoryCommands))]
@@ -656,6 +671,11 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         ApplyPatchCommand.NotifyCanExecuteChanged();
         FetchLfsCommand.NotifyCanExecuteChanged();
         PullLfsCommand.NotifyCanExecuteChanged();
+        CollectGarbageCommand.NotifyCanExecuteChanged();
+        CollectGarbageAggressivelyCommand.NotifyCanExecuteChanged();
+        FetchAndPruneCommand.NotifyCanExecuteChanged();
+        DeleteMergedBranchesCommand.NotifyCanExecuteChanged();
+        CleanUntrackedFilesCommand.NotifyCanExecuteChanged();
         PullCommand.NotifyCanExecuteChanged();
         PushCommand.NotifyCanExecuteChanged();
         ToggleHistorySearchCommand.NotifyCanExecuteChanged();
@@ -1318,6 +1338,11 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _palette.Add(new PaletteItem { Title = "Fetch", Run = tab.Fetch });
             _palette.Add(new PaletteItem { Title = "Fetch all", Run = tab.FetchAll });
             _palette.Add(new PaletteItem { Title = "Fetch all and clean up", Run = tab.FetchAllAndCleanUp });
+            _palette.Add(new PaletteItem { Title = "Fetch and prune", Run = tab.FetchAndPrune });
+            _palette.Add(new PaletteItem { Title = "Git GC", Run = tab.CollectGarbage });
+            _palette.Add(new PaletteItem { Title = "Git GC aggressively", Run = tab.CollectGarbageAggressively });
+            _palette.Add(new PaletteItem { Title = "Delete merged branches", Run = tab.DeleteMergedBranches });
+            _palette.Add(new PaletteItem { Title = "Clean untracked files", Run = tab.CleanUntrackedFiles });
             _palette.Add(new PaletteItem { Title = "Pull", Run = tab.Pull });
             if (tab.CanPush)
             {

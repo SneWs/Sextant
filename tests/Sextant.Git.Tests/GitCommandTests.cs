@@ -37,6 +37,17 @@ public class GitCommandTests
         Assert.DoesNotContain("--prune", GitCommands.Fetch("repo"));
         Assert.Equal(["-C", "repo", "fetch", "--all", "--progress"], GitCommands.FetchAll("repo"));
         Assert.Equal(["-C", "repo", "fetch", "--all", "--prune", "--progress"], GitCommands.FetchAllPrune("repo"));
+        Assert.Equal(["-C", "repo", "fetch", "--prune", "--progress"], GitCommands.FetchPrune("repo"));
+        Assert.DoesNotContain("--all", GitCommands.FetchPrune("repo"));
+        Assert.Equal(["-C", "repo", "gc"], GitCommands.CollectGarbage("repo", aggressive: false));
+        Assert.Equal(["-C", "repo", "gc", "--aggressive"], GitCommands.CollectGarbage("repo", aggressive: true));
+        Assert.Contains("--no-optional-locks", GitCommands.MergedBranches("repo"));
+        Assert.Contains("refs/heads", GitCommands.MergedBranches("repo"));
+        Assert.Equal(["done"], GitCommands.ParseMergedBranches("done\t\nlinked\t/tmp/wt\nmaster\t/tmp/repo\n"));
+        Assert.Equal(["-C", "repo", "branch", "-d", "done", "old"], GitCommands.DeleteBranches("repo", ["done", "old"]));
+        Assert.Equal(["-C", "repo", "--no-optional-locks", "clean", "-fdn"], GitCommands.CleanUntracked("repo", dryRun: true));
+        Assert.Equal(["-C", "repo", "clean", "-fd"], GitCommands.CleanUntracked("repo", dryRun: false));
+        Assert.DoesNotContain("-x", GitCommands.CleanUntracked("repo", dryRun: false));
         Assert.Equal(["-C", "repo", "branch", "topic", "abc"], GitCommands.CreateBranchAt("repo", "topic", "abc"));
         Assert.Equal(["-C", "repo", "--no-optional-locks", "format-patch", "-1", "--stdout", "abc"], GitCommands.FormatPatch("repo", "abc"));
         Assert.Equal(["-C", "repo", "--no-optional-locks", "check-attr", "--stdin", "-z", "filter"], GitCommands.CheckLfsAttr("repo", null));
