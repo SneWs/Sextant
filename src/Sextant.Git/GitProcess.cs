@@ -72,6 +72,10 @@ public sealed class GitProcessRunner
         {
             throw new GitCommandFailedException("The repository folder is not there.");
         }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 206)
+        {
+            throw new GitCommandFailedException("The git command was too long to start.");
+        }
 
         using var registration = cancellationToken.Register(() => TryKill(process));
         var stdoutTask = ReadAllAsync(process.StandardOutput.BaseStream);

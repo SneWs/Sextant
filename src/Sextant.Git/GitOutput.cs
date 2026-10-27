@@ -17,6 +17,9 @@ public sealed class GitOutput
     public required IReadOnlyList<string> DisplayArguments { get; init; }
 }
 
+/// <summary>Arguments for one git process. Standard input carries revisions when they do not fit on the command line.</summary>
+public readonly record struct GitInvocation(IReadOnlyList<string> Arguments, byte[]? StandardInput);
+
 public sealed class GitRequest
 {
     public required string Executable { get; init; }

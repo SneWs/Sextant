@@ -183,6 +183,8 @@ On 2026-10-21 location icons are built for the dispatcher that draws them. A geo
 
 On 2026-10-21 a repository tab can be dragged sideways to a new place in the strip. The new order is written with the open tabs, and the close button does not start a drag. Moving a tab no longer treats that repository as closed. `Dragging_a_repository_tab_reorders_it_and_keeps_that_order` passed. The desktop window was not launched.
 
+On 2026-10-21 hiding every branch but one in a repository with thousands of branches no longer builds a `git log` command that Windows rejects as too long. A short hidden set still uses `--exclude`. A longer set names the branches that remain visible. When those names still do not fit, `git log --stdin` reads them. A command that is still too long fails as a git error instead of an unhandled process exception. `Log_names_visible_branches_when_excludes_exceed_the_command_line`, `Log_reads_visible_branches_from_stdin_when_those_names_do_not_fit`, and `Hiding_every_branch_but_one_keeps_the_git_command_short` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
