@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Text;
 using Sextant.Git.Models;
 using Sextant.Git.Parsing;
 using Sextant.Git.Repo;
@@ -62,6 +64,80 @@ public class BranchVisibilityTests
         Assert.Contains("feature/grass", pinned);
         Assert.DoesNotContain(pinned, argument => argument.StartsWith("--exclude=", StringComparison.Ordinal));
         Assert.DoesNotContain("--branches", pinned);
+    }
+
+    [Fact]
+    public void Log_names_visible_branches_when_excludes_exceed_the_command_line()
+    {
+        var hidden = new string[1500];
+        for (var i = 0; i < hidden.Length; i++)
+            hidden[i] = "refs/heads/b" + i.ToString("0000");
+        var kept = GitCommands.LogInvocation(
+            "repo",
+            0,
+            10,
+            hiddenBranches: hidden,
+            visibleBranches: ["refs/heads/main", "refs/tags/v1"],
+            firstParent: true);
+        Assert.Null(kept.StandardInput);
+        Assert.Contains("refs/heads/main", kept.Arguments);
+        Assert.Contains("HEAD", kept.Arguments);
+        Assert.Contains("--first-parent", kept.Arguments);
+        Assert.DoesNotContain("refs/tags/v1", kept.Arguments);
+        Assert.DoesNotContain(kept.Arguments, argument => argument.StartsWith("--exclude=", StringComparison.Ordinal));
+        Assert.DoesNotContain("--branches", kept.Arguments);
+        Assert.DoesNotContain("--remotes", kept.Arguments);
+        Assert.DoesNotContain("--stdin", kept.Arguments);
+
+        var stillShort = GitCommands.LogInvocation(
+            "repo",
+            0,
+            10,
+            hiddenBranches: ["refs/heads/feature/grass"],
+            visibleBranches: ["refs/heads/main"]);
+        Assert.Contains("--exclude=feature/grass", stillShort.Arguments);
+        Assert.Contains("--branches", stillShort.Arguments);
+        Assert.Null(stillShort.StandardInput);
+
+        var nowhere = GitCommands.LogInvocation(
+            "repo",
+            0,
+            10,
+            includeHead: false,
+            hiddenBranches: hidden,
+            visibleBranches: []);
+        Assert.Contains("--glob=refs/../none", nowhere.Arguments);
+        Assert.DoesNotContain(nowhere.Arguments, argument => argument == "HEAD");
+        Assert.Null(nowhere.StandardInput);
+    }
+
+    [Fact]
+    public void Log_reads_visible_branches_from_stdin_when_those_names_do_not_fit()
+    {
+        var hidden = new string[800];
+        var visible = new string[800];
+        for (var i = 0; i < hidden.Length; i++)
+        {
+            var name = new string('n', 40) + i.ToString("0000");
+            hidden[i] = "refs/heads/h" + name;
+            visible[i] = "refs/heads/v" + name;
+        }
+
+        var invocation = GitCommands.LogInvocation(
+            "repo",
+            0,
+            10,
+            includeHead: false,
+            hiddenBranches: hidden,
+            visibleBranches: visible);
+        Assert.Contains("--stdin", invocation.Arguments);
+        Assert.DoesNotContain(invocation.Arguments, argument => argument.StartsWith("refs/", StringComparison.Ordinal));
+        Assert.DoesNotContain(invocation.Arguments, argument => argument.StartsWith("--exclude=", StringComparison.Ordinal));
+        Assert.NotNull(invocation.StandardInput);
+        var text = Encoding.UTF8.GetString(invocation.StandardInput);
+        Assert.Contains(visible[0], text);
+        Assert.Contains(visible[^1], text);
+        Assert.EndsWith("\n", text);
     }
 
     [Fact]
@@ -316,6 +392,69 @@ public class BranchVisibilityTests
         Assert.Equal("Hiding feature/grass", session.Snapshot().HistoryLabel);
         Assert.Equal(1, session.Snapshot().Commands.Count(command => command.Arguments.Contains("log")));
         Assert.Contains("--exclude=feature/grass", LastLog(session));
+    }
+
+    [Fact]
+    public async Task Hiding_every_branch_but_one_keeps_the_git_command_short()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "root\n");
+        repo.CommitAll("root");
+        var trunk = repo.CurrentBranch();
+        var trunkRef = "refs/heads/" + trunk;
+        repo.Run("switch", "-c", "feature/grass");
+        repo.WriteFile("c.txt", "feature\n");
+        repo.CommitAll("feature-only");
+        var feature = repo.RunCapture("rev-parse", "HEAD").Trim();
+        repo.Run("switch", trunk);
+        repo.WriteFile("a.txt", "trunk\n");
+        repo.CommitAll("trunk-only");
+
+        var script = new StringBuilder();
+        for (var i = 0; i < 1500; i++)
+            script.Append("update refs/heads/b").Append(i.ToString("0000")).Append(' ').Append(feature).Append('\n');
+        UpdateRefs(repo, script.ToString());
+
+        await using var session = await Open(repo);
+        await session.SetHiddenBranchesAsync(
+            BranchVisibility.HiddenExcept(session.Snapshot().Refs, trunkRef),
+            CancellationToken.None);
+        Assert.Equal(["root", "trunk-only"], Subjects(session));
+        Assert.DoesNotContain(Subjects(session), subject => subject == "feature-only");
+        var log = LastLog(session);
+        Assert.Contains(trunkRef, log);
+        Assert.Contains("--first-parent", log);
+        Assert.DoesNotContain(log, argument => argument.StartsWith("--exclude=", StringComparison.Ordinal));
+        Assert.DoesNotContain("--stdin", log);
+        var length = 0;
+        foreach (var argument in log)
+            length += argument.Length + 1;
+        Assert.True(length < GitCommands.MaxCommandLine, $"log command length {length}");
+    }
+
+    private static void UpdateRefs(TempRepo repo, string script)
+    {
+        var info = new ProcessStartInfo
+        {
+            FileName = repo.Git,
+            WorkingDirectory = repo.Directory,
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        };
+        info.ArgumentList.Add("-C");
+        info.ArgumentList.Add(repo.Directory);
+        info.ArgumentList.Add("update-ref");
+        info.ArgumentList.Add("--stdin");
+        using var process = Process.Start(info) ?? throw new InvalidOperationException("git did not start.");
+        process.StandardInput.Write(script);
+        process.StandardInput.Close();
+        var error = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException(error);
     }
 
     private static string[] Subjects(RepositorySession session) =>

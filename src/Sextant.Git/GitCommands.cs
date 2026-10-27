@@ -78,7 +78,47 @@ public static class GitCommands
         string? path = null,
         IReadOnlyCollection<string>? hiddenBranches = null,
         IReadOnlyList<string>? visibleStashes = null,
-        bool firstParent = false)
+        bool firstParent = false,
+        IReadOnlyCollection<string>? visibleBranches = null) =>
+        LogInvocation(
+            toplevel,
+            skip,
+            count,
+            includeHead,
+            includeStash,
+            revision,
+            grep,
+            author,
+            path,
+            hiddenBranches,
+            visibleStashes,
+            firstParent,
+            visibleBranches).Arguments;
+
+    /// <summary>
+    /// Windows CreateProcess rejects a command line longer than 32767 characters. A repository
+    /// with thousands of hidden branches used to pass each one as <c>--exclude</c> twice.
+    /// </summary>
+    public const int MaxCommandLine = 24000;
+
+    /// <summary>
+    /// The history walk. <see cref="GitInvocation.StandardInput"/> is set when the visible tips
+    /// themselves do not fit on the command line, and <c>git log --stdin</c> reads them.
+    /// </summary>
+    public static GitInvocation LogInvocation(
+        string toplevel,
+        int skip,
+        int count,
+        bool includeHead = true,
+        bool includeStash = false,
+        string? revision = null,
+        string? grep = null,
+        string? author = null,
+        string? path = null,
+        IReadOnlyCollection<string>? hiddenBranches = null,
+        IReadOnlyList<string>? visibleStashes = null,
+        bool firstParent = false,
+        IReadOnlyCollection<string>? visibleBranches = null)
     {
         // An unborn HEAD (fresh init, or an orphan branch) is not a revision. Passing it
         // makes log exit 128 with "ambiguous argument 'HEAD'" before --branches is considered.
@@ -91,35 +131,102 @@ public static class GitCommands
         if (!string.IsNullOrEmpty(revision))
         {
             arguments.Add(revision);
+            AppendLogTail(arguments, grep, author, count, skip, path);
+            return new GitInvocation(arguments, null);
+        }
+
+        var excluded = ExcludePatterns(hiddenBranches);
+        if (includeHead)
+            arguments.Add("HEAD");
+        if (excluded.Count == 0)
+        {
+            arguments.Add("--branches");
+            arguments.Add("--tags");
+            arguments.Add("--remotes");
         }
         else
         {
-            var excluded = ExcludePatterns(hiddenBranches);
-            if (includeHead)
-                arguments.Add("HEAD");
-            if (excluded.Count == 0)
-            {
-                arguments.Add("--branches");
-                arguments.Add("--tags");
-                arguments.Add("--remotes");
-            }
-            else
-            {
-                // --exclude applies only to the next --branches or --remotes, then git clears it.
-                // Tags stay out while a branch is hidden, or a tag would bring that branch's commits back.
-                // refs/remotes/*/HEAD is not a row the user can hide, and --remotes would walk it anyway.
-                // A stash revision is explicit, so its eye decides whether it is a root.
-                AddExcludes(arguments, excluded);
-                arguments.Add("--branches");
-                AddExcludes(arguments, excluded);
-                arguments.Add("--exclude=*/HEAD");
-                arguments.Add("--remotes");
-            }
-
-            foreach (var stash in StashTips(includeStash, visibleStashes))
-                arguments.Add(stash);
+            // --exclude applies only to the next --branches or --remotes, then git clears it.
+            // Tags stay out while a branch is hidden, or a tag would bring that branch's commits back.
+            // refs/remotes/*/HEAD is not a row the user can hide, and --remotes would walk it anyway.
+            // A stash revision is explicit, so its eye decides whether it is a root.
+            AddExcludes(arguments, excluded);
+            arguments.Add("--branches");
+            AddExcludes(arguments, excluded);
+            arguments.Add("--exclude=*/HEAD");
+            arguments.Add("--remotes");
         }
 
+        foreach (var stash in StashTips(includeStash, visibleStashes))
+            arguments.Add(stash);
+        AppendLogTail(arguments, grep, author, count, skip, path);
+        if (excluded.Count == 0 || visibleBranches is null || QuotedLength(arguments) <= MaxCommandLine)
+            return new GitInvocation(arguments, null);
+        return WalkVisible(toplevel, skip, count, includeHead, includeStash, grep, author, path, visibleStashes, firstParent, visibleBranches);
+    }
+
+    /// <summary>
+    /// Names the branches still shown. An empty tip list uses a glob that cannot match a ref,
+    /// because <c>git log</c> with no tips walks HEAD.
+    /// </summary>
+    private static GitInvocation WalkVisible(
+        string toplevel,
+        int skip,
+        int count,
+        bool includeHead,
+        bool includeStash,
+        string? grep,
+        string? author,
+        string? path,
+        IReadOnlyList<string>? visibleStashes,
+        bool firstParent,
+        IReadOnlyCollection<string> visibleBranches)
+    {
+        var arguments = new List<string>
+        {
+            "-C", toplevel, "--no-optional-locks", "log", "-z", "--date-order",
+        };
+        if (firstParent)
+            arguments.Add("--first-parent");
+        var tips = new List<string>();
+        if (includeHead)
+            tips.Add("HEAD");
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var name in visibleBranches.OrderBy(name => name, StringComparer.Ordinal))
+        {
+            if (BranchVisibility.IsGraphBranch(name) && seen.Add(name))
+                tips.Add(name);
+        }
+
+        foreach (var stash in StashTips(includeStash, visibleStashes))
+        {
+            if (seen.Add(stash))
+                tips.Add(stash);
+        }
+
+        var tail = new List<string>();
+        AppendLogTail(tail, grep, author, count, skip, path);
+        if (tips.Count == 0)
+        {
+            arguments.Add("--glob=refs/../none");
+            arguments.AddRange(tail);
+            return new GitInvocation(arguments, null);
+        }
+
+        var inline = new List<string>(arguments);
+        inline.AddRange(tips);
+        inline.AddRange(tail);
+        if (QuotedLength(inline) <= MaxCommandLine)
+            return new GitInvocation(inline, null);
+
+        arguments.Add("--stdin");
+        arguments.AddRange(tail);
+        var text = string.Join('\n', tips) + "\n";
+        return new GitInvocation(arguments, Encoding.UTF8.GetBytes(text));
+    }
+
+    private static void AppendLogTail(List<string> arguments, string? grep, string? author, int count, int skip, string? path)
+    {
         arguments.Add("--format=%H%x1f%P%x1f%at%x1f%an%x1f%ae%x1f%s");
         if (!string.IsNullOrEmpty(grep))
             arguments.Add("--grep=" + grep);
@@ -139,8 +246,69 @@ public static class GitCommands
             arguments.Add("--");
             arguments.Add(path);
         }
+    }
 
-        return arguments;
+    private static int QuotedLength(IReadOnlyList<string> arguments)
+    {
+        var length = 0;
+        foreach (var argument in arguments)
+        {
+            if (length != 0)
+                length++;
+            length += QuotedArgumentLength(argument);
+        }
+
+        return length;
+    }
+
+    /// <summary>The length of one Windows command-line argument, including quotes when they are required.</summary>
+    private static int QuotedArgumentLength(string argument)
+    {
+        if (argument.Length == 0)
+            return 2;
+        var needsQuotes = false;
+        foreach (var ch in argument)
+        {
+            if (ch == '"' || char.IsWhiteSpace(ch))
+            {
+                needsQuotes = true;
+                break;
+            }
+        }
+
+        if (!needsQuotes)
+            return argument.Length;
+
+        var length = 2;
+        var index = 0;
+        while (index < argument.Length)
+        {
+            var ch = argument[index++];
+            if (ch != '\\')
+            {
+                length += ch == '"' ? 2 : 1;
+                continue;
+            }
+
+            var slashes = 1;
+            while (index < argument.Length && argument[index] == '\\')
+            {
+                index++;
+                slashes++;
+            }
+
+            if (index == argument.Length)
+                length += slashes * 2;
+            else if (argument[index] == '"')
+            {
+                length += slashes * 2 + 2;
+                index++;
+            }
+            else
+                length += slashes;
+        }
+
+        return length;
     }
 
     private static void AddExcludes(List<string> arguments, IReadOnlyList<string> patterns)
