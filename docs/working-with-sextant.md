@@ -46,7 +46,7 @@ Add remote and Add worktree are in the Repository menu and the command palette. 
 
 ## History
 
-The top row of the graph is the working copy. Commits follow, newest first. The subject is on the left. Branch names sit on the detail line under it. Tags are amber labels on the right of the row.
+The top row of the graph is the working copy. Commits follow, newest first. The subject is on the left. Branch names sit on the detail line under it. Tags are amber labels on the right of the row. Pointing at a row shows that commit's subject, including where a branch or tag label covers the text. A long subject wraps in the tip. The file-count chip keeps its own tip.
 
 Sextant loads a page of history and more as you reach the end. The soft cap is about 50,000 commits in one tab, after which Load more is explicit. Closing the tab drops that list. While the graph is loading, whether it is the first page, Load more, a search, or a jump to a tag outside the loaded history, a small pill with a spinner floats over the middle of the list and the branch bar names the work, so the list is never just sitting there.
 

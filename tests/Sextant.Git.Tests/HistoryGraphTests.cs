@@ -1,8 +1,11 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.LogicalTree;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
@@ -308,6 +311,96 @@ public class HistoryGraphTests
             if (Directory.Exists(directory))
                 Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task History_rows_show_the_subject_from_the_row_and_wrap_a_long_line()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        var token = new string('Q', 90);
+        var message = "Ship the long subject " + string.Join(' ', Enumerable.Repeat("detail", 24)) + " " + token;
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll(message);
+        repo.Run("tag", "release/this-name-covers-the-line");
+        repo.Run("tag", "build/also-wide");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new GraphHost(repo.Git), repo.Directory);
+            await vm.EnsureLoadedAsync();
+            var commit = vm.Rows.Single(row => row.Subject == message);
+            var work = vm.Rows.Single(row => row.IsWorkingCopy);
+
+            var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 700 };
+            var window = new Window { Content = view, Width = 1100, Height = 700 };
+            window.Show();
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            for (var attempt = 0; attempt < 100 && commit.FileCountText.Length == 0; attempt++)
+            {
+                Dispatcher.UIThread.RunJobs();
+                await Task.Delay(20);
+            }
+
+            Assert.Equal("1", commit.FileCountText);
+            var graph = view.FindControl<ListBox>("GraphList");
+            Assert.NotNull(graph);
+            graph.ScrollIntoView(commit);
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            var item = graph.ContainerFromItem(commit) as ListBoxItem;
+            Assert.NotNull(item);
+            var row = item.GetVisualDescendants().OfType<Border>().Single(border => border.ContextMenu is not null);
+            Assert.Equal(message, ToolTip.GetTip(row));
+            var subject = item.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Text == message);
+            Assert.Null(ToolTip.GetTip(subject));
+            Assert.Same(row, TipOwner(subject));
+
+            var tag = item.GetVisualDescendants().OfType<Border>().First(border => border.Classes.Contains("taglabel"));
+            var branch = item.GetVisualDescendants().OfType<Border>().First(border => border.Classes.Contains("reflabel"));
+            Assert.Same(row, TipOwner(tag));
+            Assert.Same(row, TipOwner(branch));
+            var count = item.GetVisualDescendants().OfType<Border>().Single(border => border.Name == "RowFileCountChip");
+            Assert.Same(count, TipOwner(count));
+            Assert.Equal(commit.FileCountTooltip, ToolTip.GetTip(count));
+
+            ToolTip.SetIsOpen(row, true);
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            var tip = row.GetLogicalDescendants().OfType<ToolTip>().Single();
+            Assert.Equal(message, tip.Content);
+            Assert.Equal(520, tip.MaxWidth);
+            var presenter = tip.GetVisualDescendants().OfType<ContentPresenter>().Single(candidate => candidate.Name == "PART_ContentPresenter");
+            Assert.Equal(TextWrapping.Wrap, presenter.GetValue(TextBlock.TextWrappingProperty));
+            tip.Measure(new Size(4000, 4000));
+            Assert.InRange(tip.DesiredSize.Width, 200, 520);
+            Assert.True(tip.DesiredSize.Height > 36, $"tooltip height {tip.DesiredSize.Height}");
+            ToolTip.SetIsOpen(row, false);
+
+            graph.ScrollIntoView(work);
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            var workItem = graph.ContainerFromItem(work) as ListBoxItem;
+            Assert.NotNull(workItem);
+            var workRow = workItem.GetVisualDescendants().OfType<Border>().Single(border => border.ContextMenu is not null);
+            Assert.Equal("Working copy", ToolTip.GetTip(workRow));
+
+            window.Close();
+            await vm.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
+    private static Control TipOwner(Control start)
+    {
+        for (Control? control = start; control is not null; control = control.GetVisualParent() as Control)
+        {
+            if (ToolTip.GetTip(control) is not null)
+                return control;
+        }
+
+        throw new InvalidOperationException("No tooltip on this row.");
     }
 
     private static double Top(Control control, Visual relative)

@@ -187,6 +187,8 @@ On 2026-10-21 hiding every branch but one in a repository with thousands of bran
 
 On 2026-10-28 pointing at a Locations row shows that row's text. A long branch name, folder, worktree path, or stash subject stays readable when the pane trims it. The favorite and hide buttons keep their own tips. `Every_location_row_shows_its_label_as_a_tooltip` passed. A headless window confirmed each row's tooltip is its label. The desktop window was not launched.
 
+On 2026-10-28 pointing at a History row shows that commit's subject. The row owns the tip, so a branch or tag label that covers the text still shows it. A long subject wraps within 520 pixels. The file-count chip keeps its own tip. `History_rows_show_the_subject_from_the_row_and_wrap_a_long_line` passed. A headless window confirmed the row tip, the chip hit target, and the wrap. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
