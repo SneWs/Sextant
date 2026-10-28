@@ -38,6 +38,37 @@ public class PeriodicFetchTests
     }
 
     [Fact]
+    public async Task Git_page_saves_refresh_on_focus()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        await session.Dispatch(() =>
+        {
+            var window = Show(0);
+            var box = window.GetLogicalDescendants().OfType<CheckBox>().Single(item => item.Content as string == "Refresh when focused");
+            Assert.True(box.IsEffectivelyVisible);
+            Assert.False(box.IsChecked);
+            box.IsChecked = true;
+            window.GetLogicalDescendants().OfType<Button>().Single(button => button.Content as string == "OK")
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.True(window.Result?.RefreshOnFocus);
+            window.Close();
+
+            var again = new SettingsWindow(new SettingsDraft("", false, false, "system", "", RefreshOnFocus: true));
+            again.Show();
+            Dispatcher.UIThread.RunJobs();
+            again.GetLogicalDescendants().OfType<ListBox>().Single().SelectedIndex = 3;
+            Dispatcher.UIThread.RunJobs();
+            var saved = again.GetLogicalDescendants().OfType<CheckBox>().Single(item => item.Content as string == "Refresh when focused");
+            Assert.True(saved.IsChecked);
+            saved.IsChecked = false;
+            again.GetLogicalDescendants().OfType<Button>().Single(button => button.Content as string == "OK")
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.False(again.Result?.RefreshOnFocus);
+            again.Close();
+        }, CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Zero_minutes_does_not_fetch_and_a_new_value_restarts_the_wait()
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));

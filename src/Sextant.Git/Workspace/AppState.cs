@@ -299,6 +299,9 @@ public sealed class AppSettings
 
     /// <summary>Minutes between fetches of the active repository. Zero is off.</summary>
     public int FetchIntervalMinutes { get; set; }
+
+    /// <summary>When set, focusing the window reads the active repository again. Off unless the user turns it on.</summary>
+    public bool RefreshOnFocus { get; set; }
 }
 
 public static class AppPaths

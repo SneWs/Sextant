@@ -95,7 +95,8 @@ public sealed record SettingsDraft(
     string? DiffFont = null,
     double DiffFontSize = DiffFontPreference.DefaultSize,
     string? PullMode = null,
-    int FetchIntervalMinutes = 0);
+    int FetchIntervalMinutes = 0,
+    bool RefreshOnFocus = false);
 
 public sealed record SecretPrompt(string? Value, bool RememberForSession);
 
