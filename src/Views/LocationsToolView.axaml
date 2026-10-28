@@ -73,7 +73,7 @@
             </ListBox.Styles>
             <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:LocationItem">
-                    <Border Background="Transparent" Padding="2,0">
+                    <Border Background="Transparent" Padding="2,0" ToolTip.Tip="{Binding Label}">
                         <Border.ContextMenu>
                             <ContextMenu Opening="OnMenuOpening">
                                 <MenuItem Header="Create branch from tag"

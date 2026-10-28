@@ -28,7 +28,7 @@ View → Save layout… writes the current arrangement to a file. View → Resto
 
 ## Locations
 
-Expand all and Collapse all sit to the left of the filter. Expand all opens every section and folder. Collapse all closes them, including a folder inside a section that was already closed. Sextant remembers that choice for the repository. Text in the filter matches branches, tags, stashes, and the other rows. A filter that already has text still shows the rows that match.
+Expand all and Collapse all sit to the left of the filter. Expand all opens every section and folder. Collapse all closes them, including a folder inside a section that was already closed. Sextant remembers that choice for the repository. Text in the filter matches branches, tags, stashes, and the other rows. A filter that already has text still shows the rows that match. Pointing at a row shows that row's text, so a long branch name, folder, worktree path, or stash subject stays readable when the pane trims it. The favorite and hide buttons keep their own tips.
 
 Branches, and each remote's branches, split on every `/`. `fix/create` is a `fix` folder with a `create` row even when no other branch uses `fix`. A longer name nests the same way, so `topic/only/leaf` is `topic`, then `only`, then `leaf`. Tags share a folder when more than one tag starts with the same `/` prefix. One tag named `release/1.2` stays a single row.
 
