@@ -189,6 +189,8 @@ On 2026-10-28 pointing at a Locations row shows that row's text. A long branch n
 
 On 2026-10-28 pointing at a History row shows that commit's subject. The row owns the tip, so a branch or tag label that covers the text still shows it. A long subject wraps within 520 pixels. The file-count chip keeps its own tip. `History_rows_show_the_subject_from_the_row_and_wrap_a_long_line` passed. A headless window confirmed the row tip, the chip hit target, and the wrap. The desktop window was not launched.
 
+On 2026-10-28 pinning a pane and unpinning it returns that pane to the same split, at the share it had. The empty slot closes while the pane is pinned. Pinning it again keeps the flyout size from the last time it was pinned. A tool that shares a dock, such as History beside Repository files, comes back to that same dock. `Pin_round_trip_keeps_the_docked_share_and_the_pinned_size` passed. A headless window confirmed the docked width, the closed slot, and the flyout size. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

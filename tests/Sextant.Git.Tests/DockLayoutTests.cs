@@ -8,6 +8,8 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Dock.Avalonia.Controls;
+using Dock.Avalonia.Themes;
+using Dock.Avalonia.Themes.Fluent;
 using Dock.Model.Core;
 using Dock.Model.Mvvm;
 using Dock.Model.Mvvm.Controls;
@@ -778,6 +780,102 @@ public class DockLayoutTests
                 Directory.Delete(directory, recursive: true);
         }
     }
+
+    [Fact]
+    public async Task Pin_round_trip_keeps_the_docked_share_and_the_pinned_size()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        await session.Dispatch(() =>
+        {
+            var dockTheme = new DockFluentTheme
+            {
+                DensityStyle = DockDensityStyle.Compact,
+                CacheDocumentTabContent = false,
+            };
+            Application.Current!.Styles.Add(dockTheme);
+            try
+            {
+                using var host = Open(new WorkspaceState());
+                var vm = host.View;
+                var window = new Window
+                {
+                    Width = 1400,
+                    Height = 900,
+                    Content = new DockControl { Layout = vm.Dock.Root },
+                };
+                window.Show();
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                var tool = SextantDockFactory.Collect(vm.Dock.Root).OfType<RepositoryTool>().Single(item => item.ToolId == DockIds.Locations);
+                var dock = Assert.IsType<ToolDock>(tool.Owner);
+                dock.Proportion = 0.37;
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                var before = dock.Proportion;
+                var pane = Pane(window, dock);
+                var dockedWidth = pane.Bounds.Width;
+                Assert.True(dockedWidth > 100, $"docked width {dockedWidth}");
+
+                vm.Dock.Factory.PinDockable(tool);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(dock.IsEmpty);
+                pane = Pane(window, dock);
+                Assert.True(pane.Bounds.Width < 2, $"pinned gap {pane.Bounds.Width}");
+                tool.SetPinnedBounds(0, 0, 410, 640);
+
+                // The docked size is what a re-pin would otherwise copy over the flyout.
+                tool.SetVisibleBounds(0, 0, 180, 500);
+                dock.SetVisibleBounds(0, 0, 180, 500);
+                vm.Dock.Factory.UnpinDockable(tool);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.Same(dock, tool.Owner);
+                Assert.Equal(before, dock.Proportion, 3);
+                Assert.Equal(Alignment.Left, dock.Alignment);
+                pane = Pane(window, dock);
+                Assert.InRange(pane.Bounds.Width, dockedWidth - 2, dockedWidth + 2);
+
+                vm.Dock.Factory.PinDockable(tool);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                tool.GetPinnedBounds(out var x, out var y, out var width, out var height);
+                Assert.Equal(0, x);
+                Assert.Equal(0, y);
+                Assert.Equal(410, width);
+                Assert.Equal(640, height);
+                Assert.True(vm.Dock.Factory.IsDockablePinned(tool));
+                pane = Pane(window, dock);
+                Assert.True(pane.Bounds.Width < 2, $"second pinned gap {pane.Bounds.Width}");
+
+                var history = SextantDockFactory.Collect(vm.Dock.Root).OfType<RepositoryTool>().Single(item => item.ToolId == DockIds.History);
+                var files = SextantDockFactory.Collect(vm.Dock.Root).OfType<RepositoryTool>().Single(item => item.ToolId == DockIds.Files);
+                var shared = Assert.IsType<ToolDock>(history.Owner);
+                Assert.Same(shared, files.Owner);
+                var sharedShare = shared.Proportion;
+                vm.Dock.Factory.PinDockable(history);
+                vm.Dock.Factory.UnpinDockable(history);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.Same(shared, history.Owner);
+                Assert.Same(shared, files.Owner);
+                Assert.Contains(files, shared.VisibleDockables!);
+                Assert.Equal(sharedShare, shared.Proportion, 3);
+
+                window.Close();
+            }
+            finally
+            {
+                Application.Current!.Styles.Remove(dockTheme);
+            }
+
+            return Task.CompletedTask;
+        }, CancellationToken.None);
+    }
+
+    private static ToolDockControl Pane(Window window, ToolDock dock) =>
+        window.GetVisualDescendants().OfType<ToolDockControl>().Single(control => ReferenceEquals(control.DataContext, dock));
 
     [Fact]
     public async Task Changes_pane_stays_tall_enough_for_the_commit_box()

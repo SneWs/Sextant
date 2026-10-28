@@ -22,6 +22,25 @@ public sealed class SextantDockFactory : Factory
 
     public DocumentDock? Home { get; set; }
 
+    public override void PinDockable(IDockable dockable)
+    {
+        // An unset alignment pins to the left, then unpinning refuses the original dock and
+        // opens a new one at a default share. Marking the dock left lets it come back
+        // into the same split, at the proportion it had.
+        var pinning = !IsDockablePinned(dockable);
+        if (pinning && dockable.Owner is IToolDock { Alignment: Alignment.Unset } owner)
+            owner.Alignment = Alignment.Left;
+
+        dockable.GetPinnedBounds(out var x, out var y, out var width, out var height);
+        var keepPinnedSize = pinning && IsPinnedSize(width) && IsPinnedSize(height);
+        base.PinDockable(dockable);
+        if (keepPinnedSize)
+            dockable.SetPinnedBounds(x, y, width, height);
+    }
+
+    private static bool IsPinnedSize(double value) =>
+        !double.IsNaN(value) && !double.IsInfinity(value) && value > 0;
+
     public override bool OnDockableClosing(IDockable? dockable)
     {
         if (_dock.Rebuilding)

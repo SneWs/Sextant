@@ -16,7 +16,7 @@ Under the tabs, the branch bar names the checked-out branch and, when Git knows,
 
 A conflict replaces that quiet state with a banner and Continue and Abort. A sparse checkout adds a banner: excluded paths stay out of the working tree. Sextant does not check those paths out to read them.
 
-Below that, the window is three columns. Drag the splitters to resize them. The widths are remembered.
+Below that, the window is three columns. Drag the splitters to resize them. The widths are remembered. Pinning a pane parks it on that edge and closes its slot. Unpinning puts it back in the same split, at the width it had. Pinning it again keeps the size that flyout had the last time it was pinned.
 
 1. **Locations** lists branches, remotes, tags, stashes, submodules, and worktrees.
 2. **History** and **Repository files** share one dock as tabs. History is the selected tab.
