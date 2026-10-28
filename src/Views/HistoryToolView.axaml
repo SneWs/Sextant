@@ -50,7 +50,13 @@
                     </ListBox.ItemsPanel>
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:GraphRowViewModel">
-                            <Border Background="Transparent" Padding="4,0">
+                            <Border Background="Transparent" Padding="4,0" ToolTip.Tip="{Binding Subject}">
+                                <!-- Chips float over the subject, so the row owns the tip. A long subject wraps instead of running off the screen. -->
+                                <Border.Styles>
+                                    <Style Selector="ToolTip">
+                                        <Setter Property="MaxWidth" Value="520"/>
+                                    </Style>
+                                </Border.Styles>
                                 <Border.ContextMenu>
                                     <ContextMenu Opening="OnMenuOpening">
                                         <MenuItem Header="Checkout" Command="{Binding CheckoutCommand}" IsVisible="{Binding ShowCheckout}"/>

@@ -185,6 +185,10 @@ On 2026-10-21 a repository tab can be dragged sideways to a new place in the str
 
 On 2026-10-21 hiding every branch but one in a repository with thousands of branches no longer builds a `git log` command that Windows rejects as too long. A short hidden set still uses `--exclude`. A longer set names the branches that remain visible. When those names still do not fit, `git log --stdin` reads them. A command that is still too long fails as a git error instead of an unhandled process exception. `Log_names_visible_branches_when_excludes_exceed_the_command_line`, `Log_reads_visible_branches_from_stdin_when_those_names_do_not_fit`, and `Hiding_every_branch_but_one_keeps_the_git_command_short` passed. The desktop window was not launched.
 
+On 2026-10-28 pointing at a Locations row shows that row's text. A long branch name, folder, worktree path, or stash subject stays readable when the pane trims it. The favorite and hide buttons keep their own tips. `Every_location_row_shows_its_label_as_a_tooltip` passed. A headless window confirmed each row's tooltip is its label. The desktop window was not launched.
+
+On 2026-10-28 pointing at a History row shows that commit's subject. The row owns the tip, so a branch or tag label that covers the text still shows it. A long subject wraps within 520 pixels. The file-count chip keeps its own tip. `History_rows_show_the_subject_from_the_row_and_wrap_a_long_line` passed. A headless window confirmed the row tip, the chip hit target, and the wrap. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

@@ -688,6 +688,73 @@ public class LocationPanelTests
         }, CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Every_location_row_shows_its_label_as_a_tooltip()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "root\n");
+        repo.CommitAll("root");
+        var trunk = repo.CurrentBranch();
+        var longBranch = "feature/" + new string('n', 80);
+        repo.Run("switch", "-c", longBranch);
+        repo.WriteFile("a.txt", "feature\n");
+        repo.CommitAll("feature");
+        repo.Run("tag", "release/1.0");
+        repo.Run("switch", trunk);
+        var stashNote = new string('s', 60) + " stash note";
+        repo.WriteFile("a.txt", "wip\n");
+        repo.Run("stash", "push", "-m", stashNote);
+        var extra = Path.Combine(Path.GetTempPath(), "sextant-wt-" + Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            repo.Run("worktree", "add", "-b", "linked-work", extra);
+            await session.Dispatch(async () =>
+            {
+                var vm = new RepositoryViewModel(new LocationsHost(repo.Git), repo.Directory);
+                await vm.EnsureLoadedAsync();
+                var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 800 };
+                var window = new Window { Content = view, Width = 1100, Height = 800 };
+                window.Show();
+                view.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.Contains(vm.Locations, item => item.Label.Contains(new string('n', 80), StringComparison.Ordinal));
+                Assert.Contains(vm.Locations, item => item.Label.Contains(stashNote, StringComparison.Ordinal));
+                Assert.Contains(vm.Locations, item => item.Key.StartsWith("w:", StringComparison.Ordinal) && item.Label.Contains(extra, StringComparison.OrdinalIgnoreCase));
+                Assert.Contains(vm.Locations, item => item.IsHeader);
+
+                var list = view.FindControl<ListBox>("LocationList");
+                Assert.NotNull(list);
+                foreach (var item in vm.Locations)
+                {
+                    list.ScrollIntoView(item);
+                    view.UpdateLayout();
+                    Dispatcher.UIThread.RunJobs();
+                    var border = list.GetVisualDescendants().OfType<Border>()
+                        .Single(candidate => candidate.DataContext == item && candidate.ContextMenu is not null);
+                    Assert.Equal(item.Label, ToolTip.GetTip(border));
+                }
+
+                var current = vm.Locations.Single(item => item.IsCurrent && item.Key.StartsWith("b:", StringComparison.Ordinal));
+                var star = Star(view, current);
+                Assert.Equal(current.FavoriteLabel, ToolTip.GetTip(star));
+                var eye = view.GetVisualDescendants().OfType<Button>()
+                    .Single(button => button.Classes.Contains("eye") && button.IsVisible && button.Command == current.HideCommand);
+                Assert.Equal(current.HideLabel, ToolTip.GetTip(eye));
+
+                window.Close();
+                await vm.DisposeAsync();
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(extra))
+                repo.Run("worktree", "remove", "--force", "--force", extra);
+        }
+    }
+
     private static string[] SectionKeys(RepositoryViewModel vm, string header)
     {
         var keys = new List<string>();
