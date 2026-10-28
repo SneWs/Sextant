@@ -111,6 +111,9 @@
                     </StackPanel>
                     <TextBlock TextWrapping="Wrap" Opacity="0.75"
                                Text="0 turns this off. Any other value fetches the active repository after that many minutes, then again each time they pass. Another open repository is fetched only while it is the selected tab. The fetch waits while that repository is busy."/>
+                    <CheckBox x:Name="RefreshOnFocus" Content="Refresh when focused" Margin="0,8,0,0"/>
+                    <TextBlock TextWrapping="Wrap" Opacity="0.75"
+                               Text="Focusing this window reads the active repository again. Leave this off and press F5 when you want that read."/>
                 </StackPanel>
 
                 <StackPanel x:Name="MergePage" Spacing="8" IsVisible="False">

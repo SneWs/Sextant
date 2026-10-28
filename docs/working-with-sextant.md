@@ -111,6 +111,8 @@ Network commands run one at a time per repository and report progress on the bra
 
 Settings → Git → Fetch every runs Fetch for the active repository. 0 minutes leaves it off. Any other value is how many minutes pass between fetches. The first one waits that long after you set it. Switching tabs fetches the repository you selected, on the next interval.
 
+Focusing the window leaves the repository as it is. Settings → Git → Refresh when focused reads the active repository again each time the window comes forward. F5 still does that read.
+
 ## Conflicts
 
 Continue and Abort cover merge, rebase, cherry-pick, and revert.

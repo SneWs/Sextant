@@ -191,6 +191,8 @@ On 2026-10-28 pointing at a History row shows that commit's subject. The row own
 
 On 2026-10-28 pinning a pane and unpinning it returns that pane to the same split, at the share it had. The empty slot closes while the pane is pinned. Pinning it again keeps the flyout size from the last time it was pinned. A tool that shares a dock, such as History beside Repository files, comes back to that same dock. `Pin_round_trip_keeps_the_docked_share_and_the_pinned_size` passed. A headless window confirmed the docked width, the closed slot, and the flyout size. The desktop window was not launched.
 
+On 2026-10-28 focusing the window leaves the repository as it is. Settings → Git → Refresh when focused turns that read back on, and the choice is `refreshOnFocus` in settings.json. F5 still refreshes. `Git_page_saves_refresh_on_focus`, `Focusing_the_window_leaves_the_repository_until_refresh_on_focus_is_on`, and `Restoring_a_minimized_window_refreshes_after_it_is_visible` passed. A headless window confirmed the checkbox starts clear and that a new file stays unseen until the setting is on. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

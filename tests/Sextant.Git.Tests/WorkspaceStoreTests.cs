@@ -44,6 +44,7 @@ public class WorkspaceStoreTests
                 SkipUpdatePrompt = true,
                 PullMode = PullPreference.Merge,
                 FetchIntervalMinutes = 15,
+                RefreshOnFocus = true,
             });
 
             var loaded = store.LoadWorkspace();
@@ -74,6 +75,7 @@ public class WorkspaceStoreTests
             Assert.Equal(PullPreference.Rebase, PullPreference.Normalize("nope"));
             Assert.Equal(PullPreference.Merge, PullPreference.Normalize(" Merge "));
             Assert.Equal(15, settings.FetchIntervalMinutes);
+            Assert.True(settings.RefreshOnFocus);
             Assert.Equal(0, FetchInterval.Normalize(-3));
             Assert.Equal(FetchInterval.Maximum, FetchInterval.Normalize(FetchInterval.Maximum + 1));
             Assert.Equal(5, FetchInterval.Normalize(5));
@@ -95,6 +97,7 @@ public class WorkspaceStoreTests
             Assert.False(older.SkipUpdatePrompt);
             Assert.Equal(PullPreference.Rebase, older.PullMode);
             Assert.Equal(0, older.FetchIntervalMinutes);
+            Assert.False(older.RefreshOnFocus);
 
             File.WriteAllText(Path.Combine(directory, "workspace.json"), """
                 {

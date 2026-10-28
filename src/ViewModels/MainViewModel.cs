@@ -169,7 +169,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
 
     public Task InitializeAsync() => _initialize ??= InitializeCoreAsync();
 
-    public Task OnWindowActivated() => _started ? RefreshShownAsync() : Task.CompletedTask;
+    public Task OnWindowActivated() =>
+        _started && _settings.RefreshOnFocus ? RefreshShownAsync() : Task.CompletedTask;
 
     /// <summary>Refreshes the active repository and any other repository whose document is on screen.</summary>
     public async Task RefreshShownAsync()
@@ -1171,7 +1172,8 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
             _settings.DiffFont,
             _settings.DiffFontSize,
             _settings.PullMode,
-            _settings.FetchIntervalMinutes));
+            _settings.FetchIntervalMinutes,
+            _settings.RefreshOnFocus));
         if (edit is null)
             return;
         var path = string.IsNullOrWhiteSpace(edit.GitExecutable) ? null : edit.GitExecutable.Trim();
@@ -1194,6 +1196,7 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
         _settings.DiffFont = font.Length == 0 ? null : font;
         _settings.DiffFontSize = DiffFontPreference.NormalizeSize(edit.DiffFontSize);
         _settings.PullMode = PullPreference.Normalize(edit.PullMode);
+        _settings.RefreshOnFocus = edit.RefreshOnFocus;
         ApplyFetchInterval(edit.FetchIntervalMinutes);
         _store.SaveSettings(_settings);
         AppTheme.Apply(_settings.Theme, _settings.Palette);

@@ -106,6 +106,8 @@ Sextant still uses that Git's config, hooks, attributes, and credential helper. 
 
 **Fetch every** is a number of minutes. It is saved as `fetchIntervalMinutes` and defaults to 0, which leaves periodic fetch off. A value from 1 to 10080 fetches the active repository that often, using the same Fetch command as the toolbar. The first fetch waits for that interval. Another open repository is fetched only while its tab is selected. The fetch waits while that repository is already running a command. A repository with no remote is skipped.
 
+**Refresh when focused** is saved as `refreshOnFocus` and defaults to off. When it is on, focusing the window reads the active repository again. F5 does that read either way.
+
 ## Merging
 
 **External merge command** is optional.
