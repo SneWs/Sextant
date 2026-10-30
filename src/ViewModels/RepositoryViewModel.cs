@@ -573,6 +573,12 @@ public partial class RepositoryViewModel : ViewModelBase
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// A merge, rebase, cherry-pick, or revert is in progress. The open diff and merge
+    /// editor stay as they are until the user refreshes or finishes a step.
+    /// </summary>
+    private bool HoldsOpenViews => _sequencer != SequencerKind.None;
+
     [RelayCommand]
     public Task Refresh() => RunAsync("Refreshing…", async ct =>
     {
@@ -586,8 +592,8 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         // A dialog closes by activating this window. HoldFocus keeps that
         // activation from starting a refresh that takes IsBusy and drops the
-        // command the dialog just confirmed.
-        if (_session is null || IsBusy || _holdFocusRefresh > 0)
+        // command the dialog just confirmed. An open merge or rebase keeps its views.
+        if (_session is null || IsBusy || _holdFocusRefresh > 0 || HoldsOpenViews)
             return Task.CompletedTask;
         return Refresh();
     }
@@ -615,7 +621,9 @@ public partial class RepositoryViewModel : ViewModelBase
     /// <summary>Periodic fetch. A repository with no remote, or one that is already busy, is left alone.</summary>
     public Task FetchInBackground()
     {
-        if (_session is null || IsBusy || _session.Snapshot().Remotes.Count == 0)
+        // Fetch publishes a new snapshot and reloads the open views. Leave that
+        // until the merge or rebase is finished.
+        if (_session is null || IsBusy || HoldsOpenViews || _session.Snapshot().Remotes.Count == 0)
             return Task.CompletedTask;
         return Fetch();
     }
@@ -1390,7 +1398,7 @@ public partial class RepositoryViewModel : ViewModelBase
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task RefreshFromWatcherAsync()
     {
-        if (_session is null || IsBusy || _lifetime.IsCancellationRequested)
+        if (_session is null || IsBusy || _lifetime.IsCancellationRequested || HoldsOpenViews)
             return;
         // Overlapping watcher ticks share one refresh. A tick dropped because a
         // command owns IsBusy is left alone: that command publishes its own result.

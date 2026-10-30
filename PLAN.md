@@ -195,6 +195,8 @@ On 2026-10-28 focusing the window leaves the repository as it is. Settings → G
 
 On 2026-10-30 the merge editor opens with the first conflict in view. A file with one conflict and a file with several both stayed at the top, because that conflict is index 0 and the scroll ran before the editor had a height. `The_merge_editor_opens_on_the_first_conflict` passed. The desktop window was not launched.
 
+On 2026-10-30 a merge, rebase, cherry-pick, or revert leaves the open views alone. A change on disk, focusing the window, and a periodic fetch do not reload the diff or the merge editor. F5, save, stage, continue, and abort still update the views. `Merge_keeps_the_open_editor_until_refresh` and `Rebase_keeps_the_open_editor_until_refresh` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
