@@ -111,13 +111,13 @@ Network commands run one at a time per repository and report progress on the bra
 
 Settings → Git → Fetch every runs Fetch for the active repository. 0 minutes leaves it off. Any other value is how many minutes pass between fetches. The first one waits that long after you set it. Switching tabs fetches the repository you selected, on the next interval.
 
-Focusing the window leaves the repository as it is. Settings → Git → Refresh when focused reads the active repository again each time the window comes forward. F5 still does that read.
+Focusing the window leaves the repository as it is. Settings → Git → Refresh when focused reads the active repository again each time the window comes forward. F5 still does that read. A merge, rebase, cherry-pick, or revert in progress leaves the open views as they are: focusing the window, a change on disk, and a periodic fetch do not reload them. F5 still does.
 
 ## Conflicts
 
 Continue and Abort cover merge, rebase, cherry-pick, and revert.
 
-For a text conflict, the diff area becomes the three-way editor: ours, the result, and theirs. The result opens on the first conflict, including when that conflict is the only one. Previous and Next walk the conflicts in the file. Take ours and Take theirs fill the result. Save and stage writes the result and stages the file when no conflict markers remain.
+For a text conflict, the diff area becomes the three-way editor: ours, the result, and theirs. The result opens on the first conflict, including when that conflict is the only one. Previous and Next walk the conflicts in the file. Take ours and Take theirs fill the result. Save and stage writes the result and stages the file when no conflict markers remain. While that merge, rebase, cherry-pick, or revert is in progress, Sextant does not reload the editor when files change on disk or the window is focused. Saving, staging, continuing, aborting, and F5 still update the views.
 
 A file type with a restore command converts that text before the write. The editor tells you when it will. [Configuration](configuration.md) works through JSON and `jq`.
 
