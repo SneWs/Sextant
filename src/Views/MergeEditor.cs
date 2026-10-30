@@ -51,7 +51,9 @@ public sealed class MergeEditor : Grid
     private MergeSession? _listening;
     private bool _applying;
     private bool _movingCaret;
+    private bool _caretChose;
     private bool _syncing;
+    private int _reveal;
 
     public MergeEditor()
     {
@@ -126,13 +128,16 @@ public sealed class MergeEditor : Grid
         {
             Retarget(Session);
             LoadFromSession(resetDocuments: false);
+            QueueReveal();
         }
         else if (change.Property == FilePathProperty)
             ApplyGrammar();
         else if (change.Property == ShowBaseProperty)
             ApplyBaseColumn();
         else if (change.Property == ConflictIndexProperty)
-            RevealConflict();
+            QueueReveal();
+        else if (change.Property == IsVisibleProperty && IsVisible)
+            QueueReveal();
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -145,7 +150,7 @@ public sealed class MergeEditor : Grid
         InstallGrammars();
         Retarget(Session);
         LoadFromSession(resetDocuments: true);
-        RevealConflict();
+        QueueReveal();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -244,13 +249,36 @@ public sealed class MergeEditor : Grid
             return;
         var index = Session.ConflictAt(_result.CaretOffset);
         if (index >= 0 && index != ConflictIndex)
-            ConflictIndex = index;
+        {
+            // The click is already on that conflict. Scrolling would jump back to its first line.
+            _caretChose = true;
+            try
+            {
+                ConflictIndex = index;
+            }
+            finally
+            {
+                _caretChose = false;
+            }
+        }
         else
             RefreshHighlight();
     }
 
-    private void RevealConflict()
+    /// <summary>
+    /// The first conflict is index 0, so opening a file does not change the index.
+    /// The editor is often still hidden on that pass, so scroll again after it has a height.
+    /// </summary>
+    private void QueueReveal()
     {
+        var ticket = ++_reveal;
+        Reveal(ticket, 0);
+    }
+
+    private void Reveal(int ticket, int pass)
+    {
+        if (ticket != _reveal)
+            return;
         if (_applying || Session is null || _result.Document is null)
         {
             RefreshHighlight();
@@ -263,29 +291,55 @@ public sealed class MergeEditor : Grid
             return;
         }
 
-        var end = range.ResultOffset + range.ResultLength;
-        var caret = _result.CaretOffset;
-        if (caret >= range.ResultOffset && caret <= end)
+        // Replacing the document leaves the caret at the end. That offset can still fall inside
+        // the conflict, and a click is the only case that should keep a caret already in it.
+        if (_caretChose)
         {
             RefreshHighlight();
             return;
         }
 
-        _movingCaret = true;
-        try
+        var offset = Math.Clamp(range.ResultOffset, 0, _result.Document.TextLength);
+        var line = _result.Document.GetLineByOffset(Math.Clamp(offset, 0, Math.Max(0, _result.Document.TextLength))).LineNumber;
+        if (_result.CaretOffset != offset)
         {
-            var offset = Math.Clamp(range.ResultOffset, 0, _result.Document.TextLength);
-            _result.CaretOffset = offset;
-            var line = _result.Document.GetLineByOffset(Math.Clamp(offset, 0, Math.Max(0, _result.Document.TextLength)));
-            _result.ScrollTo(line.LineNumber, 1);
-            SyncFrom(_result);
+            _movingCaret = true;
+            try
+            {
+                _result.CaretOffset = offset;
+            }
+            finally
+            {
+                _movingCaret = false;
+            }
         }
-        finally
+
+        var ready = IsEffectivelyVisible && _result.TextArea.TextView.Bounds.Height >= 1;
+        if (ready)
         {
-            _movingCaret = false;
+            _result.ScrollTo(line, 1);
+            SyncFrom(_result);
         }
 
         RefreshHighlight();
+        if (!ready || !ShowsLine(line))
+        {
+            if (pass < 12)
+                Dispatcher.UIThread.Post(() => Reveal(ticket, pass + 1), DispatcherPriority.Loaded);
+            return;
+        }
+
+        if (pass < 2)
+            Dispatcher.UIThread.Post(() => Reveal(ticket, pass + 1), DispatcherPriority.Background);
+    }
+
+    private bool ShowsLine(int lineNumber)
+    {
+        var view = _result.TextArea.TextView;
+        if (view.Bounds.Height < 1 || view.Document is null)
+            return false;
+        var top = view.GetVisualTopByDocumentLine(lineNumber);
+        return top >= view.VerticalOffset - 1 && top < view.VerticalOffset + view.Bounds.Height - 1;
     }
 
     private void RefreshHighlight()

@@ -4369,6 +4369,7 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         if (PathIsLfs(path))
             return true;
+        
         foreach (var row in Files)
         {
             if (!row.IsHeader && row.LfsTracked && (row.Path == path || row.OriginalPath == path))
@@ -4456,7 +4457,9 @@ public partial class RepositoryViewModel : ViewModelBase
         public void Dispose()
         {
             lock (_owner._pendingGate)
+            {
                 _owner._pendingRepositoryWork.Remove(_completion.Task);
+            }
             _completion.TrySetResult();
         }
     }

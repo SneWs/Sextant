@@ -193,6 +193,8 @@ On 2026-10-28 pinning a pane and unpinning it returns that pane to the same spli
 
 On 2026-10-28 focusing the window leaves the repository as it is. Settings → Git → Refresh when focused turns that read back on, and the choice is `refreshOnFocus` in settings.json. F5 still refreshes. `Git_page_saves_refresh_on_focus`, `Focusing_the_window_leaves_the_repository_until_refresh_on_focus_is_on`, and `Restoring_a_minimized_window_refreshes_after_it_is_visible` passed. A headless window confirmed the checkbox starts clear and that a new file stays unseen until the setting is on. The desktop window was not launched.
 
+On 2026-10-30 the merge editor opens with the first conflict in view. A file with one conflict and a file with several both stayed at the top, because that conflict is index 0 and the scroll ran before the editor had a height. `The_merge_editor_opens_on_the_first_conflict` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

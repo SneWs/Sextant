@@ -117,7 +117,7 @@ Focusing the window leaves the repository as it is. Settings → Git → Refresh
 
 Continue and Abort cover merge, rebase, cherry-pick, and revert.
 
-For a text conflict, the diff area becomes the three-way editor: ours, the result, and theirs. Previous and Next walk the conflicts in the file. Take ours and Take theirs fill the result. Save and stage writes the result and stages the file when no conflict markers remain.
+For a text conflict, the diff area becomes the three-way editor: ours, the result, and theirs. The result opens on the first conflict, including when that conflict is the only one. Previous and Next walk the conflicts in the file. Take ours and Take theirs fill the result. Save and stage writes the result and stages the file when no conflict markers remain.
 
 A file type with a restore command converts that text before the write. The editor tells you when it will. [Configuration](configuration.md) works through JSON and `jq`.
 
