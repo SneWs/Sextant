@@ -38,6 +38,7 @@ public partial class RepositoryViewModel : ViewModelBase
     private int _watcherRefs;
     private int _watcherGate;
     private int _watcherAgain;
+    private int _watcherEpoch;
     private DispatcherPriority _uiPriority = DispatcherPriority.Background;
     private bool _loadingMore;
     private int _historyGeneration;
@@ -1395,6 +1396,9 @@ public partial class RepositoryViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Even while a watcher reload is idle, odd while one is in progress.</summary>
+    internal int WatcherEpoch => Volatile.Read(ref _watcherEpoch);
+
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task RefreshFromWatcherAsync()
     {
@@ -1408,6 +1412,7 @@ public partial class RepositoryViewModel : ViewModelBase
             return;
         }
 
+        Interlocked.Increment(ref _watcherEpoch);
         var previous = _uiPriority;
         _uiPriority = DispatcherPriority.Render;
         try
@@ -1465,6 +1470,7 @@ public partial class RepositoryViewModel : ViewModelBase
         {
             _uiPriority = previous;
             Interlocked.Exchange(ref _watcherGate, 0);
+            Interlocked.Increment(ref _watcherEpoch);
             if (Interlocked.Exchange(ref _watcherAgain, 0) == 1
                 && _session is not null
                 && !IsBusy

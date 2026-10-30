@@ -33,7 +33,7 @@ public class LineStageMenuTests
                 await vm.EnsureLoadedAsync();
                 Assert.False(vm.SideBySide);
                 await vm.ExpandAllSectionsCommand.ExecuteAsync(null);
-                var unstaged = EditorFor(vm, staged: false);
+                var unstaged = await StableEditor(vm, null, staged: false);
                 Assert.True(unstaged.Lines.Single(line => line.Text == "one").PatchLine < 0);
                 var alpha = unstaged.Lines.Single(line => line.Text == "alpha").PatchLine;
                 var beta = unstaged.Lines.Single(line => line.Text == "beta").PatchLine;
@@ -74,7 +74,7 @@ public class LineStageMenuTests
                 Assert.Contains("+gamma", unstagedDiff, StringComparison.Ordinal);
                 Assert.DoesNotContain("+alpha", unstagedDiff, StringComparison.Ordinal);
 
-                unstaged = EditorFor(vm, staged: false);
+                unstaged = await StableEditor(vm, view, staged: false);
                 var betaLeft = unstaged.Lines.Single(line => line.Text == "beta").PatchLine;
                 var gammaLeft = unstaged.Lines.Single(line => line.Text == "gamma").PatchLine;
                 editor = ShowEditor(view, unstaged);
@@ -90,7 +90,7 @@ public class LineStageMenuTests
                 Assert.Equal("one\nalpha\nbeta\ngamma\n", Text(repo.RunCapture("show", ":a.txt")));
                 Assert.Equal("one\nalpha\nbeta\ngamma\n", Text(File.ReadAllText(Path.Combine(repo.Directory, "a.txt"))));
 
-                var staged = EditorFor(vm, staged: true);
+                var staged = await StableEditor(vm, view, staged: true);
                 var stagedAlpha = staged.Lines.Single(line => line.Text == "alpha").PatchLine;
                 editor = ShowEditor(view, staged);
                 Select(editor, staged, "alpha", "alpha");
@@ -105,7 +105,7 @@ public class LineStageMenuTests
                 Assert.Equal("one\nbeta\ngamma\n", Text(repo.RunCapture("show", ":a.txt")));
                 Assert.Equal("one\nalpha\nbeta\ngamma\n", Text(File.ReadAllText(Path.Combine(repo.Directory, "a.txt"))));
 
-                staged = EditorFor(vm, staged: true);
+                staged = await StableEditor(vm, view, staged: true);
                 editor = ShowEditor(view, staged);
                 Select(editor, staged, "beta", "gamma");
                 menu = OpenMenu(editor);
@@ -147,7 +147,7 @@ public class LineStageMenuTests
                 await vm.EnsureLoadedAsync();
                 Assert.True(vm.SideBySide);
                 await vm.ExpandAllSectionsCommand.ExecuteAsync(null);
-                var staged = EditorFor(vm, staged: true);
+                var staged = await StableEditor(vm, null, staged: true);
                 Assert.True(staged.SideBySide);
                 var blank = staged.RightLines.Single(line => line.Kind == EditorLineKind.Added && line.Text == "");
                 var text = staged.RightLines.Single(line => line.Text == "Adding more lines...!");
@@ -179,7 +179,7 @@ public class LineStageMenuTests
                 Assert.Equal("one\n\n", Text(repo.RunCapture("show", ":a.txt")));
                 Assert.Equal("one\n\nAdding more lines...!\n", Text(File.ReadAllText(Path.Combine(repo.Directory, "a.txt"))));
 
-                staged = EditorFor(vm, staged: true);
+                staged = await StableEditor(vm, view, staged: true);
                 (_, right) = ShowSides(view, staged);
                 PlaceCaret(right, staged.RightLines, "");
                 menu = OpenMenu(right);
@@ -202,6 +202,33 @@ public class LineStageMenuTests
         }, CancellationToken.None);
     }
 
+    private static async Task<DiffEditorRow> StableEditor(RepositoryViewModel vm, Control? view, bool staged)
+    {
+        // The git watcher debounces for 200ms and then rebuilds every diff row.
+        // WatcherEpoch stays odd until that rebuild has published the new rows.
+        var seen = vm.WatcherEpoch;
+        var stable = 0;
+        for (var pass = 0; pass < 80; pass++)
+        {
+            view?.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            await Task.Delay(20);
+            var now = vm.WatcherEpoch;
+            if (now == seen && (now & 1) == 0)
+                stable++;
+            else
+            {
+                seen = now;
+                stable = 0;
+            }
+
+            if (pass >= 12 && stable >= 8)
+                break;
+        }
+
+        return EditorFor(vm, staged);
+    }
+
     private static DiffEditorRow EditorFor(RepositoryViewModel vm, bool staged)
     {
         var header = vm.DiffRows.OfType<DiffFileRow>().Single(row => row.Path == "a.txt" && row.StagingFile?.FromStagedList == staged);
@@ -213,8 +240,7 @@ public class LineStageMenuTests
         var list = view.FindControl<CopyListBox>("DiffList");
         Assert.NotNull(list);
         list.ScrollIntoView(row);
-        Settle(view);
-        var host = view.GetVisualDescendants().OfType<DiffTextHost>().Single(item => ReferenceEquals(item.Editor, row));
+        var host = Realize(view, row);
         return Assert.Single(host.GetVisualDescendants().OfType<TextEditor>());
     }
 
@@ -223,8 +249,7 @@ public class LineStageMenuTests
         var list = view.FindControl<CopyListBox>("DiffList");
         Assert.NotNull(list);
         list.ScrollIntoView(row);
-        Settle(view);
-        var host = view.GetVisualDescendants().OfType<DiffTextHost>().Single(item => ReferenceEquals(item.Editor, row));
+        var host = Realize(view, row);
         var editors = host.GetVisualDescendants().OfType<TextEditor>().ToArray();
         Assert.Equal(2, editors.Length);
         return (editors[0], editors[1]);
@@ -273,13 +298,18 @@ public class LineStageMenuTests
     private static string[] VisibleHeaders(ContextMenu menu) =>
         menu.Items.OfType<MenuItem>().Where(item => item.IsVisible).Select(item => item.Header as string ?? "").ToArray();
 
-    private static void Settle(Control view)
+    private static DiffTextHost Realize(RepositoryView view, DiffEditorRow row)
     {
-        for (var pass = 0; pass < 6; pass++)
+        DiffTextHost? host = null;
+        for (var pass = 0; pass < 20 && host is null; pass++)
         {
             view.UpdateLayout();
             Dispatcher.UIThread.RunJobs();
+            host = view.GetVisualDescendants().OfType<DiffTextHost>().FirstOrDefault(item => ReferenceEquals(item.Editor, row));
         }
+
+        Assert.NotNull(host);
+        return host;
     }
 
     private static string Text(string value) => value.Replace("\r\n", "\n", StringComparison.Ordinal);
