@@ -17,8 +17,8 @@
     <PackageReference Include="Avalonia.Headless" Version="12.1.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <!-- SkiaSharp itself only depends on the Win32 and macOS natives. Pin the managed build to the same version as this native library. -->
-    <PackageReference Include="SkiaSharp" Version="4.153.1" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="4.153.1" />
+    <PackageReference Include="SkiaSharp" Version="4.154.0" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="4.154.0" />
     <PackageReference Include="Svg.Skia" Version="5.2.3" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1">
