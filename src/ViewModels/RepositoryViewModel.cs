@@ -2081,10 +2081,13 @@ public partial class RepositoryViewModel : ViewModelBase
         _workingFiles.Clear();
         var conflicts = state.Entries.Where(entry => entry.Kind == ChangeKind.Unmerged).ToList();
         var staged = state.Entries.Where(entry => entry.Staged && entry.Kind != ChangeKind.Unmerged).ToList();
-        var unstaged = state.Entries.Where(entry => (entry.Unstaged || entry.Kind == ChangeKind.Untracked) && entry.Kind != ChangeKind.Unmerged).ToList();
+        var unstaged = state.Entries.Where(entry =>
+            entry.Kind != ChangeKind.Unmerged && entry.Kind != ChangeKind.Untracked && entry.Unstaged).ToList();
+        var untracked = state.Entries.Where(entry => entry.Kind == ChangeKind.Untracked).ToList();
         AddFileSection("Conflicts", conflicts, stagedList: false, conflict: true);
         AddFileSection("Staged", staged, stagedList: true, conflict: false);
         AddFileSection("Unstaged", unstaged, stagedList: false, conflict: false);
+        AddUntrackedSection(untracked);
         if (!_showingCommitFiles)
             CopyFiles(_workingFiles);
     }
@@ -2096,6 +2099,23 @@ public partial class RepositoryViewModel : ViewModelBase
         _workingFiles.Add(new FileRowViewModel { IsHeader = true, Label = title });
         foreach (var entry in entries)
             _workingFiles.Add(FileRow(entry, stagedList, conflict));
+    }
+
+    private void AddUntrackedSection(List<StatusEntry> entries)
+    {
+        if (entries.Count == 0)
+            return;
+        var paths = entries.Select(entry => entry.Path).ToList();
+        _workingFiles.Add(new FileRowViewModel
+        {
+            IsHeader = true,
+            Label = "Untracked",
+            ShowUntrackedActions = true,
+            StageCommand = new AsyncRelayCommand(() => AddUntrackedAsync(paths)),
+            DiscardCommand = new AsyncRelayCommand(() => DeleteUntrackedAsync(paths, all: true)),
+        });
+        foreach (var entry in entries)
+            _workingFiles.Add(FileRow(entry, stagedList: false, conflict: false));
     }
 
     private FileRowViewModel FileRow(StatusEntry entry, bool stagedList, bool conflict)
@@ -2123,9 +2143,15 @@ public partial class RepositoryViewModel : ViewModelBase
             ShowLfsTrack = !conflict && !lfs,
             ShowLfsUntrack = !conflict && lfs,
             ShowLfsDownload = !conflict && lfs && !untracked,
-            StageCommand = new AsyncRelayCommand(() => RunAsync(conflict ? "Staging resolution…" : "Staging…", ct => Session.StageFileAsync(path, ct))),
+            StageLabel = untracked ? "Add" : "Stage",
+            DiscardLabel = untracked ? "Delete" : "Discard",
+            StageCommand = new AsyncRelayCommand(() => RunAsync(
+                conflict ? "Staging resolution…" : untracked ? "Adding…" : "Staging…",
+                ct => Session.StageFileAsync(path, ct))),
             UnstageCommand = new AsyncRelayCommand(() => RunAsync("Unstaging…", ct => Session.UnstageFileAsync(path, ct))),
-            DiscardCommand = new AsyncRelayCommand(() => DiscardAsync(path, untracked)),
+            DiscardCommand = new AsyncRelayCommand(() => untracked
+                ? DeleteUntrackedAsync([path], all: false)
+                : DiscardAsync(path, untracked: false)),
             MergetoolCommand = new AsyncRelayCommand(() => OpenMergeToolAsync(path)),
             HistoryCommand = new AsyncRelayCommand(() => ShowFileHistoryAsync(path)),
             LfsTrackCommand = new AsyncRelayCommand(() => TrackWithLfs(path)),
@@ -2223,6 +2249,36 @@ public partial class RepositoryViewModel : ViewModelBase
                 await RunAsync("Discarding…", ct => _session.DiscardUntrackedAsync(path, ct));
             else
                 await RunAsync("Discarding…", ct => _session.DiscardTrackedAsync(path, ct));
+        });
+    }
+
+    private Task AddUntrackedAsync(IReadOnlyList<string> paths)
+    {
+        if (_session is null || paths.Count == 0)
+            return Task.CompletedTask;
+        return RunAsync("Adding untracked…", ct => _session.StagePathsAsync(paths, ct));
+    }
+
+    /// <summary>
+    /// Asks, then removes the untracked paths captured when the row was built.
+    /// <c>git clean -fd</c> also removes a directory that status listed once.
+    /// </summary>
+    private Task DeleteUntrackedAsync(IReadOnlyList<string> paths, bool all)
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || paths.Count == 0)
+            return Task.CompletedTask;
+        return HoldFocus(async () =>
+        {
+            var message = paths.Count == 1 && !all
+                ? $"Delete {paths[0]}? This cannot be undone."
+                : Listed("Delete these untracked files? This cannot be undone.", paths);
+            var ok = await dialogs.ConfirmAsync(
+                all ? "Delete untracked" : "Delete",
+                message,
+                all ? "Delete all" : "Delete");
+            if (!ok || _session is null)
+                return;
+            await RunAsync("Deleting untracked…", ct => _session.DiscardUntrackedPathsAsync(paths, ct));
         });
     }
 
@@ -4146,7 +4202,9 @@ public partial class RepositoryViewModel : ViewModelBase
             return state.Branch.Unborn ? "No commits yet" : "Clean";
         var conflicts = state.Entries.Count(entry => entry.Kind == ChangeKind.Unmerged);
         var staged = state.Entries.Count(entry => entry.Staged && entry.Kind != ChangeKind.Unmerged);
-        var unstaged = state.Entries.Count(entry => entry.Kind != ChangeKind.Unmerged && (entry.Unstaged || entry.Kind == ChangeKind.Untracked));
+        var unstaged = state.Entries.Count(entry =>
+            entry.Kind != ChangeKind.Unmerged && entry.Kind != ChangeKind.Untracked && entry.Unstaged);
+        var untracked = state.Entries.Count(entry => entry.Kind == ChangeKind.Untracked);
         var parts = new List<string>();
         if (conflicts > 0)
             parts.Add($"{conflicts} conflicted");
@@ -4154,6 +4212,8 @@ public partial class RepositoryViewModel : ViewModelBase
             parts.Add($"{staged} staged");
         if (unstaged > 0)
             parts.Add($"{unstaged} unstaged");
+        if (untracked > 0)
+            parts.Add($"{untracked} untracked");
         return string.Join(", ", parts);
     }
 

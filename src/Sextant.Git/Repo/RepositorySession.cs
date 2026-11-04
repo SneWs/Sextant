@@ -859,6 +859,13 @@ public sealed partial class RepositorySession : IAsyncDisposable
     public Task DiscardUntrackedAsync(string path, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.DiscardUntracked(_toplevel, path), null, cancellationToken);
 
+    public Task DiscardUntrackedPathsAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    {
+        if (paths.Count == 0)
+            return Task.CompletedTask;
+        return MutateAsync(GitCommands.DiscardUntrackedPaths(_toplevel, paths), null, cancellationToken);
+    }
+
     public Task DiscardAllAsync(CancellationToken cancellationToken)
     {
         var entries = Snapshot().Entries.Where(entry => entry.Kind != ChangeKind.Unmerged).ToList();

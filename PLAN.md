@@ -197,6 +197,8 @@ On 2026-10-30 the merge editor opens with the first conflict in view. A file wit
 
 On 2026-10-30 a merge, rebase, cherry-pick, or revert leaves the open views alone. A change on disk, focusing the window, and a periodic fetch do not reload the diff or the merge editor. F5, save, stage, continue, and abort still update the views. `Merge_keeps_the_open_editor_until_refresh` and `Rebase_keeps_the_open_editor_until_refresh` passed. The desktop window was not launched.
 
+On 2026-11-04 the Changes list keeps Conflicts, then Staged, then Unstaged, and puts untracked files in their own Untracked section. Each untracked file has Add and Delete. The Untracked title has Add all and Delete all. Add all stages only those untracked paths. Delete and Delete all ask, then remove only those untracked files and directories and leave tracked changes alone. `Untracked_files_are_their_own_section_with_add_and_delete` and `Staged_files_sit_above_unstaged_and_the_section_is_a_bar` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

@@ -297,6 +297,13 @@ public partial class FileRowViewModel : ObservableObject
 
     public bool ShowDiscard { get; init; }
 
+    public string StageLabel { get; init; } = "Stage";
+
+    public string DiscardLabel { get; init; } = "Discard";
+
+    /// <summary>The Untracked title offers Add all and Delete all.</summary>
+    public bool ShowUntrackedActions { get; init; }
+
     public bool ShowMergetool { get; init; }
 
     public string MergetoolLabel { get; init; } = "";
