@@ -69,7 +69,7 @@ public class LineStageMenuTests
                 Assert.False(vm.HasBanner, vm.Banner);
                 Assert.Equal("one\nalpha\n", Text(repo.RunCapture("show", ":a.txt")));
                 Assert.Equal("one\nalpha\nbeta\ngamma\n", Text(File.ReadAllText(Path.Combine(repo.Directory, "a.txt"))));
-                var unstagedDiff = repo.RunCapture("diff", "--", "a.txt");
+                var unstagedDiff = repo.RunCapture("-c", "diff.autoRefreshIndex=false", "--no-optional-locks", "diff", "--", "a.txt");
                 Assert.Contains("+beta", unstagedDiff, StringComparison.Ordinal);
                 Assert.Contains("+gamma", unstagedDiff, StringComparison.Ordinal);
                 Assert.DoesNotContain("+alpha", unstagedDiff, StringComparison.Ordinal);
@@ -115,7 +115,7 @@ public class LineStageMenuTests
                 menu.Close();
 
                 Assert.False(vm.HasBanner, vm.Banner);
-                Assert.Equal("", repo.RunCapture("diff", "--cached", "--name-only").Trim());
+                Assert.Equal("", repo.RunCapture("-c", "diff.autoRefreshIndex=false", "--no-optional-locks", "diff", "--cached", "--name-only").Trim());
                 Assert.Equal("one\nalpha\nbeta\ngamma\n", Text(File.ReadAllText(Path.Combine(repo.Directory, "a.txt"))));
             }
             finally
@@ -189,7 +189,7 @@ public class LineStageMenuTests
                 menu.Close();
 
                 Assert.False(vm.HasBanner, vm.Banner);
-                Assert.Equal("", repo.RunCapture("diff", "--cached", "--name-only").Trim());
+                Assert.Equal("", repo.RunCapture("-c", "diff.autoRefreshIndex=false", "--no-optional-locks", "diff", "--cached", "--name-only").Trim());
                 Assert.Equal("one\n\nAdding more lines...!\n", Text(File.ReadAllText(Path.Combine(repo.Directory, "a.txt"))));
             }
             finally
@@ -206,6 +206,8 @@ public class LineStageMenuTests
     {
         // The git watcher debounces for 200ms and then rebuilds every diff row.
         // WatcherEpoch stays odd until that rebuild has published the new rows.
+        // The quiet stretch has to outlast that debounce, or the next git command
+        // starts while a refresh is still armed.
         var seen = vm.WatcherEpoch;
         var stable = 0;
         for (var pass = 0; pass < 80; pass++)
@@ -222,7 +224,7 @@ public class LineStageMenuTests
                 stable = 0;
             }
 
-            if (pass >= 12 && stable >= 8)
+            if (pass >= 15 && stable >= 15)
                 break;
         }
 

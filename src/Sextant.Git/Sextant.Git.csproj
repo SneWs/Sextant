@@ -8,4 +8,9 @@
     <Nullable>enable</Nullable>
     <RootNamespace>Sextant.Git</RootNamespace>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="ProcessSignals.Unix.cs" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
+    <Compile Remove="ProcessSignals.Windows.cs" Condition="!$([MSBuild]::IsOSPlatform('Windows'))" />
+  </ItemGroup>
 </Project>

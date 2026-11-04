@@ -197,6 +197,22 @@ On 2026-10-30 the merge editor opens with the first conflict in view. A file wit
 
 On 2026-10-30 a merge, rebase, cherry-pick, or revert leaves the open views alone. A change on disk, focusing the window, and a periodic fetch do not reload the diff or the merge editor. F5, save, stage, continue, and abort still update the views. `Merge_keeps_the_open_editor_until_refresh` and `Rebase_keeps_the_open_editor_until_refresh` passed. The desktop window was not launched.
 
+On 2026-11-04 the Changes list keeps Conflicts, then Staged, then Unstaged, and puts untracked files in their own Untracked section. Each untracked file has Add and Delete. The Untracked title has Add all and Delete all. Add all stages only those untracked paths. Delete and Delete all ask, then remove only those untracked files and directories and leave tracked changes alone. `Untracked_files_are_their_own_section_with_add_and_delete` and `Staged_files_sit_above_unstaged_and_the_section_is_a_bar` passed. The desktop window was not launched.
+
+On 2026-11-04 the working-copy diff uses those same bars: Conflicts, then Staged, then Unstaged, then Untracked. The Untracked bar has Add all and Delete all, wired to the Changes header. Expand all and Collapse all keep the bars. A commit diff has none. `Working_copy_diff_groups_files_like_the_changes_list` passed. The desktop window was not launched.
+
+On 2026-11-04 those diff bars are taller than the file headers and use an accent stripe. The Staged bar has Unstage all and the Unstaged bar has Stage all, the same commands as the diff command bar. The Untracked bar still has Add all and Delete all. `Working_copy_diff_groups_files_like_the_changes_list` passed. The desktop window was not launched.
+
+On 2026-11-04 the Changes list uses that same accent bar for Conflicts, Staged, Unstaged, Untracked, and a commit's Changes title. Diff file headers are a shorter card, and the label and Stage file or Unstage file button still fit. `Staged_files_sit_above_unstaged_and_the_section_is_a_bar` and `Working_copy_diff_groups_files_like_the_changes_list` passed. The desktop window was not launched.
+
+On 2026-11-04 the Changes Staged bar has Unstage all and the Unstaged bar has Stage all, the same commands as the diff bars. Those bars are 40px in both views, still taller than the file rows, and the label and button fit. `Staged_files_sit_above_unstaged_and_the_section_is_a_bar`, `Untracked_files_are_their_own_section_with_add_and_delete`, and `Working_copy_diff_groups_files_like_the_changes_list` passed. The desktop window was not launched.
+
+On 2026-11-04 the Unstaged bar in Changes and in the diff has Discard all. It asks, then runs `git restore --worktree` for the unstaged paths captured on that bar. The index stays, so a partly staged file keeps its staged text, and untracked files stay. `Discard_unstaged_restores_the_worktree_and_leaves_staged_and_untracked` and `Unstaged_header_discards_only_unstaged_changes` passed. The desktop window was not launched.
+
+On 2026-11-04 Stage all is the rightmost button on the Unstaged bar in Changes and in the diff. Discard all sits to its left. `Staged_files_sit_above_unstaged_and_the_section_is_a_bar` and `Untracked_files_are_their_own_section_with_add_and_delete` passed. The desktop window was not launched.
+
+On 2026-11-04 a line stage no longer fails with `index.lock` still present. `git diff` was rewriting the index after a stale stat, even with `--no-optional-locks`, and cancelling that diff with SIGKILL left the lock. Diff commands now pass `-c diff.autoRefreshIndex=false`. On macOS and Linux a cancelled git process gets SIGTERM first, so it can unlink the lock. `Cancelling_on_unix_lets_the_process_remove_its_lock` and `Selected_lines_stage_and_unstage_from_the_diff_menu` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
@@ -224,7 +240,7 @@ Speed comes from calling git rarely, asking for machine-readable slices, and pai
 - Selecting a commit or a file cancels the previous file-list or diff process for that tab.
 - An inactive tab never runs `git log` or `git diff`. It stays unloaded until selected.
 - Network operations (clone, fetch, pull, push) are exclusive per repository, show progress, and cancel only when the user cancels them.
-- Read commands pass `--no-optional-locks` so a refresh does not rewrite the index and wake the file watcher.
+- Read commands pass `--no-optional-locks` so a refresh does not rewrite the index and wake the file watcher. `git diff` still rewrites it when a stat is stale, so those commands also pass `-c diff.autoRefreshIndex=false`.
 
 Measure these on a real repository and record the numbers in this file when Phase 1 is far enough to time them. Targets, on a machine where the repo is already on disk and git's commit-graph is warm:
 
@@ -291,7 +307,7 @@ Probe `git --version` at startup. Porcelain v2, `git switch`, and `git restore` 
 - Decode stdout as UTF-8 by default. If the repo's `i18n.logOutputEncoding` is set, use that for human text. Paths come from `-z` records, not from quoted escaped paths.
 - Before writing a command to the on-screen log, strip URL userinfo so a token in an HTTPS remote does not land in the log.
 
-Cancellation uses `Process.Kill(entireProcessTree: true)`, which is cross-platform on .NET 10. Cancel is wired to the tab's lifetime: closing a tab cancels its reads and kills its children. A write that the user did not cancel is allowed to finish, except network operations, which have an explicit Cancel button.
+On macOS and Linux, cancellation sends SIGTERM and waits briefly so git can unlink `index.lock`, then `Process.Kill(entireProcessTree: true)` if the process is still running. Windows cancellation is that kill immediately. Cancel is wired to the tab's lifetime: closing a tab cancels its reads and stops its children. A write that the user did not cancel is allowed to finish, except network operations, which have an explicit Cancel button.
 
 There is no global timeout on local commands. A slow `git status` on a huge tree is a real result, and it is the signal for the performance suggestion. Network commands run until they exit or the user cancels.
 
@@ -331,9 +347,9 @@ Reads add `--no-optional-locks`. Writes do not.
 | Status | `--no-optional-locks status --porcelain=v2 -z -b` |
 | Refs | `--no-optional-locks for-each-ref` with a NUL format of object name, refname, HEAD marker, upstream short name |
 | Log page | `--no-optional-locks log -z --date-order HEAD --branches --tags --remotes --format=%H%x1f%P%x1f%at%x1f%an%x1f%ae%x1f%s -n <count> --skip <skip>` |
-| Commit files | `--no-optional-locks diff -z --name-status <first-parent> <sha>`. A commit with no parent stays `show -z --format= --name-status <sha>`. `git show` on a merge is a combined diff and lists only paths that differ from every parent, so a clean merge would render no files |
-| Unstaged diff | `--no-optional-locks diff -- <path>` |
-| Staged diff | `--no-optional-locks diff --cached -- <path>` |
+| Commit files | `--no-optional-locks -c diff.autoRefreshIndex=false diff -z --name-status <first-parent> <sha>`. A commit with no parent stays `show -z --format= --name-status <sha>`. `git show` on a merge is a combined diff and lists only paths that differ from every parent, so a clean merge would render no files |
+| Unstaged diff | `--no-optional-locks -c diff.autoRefreshIndex=false diff -- <path>` |
+| Staged diff | `--no-optional-locks -c diff.autoRefreshIndex=false diff --cached -- <path>` |
 | Stage file | `add -- <path>` |
 | Stage all | `add -A`. While a merge, cherry-pick, or revert is conflicted, `add -- <paths>` for the non-unmerged paths so those conflicts stay unmerged |
 | Unstage file | `restore --staged -- <path>` |

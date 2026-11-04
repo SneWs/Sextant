@@ -160,8 +160,32 @@
                                         </StackPanel>
                                     </Grid>
                                 </DataTemplate>
+                                <DataTemplate DataType="vm:DiffGroupRow" x:DataType="vm:DiffGroupRow">
+                                    <Border Classes="diffgroup" Margin="0,12,0,4" Padding="12,6" MinHeight="40" CornerRadius="0"
+                                            BorderThickness="4,0,0,0">
+                                        <Border.Background>
+                                            <SolidColorBrush Color="{DynamicResource SystemAccentColor}" Opacity="0.18"/>
+                                        </Border.Background>
+                                        <Border.BorderBrush>
+                                            <SolidColorBrush Color="{DynamicResource SystemAccentColor}"/>
+                                        </Border.BorderBrush>
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Classes="diffgrouplabel" Text="{Binding Label}" FontSize="15" FontWeight="Bold" VerticalAlignment="Center"/>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="12,0,4,0" VerticalAlignment="Center">
+                                                <Button Classes="flat" Content="{Binding DiscardAllLabel}" Command="{Binding DiscardAllCommand}"
+                                                        IsVisible="{Binding ShowDiscardAll}" Padding="8,2"/>
+                                                <Button Classes="flat" Content="{Binding BulkLabel}" Command="{Binding BulkCommand}"
+                                                        IsVisible="{Binding ShowBulk}" Padding="8,2"/>
+                                                <Button Classes="flat" Content="Add all" Command="{Binding StageCommand}"
+                                                        IsVisible="{Binding ShowUntrackedActions}" Padding="8,2"/>
+                                                <Button Classes="flat" Content="Delete all" Command="{Binding DiscardCommand}"
+                                                        IsVisible="{Binding ShowUntrackedActions}" Padding="8,2"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
                                 <DataTemplate DataType="vm:DiffFileRow" x:DataType="vm:DiffFileRow">
-                                    <Border Margin="8,10,8,4" Padding="8,6" CornerRadius="6" BorderThickness="1"
+                                    <Border Margin="8,6,8,2" Padding="8,3" CornerRadius="6" BorderThickness="1"
                                             HorizontalAlignment="Stretch"
                                             Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
                                             BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
@@ -203,7 +227,8 @@
                                             <TextBlock Grid.Column="3" Text="{Binding StagingLabel}" IsVisible="{Binding ShowAction}"
                                                        Margin="12,0,0,0" Opacity="0.7" VerticalAlignment="Center"/>
                                             <Button Grid.Column="4" Classes="accent" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                                    Content="{Binding ActionLabel}" Command="{Binding ActionCommand}" IsVisible="{Binding ShowAction}" Margin="12,0,0,0"/>
+                                                    Content="{Binding ActionLabel}" Command="{Binding ActionCommand}" IsVisible="{Binding ShowAction}"
+                                                    Margin="12,0,0,0" Padding="8,2" MinHeight="0"/>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>

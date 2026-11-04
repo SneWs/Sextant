@@ -179,6 +179,7 @@ public static class CopyText
         DiffEditorRow row when key == "right" && row.SideBySide => DiffEditorRow.Copy(row.RightLines),
         DiffEditorRow row when key == "blame" && row.Blame => DiffEditorRow.Copy(row.Lines),
         DiffHunkRow row when key is "body" or "left" or "right" or "span" => row.Header,
+        DiffGroupRow row when key is "body" or "left" or "right" or "span" => row.Label,
         DiffFileRow row when key is "body" or "left" or "right" or "span" => row.Label,
         DiffSideRow row when key == "left" => row.SkipLeftCopy ? null : row.Left,
         DiffSideRow row when key == "right" => row.SkipRightCopy ? null : row.Right,

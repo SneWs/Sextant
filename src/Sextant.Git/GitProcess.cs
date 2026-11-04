@@ -77,7 +77,7 @@ public sealed class GitProcessRunner
             throw new GitCommandFailedException("The git command was too long to start.");
         }
 
-        using var registration = cancellationToken.Register(() => TryKill(process));
+        using var registration = cancellationToken.Register(() => RequestExit(process));
         var stdoutTask = ReadAllAsync(process.StandardOutput.BaseStream);
         var stderrTask = ReadStandardErrorAsync(process.StandardError.BaseStream, request.Progress);
         if (request.StandardInput is { Length: > 0 })
@@ -94,15 +94,8 @@ public sealed class GitProcessRunner
         }
         catch (OperationCanceledException)
         {
-            TryKill(process);
-            try
-            {
-                await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-
+            RequestExit(process);
+            await WaitUntilExitedAsync(process).ConfigureAwait(false);
             await DrainAsync(stdoutTask, stderrTask).ConfigureAwait(false);
             throw;
         }
@@ -244,12 +237,49 @@ public sealed class GitProcessRunner
     private static bool WorkTreeMissing(string? directory) =>
         !string.IsNullOrEmpty(directory) && !Directory.Exists(directory);
 
-    private static void TryKill(Process process)
+    /// <summary>
+    /// Asks git to exit. On macOS and Linux that is SIGTERM, so git can unlink <c>index.lock</c>
+    /// before it dies. SIGKILL skips that handler and the next command then finds the lock.
+    /// Windows has no such signal, so the process tree is killed immediately.
+    /// </summary>
+    internal static void RequestExit(Process process)
     {
         try
         {
+            if (process.HasExited)
+                return;
+            if (ProcessSignals.TryTerminate(process))
+                return;
+            process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (Win32Exception)
+        {
+        }
+    }
+
+    /// <summary>Waits for <see cref="RequestExit"/> to finish, then kills the tree if it is still running.</summary>
+    internal static async Task WaitUntilExitedAsync(Process process)
+    {
+        try
+        {
+            if (process.HasExited)
+                return;
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+                return;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
             if (!process.HasExited)
                 process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
         }
         catch (InvalidOperationException)
         {

@@ -992,12 +992,32 @@ public partial class RepositoryViewModel
             FileMenu = FileMenuFor(path, tracked),
             StagingFile = stagingFile,
         };
-        var section = new DiffSection(key, header);
+        var group = ImageGroup(stagingFile, path);
+        var groupRow = group is null || _sections.Any(section => section.GroupName == group)
+            ? null
+            : CreateGroupRow(group);
+        var section = new DiffSection(key, header)
+        {
+            GroupName = group,
+            GroupHeader = groupRow,
+        };
         header.ToggleCommand = new AsyncRelayCommand(() => SetExpanded(section, !header.Expanded), AsyncRelayCommandOptions.AllowConcurrentExecutions);
-        _sections.Add(section);
-        DiffRows.Add(header);
+        InsertSection(section);
         NoteSectionFolds();
         return section;
+    }
+
+    private string? ImageGroup(FileRowViewModel? stagingFile, string path)
+    {
+        if (!ShowingWorkingCopy || _rangeOlder is not null || _rangeNewer is not null)
+            return null;
+        if (stagingFile is { Kind: ChangeKind.Unmerged })
+            return "Conflicts";
+        if (stagingFile is { FromStagedList: true })
+            return "Staged";
+        if (stagingFile is { Untracked: true } || IsUntrackedPath(path))
+            return "Untracked";
+        return "Unstaged";
     }
 
     private void NoteMissingPreview(string path, bool? staged)

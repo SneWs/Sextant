@@ -15,7 +15,7 @@ public class GitCommandTests
                 "-c", "filter.lfs.smudge=",
                 "-c", "filter.lfs.process=",
                 "-c", "filter.lfs.required=false",
-                "-C", "repo", "--no-optional-locks", "diff", "--no-textconv", "--numstat", "-z", "aaa", "bbb",
+                "-C", "repo", "--no-optional-locks", "-c", "diff.autoRefreshIndex=false", "diff", "--no-textconv", "--numstat", "-z", "aaa", "bbb",
             ],
             GitCommands.NumStat("repo", "aaa", "bbb"));
         Assert.Equal(
@@ -129,6 +129,11 @@ public class GitCommandTests
         Assert.Equal(
             ["-C", "repo", "restore", "--source=HEAD", "--worktree", "--staged", "--", "a.txt", "old.txt"],
             GitCommands.DiscardTrackedPaths("repo", ["a.txt", "old.txt"]));
+        Assert.Equal(
+            ["-C", "repo", "restore", "--worktree", "--", "a.txt", "old.txt"],
+            GitCommands.DiscardWorktreePaths("repo", ["a.txt", "old.txt"]));
+        Assert.DoesNotContain("--staged", GitCommands.DiscardWorktreePaths("repo", ["a.txt"]));
+        Assert.DoesNotContain("--source=HEAD", GitCommands.DiscardWorktreePaths("repo", ["a.txt"]));
         Assert.Equal(["-C", "repo", "rm", "-f", "--", "a.txt"], GitCommands.DiscardUnbornPaths("repo", ["a.txt"]));
         Assert.Equal(["-C", "repo", "clean", "-fd", "--", "new.txt"], GitCommands.DiscardUntrackedPaths("repo", ["new.txt"]));
         Assert.DoesNotContain("-x", GitCommands.DiscardUntrackedPaths("repo", ["new.txt"]));
@@ -153,6 +158,9 @@ public class GitCommandTests
         Assert.DoesNotContain("filter.lfs.smudge=", GitCommands.DiffWorktree("repo", false, false));
         Assert.DoesNotContain("filter.lfs.required=false", GitCommands.DiffWorktree("repo", false, false));
         Assert.Contains("--no-textconv", GitCommands.DiffWorktree("repo", false, false));
+        Assert.Contains("diff.autoRefreshIndex=false", GitCommands.DiffWorktree("repo", false, false));
+        Assert.Contains("diff.autoRefreshIndex=false", GitCommands.DiffRange("repo", "a", "b", "file.bin"));
+        Assert.Contains("diff.autoRefreshIndex=false", GitCommands.RangeNameStatus("repo", "a", "b"));
         Assert.DoesNotContain("diff.lfs.textconv=", GitCommands.DiffWorktree("repo", false, false));
         Assert.Contains("filter.lfs.process=", GitCommands.DiffWorktree("repo", true, false));
         Assert.Contains("--no-textconv", GitCommands.DiffWorktree("repo", true, false));
