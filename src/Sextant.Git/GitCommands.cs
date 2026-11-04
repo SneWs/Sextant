@@ -545,6 +545,7 @@ public static class GitCommands
         arguments.Add("/dev/null");
         arguments.Add(path);
         KeepLfsPointers(arguments);
+        SkipIndexRefresh(arguments);
         return arguments;
     }
 
@@ -559,6 +560,7 @@ public static class GitCommands
         arguments.Add(before);
         arguments.Add(after);
         KeepLfsPointers(arguments);
+        SkipIndexRefresh(arguments);
         return arguments;
     }
 
@@ -582,6 +584,7 @@ public static class GitCommands
         // compares those bytes, so a clean checkout looks modified whenever git re-reads the file.
         if (staged)
             KeepLfsPointers(arguments);
+        SkipIndexRefresh(arguments);
         return arguments;
     }
 
@@ -599,11 +602,16 @@ public static class GitCommands
         }
 
         KeepLfsPointers(arguments);
+        SkipIndexRefresh(arguments);
         return arguments;
     }
 
-    public static IReadOnlyList<string> RangeNameStatus(string toplevel, string older, string newer) =>
-        ["-C", toplevel, "--no-optional-locks", "diff", "-z", "--name-status", older, newer];
+    public static IReadOnlyList<string> RangeNameStatus(string toplevel, string older, string newer)
+    {
+        var arguments = new List<string> { "-C", toplevel, "--no-optional-locks", "diff", "-z", "--name-status", older, newer };
+        SkipIndexRefresh(arguments);
+        return arguments;
+    }
 
     /// <summary>Added and removed lines between two commits. Rename detection stays on, so a rename is not a full delete plus add.</summary>
     public static IReadOnlyList<string> NumStat(string toplevel, string older, string newer)
@@ -613,6 +621,7 @@ public static class GitCommands
             "-C", toplevel, "--no-optional-locks", "diff", "--no-textconv", "--numstat", "-z", older, newer,
         };
         KeepLfsPointers(arguments);
+        SkipIndexRefresh(arguments);
         return arguments;
     }
 
@@ -1208,6 +1217,16 @@ public static class GitCommands
     /// An unstaged worktree diff does not use this. That comparison has to run the clean filter, or a clean checkout looks modified.
     /// Text conversion is turned off with --no-textconv on the command. An empty diff.lfs.textconv makes git try to spawn a blank program.
     /// </summary>
+    /// <summary>
+    /// <c>git diff</c> rewrites the index when a stat is stale, and <c>--no-optional-locks</c> does not stop that.
+    /// The rewrite takes <c>index.lock</c>. Cancelling the diff used to leave the lock, and the next stage failed.
+    /// </summary>
+    private static void SkipIndexRefresh(List<string> arguments)
+    {
+        var index = arguments.IndexOf("diff");
+        arguments.InsertRange(index, ["-c", "diff.autoRefreshIndex=false"]);
+    }
+
     private static void KeepLfsPointers(List<string> arguments)
     {
         arguments.InsertRange(0,

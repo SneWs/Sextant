@@ -15,7 +15,7 @@ public class GitCommandTests
                 "-c", "filter.lfs.smudge=",
                 "-c", "filter.lfs.process=",
                 "-c", "filter.lfs.required=false",
-                "-C", "repo", "--no-optional-locks", "diff", "--no-textconv", "--numstat", "-z", "aaa", "bbb",
+                "-C", "repo", "--no-optional-locks", "-c", "diff.autoRefreshIndex=false", "diff", "--no-textconv", "--numstat", "-z", "aaa", "bbb",
             ],
             GitCommands.NumStat("repo", "aaa", "bbb"));
         Assert.Equal(
@@ -158,6 +158,9 @@ public class GitCommandTests
         Assert.DoesNotContain("filter.lfs.smudge=", GitCommands.DiffWorktree("repo", false, false));
         Assert.DoesNotContain("filter.lfs.required=false", GitCommands.DiffWorktree("repo", false, false));
         Assert.Contains("--no-textconv", GitCommands.DiffWorktree("repo", false, false));
+        Assert.Contains("diff.autoRefreshIndex=false", GitCommands.DiffWorktree("repo", false, false));
+        Assert.Contains("diff.autoRefreshIndex=false", GitCommands.DiffRange("repo", "a", "b", "file.bin"));
+        Assert.Contains("diff.autoRefreshIndex=false", GitCommands.RangeNameStatus("repo", "a", "b"));
         Assert.DoesNotContain("diff.lfs.textconv=", GitCommands.DiffWorktree("repo", false, false));
         Assert.Contains("filter.lfs.process=", GitCommands.DiffWorktree("repo", true, false));
         Assert.Contains("--no-textconv", GitCommands.DiffWorktree("repo", true, false));

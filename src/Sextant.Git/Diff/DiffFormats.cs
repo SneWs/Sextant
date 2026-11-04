@@ -339,7 +339,7 @@ public static class DiffFormatTool
         using (process)
         {
             var started = Stopwatch.StartNew();
-            using var registration = cancellationToken.Register(() => TryKill(process));
+            using var registration = cancellationToken.Register(() => GitProcessRunner.RequestExit(process));
             var stdout = ReadCappedAsync(process, process.StandardOutput.BaseStream, cancellationToken);
             var stderr = ReadTextAsync(process.StandardError.BaseStream);
             try
@@ -349,7 +349,8 @@ public static class DiffFormatTool
             }
             catch (OperationCanceledException)
             {
-                TryKill(process);
+                GitProcessRunner.RequestExit(process);
+                await GitProcessRunner.WaitUntilExitedAsync(process).ConfigureAwait(false);
                 throw;
             }
 
@@ -358,7 +359,10 @@ public static class DiffFormatTool
             cancellationToken.ThrowIfCancellationRequested();
             started.Stop();
             if (output is null)
+            {
+                await GitProcessRunner.WaitUntilExitedAsync(process).ConfigureAwait(false);
                 return new DiffFormatRun(false, [], "The formatter wrote more than 8 MB.", display, process.ExitCode, started.Elapsed);
+            }
             if (process.ExitCode != 0)
             {
                 var detail = string.IsNullOrWhiteSpace(errorText)
@@ -466,7 +470,7 @@ public static class DiffFormatTool
                 return memory.ToArray();
             if (memory.Length + read > HistoryLimits.MaxPreviewBytes)
             {
-                TryKill(process);
+                GitProcessRunner.RequestExit(process);
                 return null;
             }
 
@@ -480,20 +484,6 @@ public static class DiffFormatTool
         return await reader.ReadToEndAsync().ConfigureAwait(false);
     }
 
-    private static void TryKill(Process process)
-    {
-        try
-        {
-            if (!process.HasExited)
-                process.Kill(entireProcessTree: true);
-        }
-        catch (InvalidOperationException)
-        {
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-        }
-    }
 }
 
 public readonly record struct DiffFormatSides(string BeforePath, string AfterPath, bool BeforeMissing, bool AfterMissing);

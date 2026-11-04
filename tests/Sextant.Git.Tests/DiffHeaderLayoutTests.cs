@@ -479,7 +479,9 @@ public class DiffHeaderLayoutTests
                 stable = 0;
             }
 
-            if (pass >= 12 && stable >= 8)
+            // Longer than GitDirectoryWatcher's 200ms debounce, so a refresh
+            // armed at the start of this wait has either run or been ruled out.
+            if (pass >= 15 && stable >= 15)
                 return;
         }
     }

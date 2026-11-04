@@ -752,6 +752,53 @@ public class SessionTests
         Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(10));
     }
 
+    [Fact]
+    public async Task Cancelling_on_unix_lets_the_process_remove_its_lock()
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-stop-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        var script = Path.Combine(directory, "hold-lock");
+        var lockFile = Path.Combine(directory, "index.lock");
+        try
+        {
+            await File.WriteAllTextAsync(script, """
+                #!/bin/sh
+                lock="$1"
+                trap 'rm -f "$lock"; : > "$lock.termed"; exit 0' TERM
+                : > "$lock"
+                while :; do
+                    :
+                done
+                """);
+            File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            using var cts = new CancellationTokenSource();
+            var task = new GitProcessRunner().RunAsync(
+                new GitRequest { Executable = script, Arguments = [lockFile], WorkingDirectory = directory },
+                cts.Token);
+            for (var pass = 0; pass < 50 && !File.Exists(lockFile); pass++)
+                await Task.Delay(20);
+            Assert.True(File.Exists(lockFile));
+            cts.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
+            Assert.False(File.Exists(lockFile));
+            Assert.True(File.Exists(lockFile + ".termed"));
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+        }
+    }
+
     private static Task<RepositorySession> Open(TempRepo repo) =>
         RepositorySession.OpenAsync(new GitProcessRunner(), repo.Git, repo.Directory, CancellationToken.None);
 
