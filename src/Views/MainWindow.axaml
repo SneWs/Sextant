@@ -208,13 +208,11 @@
                         Background="{DynamicResource DockSurfacePanelBrush}"
                         BorderThickness="0,0,0,1"
                         BorderBrush="{DynamicResource DockSeparatorBrush}">
-                    <ScrollViewer x:Name="TabScroll"
-                                  HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
-                                  Background="Transparent">
+                    <Grid x:Name="RepositoryTabBar" ClipToBounds="True">
                         <TabStrip x:Name="RepositoryTabs" ItemsSource="{Binding Tabs}" SelectionChanged="OnRepositoryTabSelected">
                             <TabStrip.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <StackPanel Orientation="Horizontal"/>
+                                    <views:RepositoryTabPanel/>
                                 </ItemsPanelTemplate>
                             </TabStrip.ItemsPanel>
                             <TabStrip.ItemTemplate>
@@ -241,7 +239,18 @@
                                 </DataTemplate>
                             </TabStrip.ItemTemplate>
                         </TabStrip>
-                    </ScrollViewer>
+                        <Button x:Name="TabOverflow" Classes="flat"
+                                HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                                Width="{DynamicResource DockHeaderHeight}"
+                                MinWidth="{DynamicResource DockHeaderHeight}"
+                                MaxWidth="{DynamicResource DockHeaderHeight}"
+                                Padding="0" Background="Transparent" IsVisible="False"
+                                ToolTip.Tip="More tabs" AutomationProperties.Name="More tabs">
+                            <Path Width="8" Height="5" Stretch="Uniform"
+                                  Fill="{DynamicResource DockTabForegroundBrush}"
+                                  Data="M0,0 L8,0 L4,5 Z"/>
+                        </Button>
+                    </Grid>
                 </Border>
                 <Panel Grid.Row="1" IsVisible="{Binding HasActiveTab}">
                     <ContentControl Content="{Binding ActiveTab}">

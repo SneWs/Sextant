@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using CommunityToolkit.Mvvm.Input;
 using Sextant;
 using Sextant.Docking;
 using Sextant.Services;
@@ -30,6 +31,7 @@ public partial class MainWindow : Window
         DataContextChanged += (_, _) => AttachViewModel();
         Activated += OnWindowActivated;
         RepositoryTabs.AddHandler(PointerPressedEvent, OnRepositoryTabPressed, RoutingStrategies.Tunnel);
+        RepositoryTabs.LayoutUpdated += OnRepositoryTabLayout;
         AddHandler(PointerMovedEvent, OnWindowPointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(PointerReleasedEvent, OnWindowPointerReleased, RoutingStrategies.Tunnel, handledEventsToo: true);
         // A taskbar click activates the window while it is still minimized. Avalonia
@@ -114,7 +116,6 @@ public partial class MainWindow : Window
         if (index >= 0)
             vm.MoveTab(_dragTab, index);
         SyncRepositoryTabs();
-        NudgeTabScroll(e.GetPosition(TabScroll));
         e.Handled = true;
     }
 
@@ -149,36 +150,97 @@ public partial class MainWindow : Window
             vm.Save();
     }
 
-    private void NudgeTabScroll(Point point)
+    private string[]? _overflowKey;
+
+    private void OnRepositoryTabLayout(object? sender, EventArgs e)
     {
-        var offset = TabScroll.Offset;
-        if (point.X < 24)
-            TabScroll.Offset = new Vector(Math.Max(0, offset.X - 16), offset.Y);
-        else if (point.X > TabScroll.Bounds.Width - 24)
-            TabScroll.Offset = new Vector(offset.X + 16, offset.Y);
+        if (RepositoryTabs.ItemsPanelRoot is not RepositoryTabPanel panel)
+            return;
+        if (TabOverflow.IsVisible != panel.HasOverflow)
+            TabOverflow.IsVisible = panel.HasOverflow;
+        // Filling the menu from Opening runs after the presenter is created, and the desktop popup stays empty.
+        UpdateOverflowMenu(panel.OverflowTabs);
+    }
+
+    private void UpdateOverflowMenu(IReadOnlyList<RepositoryViewModel> tabs)
+    {
+        if (DataContext is not MainViewModel vm)
+            return;
+        if (TabOverflow.Flyout is MenuFlyout { IsOpen: true })
+            return;
+        var key = new string[tabs.Count];
+        for (var i = 0; i < tabs.Count; i++)
+            key[i] = tabs[i].Title + "\n" + tabs[i].ShortcutHint;
+        if (_overflowKey is not null && SameKey(_overflowKey, key))
+            return;
+
+        _overflowKey = key;
+        var flyout = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedRight };
+        foreach (var tab in tabs)
+        {
+            flyout.Items.Add(new MenuItem
+            {
+                Header = OverflowHeader(tab),
+                Tag = tab,
+                Command = new AsyncRelayCommand(() => vm.Activate(tab)),
+            });
+        }
+
+        flyout.Closed += OnOverflowMenuClosed;
+        TabOverflow.Flyout = flyout;
+    }
+
+    private void OnOverflowMenuClosed(object? sender, EventArgs e)
+    {
+        if (sender is MenuFlyout flyout)
+            flyout.Closed -= OnOverflowMenuClosed;
+        _overflowKey = null;
+        if (RepositoryTabs.ItemsPanelRoot is RepositoryTabPanel panel)
+            UpdateOverflowMenu(panel.OverflowTabs);
+    }
+
+    private static bool SameKey(string[] left, string[] right)
+    {
+        if (left.Length != right.Length)
+            return false;
+        for (var i = 0; i < left.Length; i++)
+        {
+            if (!string.Equals(left[i], right[i], StringComparison.Ordinal))
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>A string header keeps underscores as characters. The menu theme treats a single underscore as an access key.</summary>
+    private static string OverflowHeader(RepositoryViewModel tab)
+    {
+        var title = tab.Title.Replace("_", "__", StringComparison.Ordinal);
+        if (string.IsNullOrEmpty(tab.ShortcutHint))
+            return title;
+        return title + "  " + tab.ShortcutHint;
     }
 
     private int TabIndexAt(Point point)
     {
         if (DataContext is not MainViewModel vm || vm.Tabs.Count == 0)
             return -1;
-        var first = TabBounds(0);
-        var last = TabBounds(vm.Tabs.Count - 1);
-        if (first is null || last is null)
-            return -1;
-        if (point.X < first.Value.X)
-            return 0;
-        if (point.X >= last.Value.X + last.Value.Width)
-            return vm.Tabs.Count - 1;
+        var first = -1;
+        var last = -1;
         for (var i = 0; i < vm.Tabs.Count; i++)
         {
-            if (TabBounds(i) is not Rect bounds)
+            if (TabBounds(i) is not Rect bounds || bounds.Width < 1)
                 continue;
+            if (first < 0)
+                first = i;
+            last = i;
             if (point.X >= bounds.X && point.X < bounds.X + bounds.Width)
                 return i;
         }
 
-        return -1;
+        if (first < 0 || TabBounds(first) is not Rect start)
+            return -1;
+        return point.X < start.X ? first : last;
     }
 
     private Rect? TabBounds(int index)
