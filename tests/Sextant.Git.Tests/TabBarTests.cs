@@ -232,9 +232,10 @@ public class TabBarTests
                 var presenter = flyout.Popup.Child;
                 var popupText = MenuText(presenter);
                 Assert.True(flyout.IsOpen, $"flyout closed. items={flyout.Items.Count}");
-                Assert.True(presenter is { Bounds.Height: > 40, Bounds.Width: > 40 },
-                    $"presenter {presenter?.Bounds} texts={string.Join("|", popupText)}");
-                var menuOrigin = presenter!.TranslatePoint(default, window);
+                Assert.NotNull(presenter);
+                Assert.True(presenter.Bounds.Height > 40 && presenter.Bounds.Width > 40,
+                    $"presenter {presenter.Bounds} texts={string.Join("|", popupText)}");
+                var menuOrigin = presenter.TranslatePoint(default, window);
                 if (menuOrigin is { } at)
                     Assert.True(at.Y >= 20, $"menu origin {at} presenter {presenter.Bounds}");
                 foreach (var title in titles)
