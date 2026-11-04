@@ -1516,7 +1516,7 @@ public partial class RepositoryViewModel : ViewModelBase
                 settings.Add(("core.fsmonitor", "true"));
             await ApplyPerformanceAsync(settings);
         }
-        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        catch (OperationCanceledException)
         {
         }
         finally
@@ -2915,7 +2915,8 @@ public partial class RepositoryViewModel : ViewModelBase
             else
                 ShowInHistory(row);
         }
-        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        // A write evicts in-flight reads through the scheduler epoch, not _lifetime.
+        catch (OperationCanceledException)
         {
         }
         catch (GitCommandFailedException exception)

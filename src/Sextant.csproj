@@ -26,21 +26,21 @@
 
   <ItemGroup>
     <PackageReference Include="AssimpNetter" Version="6.0.5" />
-    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia" Version="12.1.5" />
     <PackageReference Include="Avalonia.AvaloniaEdit" Version="12.0.0" />
     <PackageReference Include="AvaloniaEdit.TextMate" Version="12.0.0" />
-    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.5" />
     <!-- X11-on-XWayland does not see the compositor scale. Opt in; X11 stays the fallback.
          GNOME stays on X11: Mutter will not decorate a native Wayland window. -->
-    <PackageReference Include="Avalonia.Wayland" Version="12.1.4" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Wayland" Version="12.1.5" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.5" />
     <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3">
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.5" />
     <!-- Runtime XAML loader for user theme files. Compiled XAML does not need it. -->
-    <PackageReference Include="Avalonia.Markup.Xaml.Loader" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Markup.Xaml.Loader" Version="12.1.5" />
     <PackageReference Include="BitMiracle.LibTiff.NET" Version="2.4.660" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Dock.Avalonia" Version="12.1.0.13" />
