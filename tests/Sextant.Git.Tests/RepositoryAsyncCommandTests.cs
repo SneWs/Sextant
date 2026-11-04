@@ -578,6 +578,119 @@ public class RepositoryAsyncCommandTests
         }, CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Reveal_survives_a_write_that_evicts_its_history_load()
+    {
+        // The wrapper is a shell script. Windows has no equivalent without extra tooling.
+        if (OperatingSystem.IsWindows())
+            return;
+
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        // One commit more than the first page, so revealing the oldest needs a load-more.
+        ImportLinearHistory(repo, HistoryLimits.FirstPage + 10, "v0");
+        repo.WriteFile("dirty.txt", "x\n");
+
+        var marker = Path.Combine(repo.Directory, ".git", "load-more-started");
+        var wrapper = Path.Combine(repo.Directory, ".git", "git-wrapper.sh");
+        // Holds the first load-more git log until the scheduler kills it.
+        File.WriteAllText(wrapper, $$"""
+            #!/bin/sh
+            prev=
+            skip=
+            for a in "$@"; do
+              if [ "$prev" = "--skip" ]; then skip="$a"; fi
+              prev="$a"
+            done
+            if [ -n "$skip" ] && [ "$skip" != "0" ] && [ ! -f '{{marker}}' ]; then
+              : > '{{marker}}'
+              i=0
+              while [ $i -lt 600 ]; do sleep 0.05; i=$((i+1)); done
+            fi
+            exec '{{repo.Git}}' "$@"
+            """.Replace("\r\n", "\n", StringComparison.Ordinal));
+        File.SetUnixFileMode(wrapper, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new AsyncHost { GitExecutable = wrapper }, repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                Assert.False(vm.IsBusy);
+                var tag = Flatten(vm.Locations).First(item => item.Key == "t:v0");
+                var reveal = Assert.IsAssignableFrom<IAsyncRelayCommand>(tag.RevealCommand);
+                var revealing = reveal.ExecuteAsync(null);
+
+                var deadline = DateTime.UtcNow.AddSeconds(10);
+                while (!File.Exists(marker))
+                {
+                    Assert.True(DateTime.UtcNow < deadline, "Reveal never started a load-more git log.");
+                    await Task.Delay(20);
+                }
+
+                Assert.False(revealing.IsCompleted);
+                await vm.StageAllCommand.ExecuteAsync(null);
+
+                // The wrapper would hold for 30s. Finishing sooner proves the write evicted it.
+                // Before the fix this rethrew the TaskCanceledException from the command.
+                await revealing.WaitAsync(TimeSpan.FromSeconds(10));
+                Assert.True(revealing.IsCompletedSuccessfully);
+                Assert.False(vm.IsLoadingHistory);
+                Assert.Contains("A  dirty.txt", repo.RunCapture("status", "--porcelain"), StringComparison.Ordinal);
+            }
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    private static IEnumerable<LocationItem> Flatten(IEnumerable<LocationItem> items)
+    {
+        foreach (var item in items)
+        {
+            yield return item;
+            foreach (var child in Flatten(item.Children))
+                yield return child;
+        }
+    }
+
+    private static void ImportLinearHistory(TempRepo repo, int commits, string firstTag)
+    {
+        var stream = new System.Text.StringBuilder();
+        for (var i = 1; i <= commits; i++)
+        {
+            var message = "c" + i;
+            stream.Append("commit refs/heads/main\n")
+                .Append("mark :").Append(i).Append('\n')
+                .Append("committer Test <test@example.com> ").Append(1_700_000_000 + i * 60).Append(" +0000\n")
+                .Append("data ").Append(message.Length).Append('\n').Append(message).Append('\n');
+            if (i > 1)
+                stream.Append("from :").Append(i - 1).Append('\n');
+            stream.Append('\n');
+        }
+
+        stream.Append("reset refs/tags/").Append(firstTag).Append("\nfrom :1\n\n");
+        var info = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = repo.Git,
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var argument in new[] { "-C", repo.Directory, "fast-import", "--quiet" })
+            info.ArgumentList.Add(argument);
+        using var process = System.Diagnostics.Process.Start(info)!;
+        process.StandardInput.Write(stream.ToString());
+        process.StandardInput.Close();
+        var error = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        Assert.True(process.ExitCode == 0, error);
+        repo.Run("symbolic-ref", "HEAD", "refs/heads/main");
+    }
+
     public class DiffPreviewApp : Application
     {
         public static AppBuilder BuildAvaloniaApp() =>
