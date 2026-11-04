@@ -129,6 +129,11 @@ public class GitCommandTests
         Assert.Equal(
             ["-C", "repo", "restore", "--source=HEAD", "--worktree", "--staged", "--", "a.txt", "old.txt"],
             GitCommands.DiscardTrackedPaths("repo", ["a.txt", "old.txt"]));
+        Assert.Equal(
+            ["-C", "repo", "restore", "--worktree", "--", "a.txt", "old.txt"],
+            GitCommands.DiscardWorktreePaths("repo", ["a.txt", "old.txt"]));
+        Assert.DoesNotContain("--staged", GitCommands.DiscardWorktreePaths("repo", ["a.txt"]));
+        Assert.DoesNotContain("--source=HEAD", GitCommands.DiscardWorktreePaths("repo", ["a.txt"]));
         Assert.Equal(["-C", "repo", "rm", "-f", "--", "a.txt"], GitCommands.DiscardUnbornPaths("repo", ["a.txt"]));
         Assert.Equal(["-C", "repo", "clean", "-fd", "--", "new.txt"], GitCommands.DiscardUntrackedPaths("repo", ["new.txt"]));
         Assert.DoesNotContain("-x", GitCommands.DiscardUntrackedPaths("repo", ["new.txt"]));

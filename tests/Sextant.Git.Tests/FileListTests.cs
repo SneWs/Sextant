@@ -71,15 +71,28 @@ public class FileListTests
             Assert.True(unstagedTop < unstagedFileTop, $"unstaged header {unstagedTop} file {unstagedFileTop}");
 
             Assert.True(stagedHead.Bounds.Width > stagedText.Bounds.Width + 40);
-            Assert.True(stagedHead.CornerRadius.TopLeft > 0);
-            Assert.True(stagedHead.BorderThickness.Left > 0);
-            Assert.True(stagedHead.BorderThickness.Top > 0);
+            Assert.Equal(new CornerRadius(0), stagedHead.CornerRadius);
+            Assert.Equal(new Thickness(4, 0, 0, 0), stagedHead.BorderThickness);
+            Assert.Equal(40, stagedHead.MinHeight);
             Assert.False(IsClear(stagedHead.Background));
-            Assert.Equal(FontWeight.SemiBold, HeadLabel(stagedHead).FontWeight);
+            Assert.Equal(FontWeight.Bold, HeadLabel(stagedHead).FontWeight);
+            Assert.True(HeadLabel(stagedHead).FontSize >= 15);
             Assert.True(HeadLabel(stagedHead).Opacity > 0.9);
 
             var fileBorder = stagedText.FindAncestorOfType<Border>();
             Assert.NotNull(fileBorder);
+            Assert.True(stagedHead.Bounds.Height > fileBorder.Bounds.Height, "the section bar is taller than a file row");
+            Assert.Equal(["Unstage all"], VisibleButtons(stagedHead));
+            Assert.Equal(["Discard all", "Stage all"], VisibleButtons(unstagedHead));
+            var unstageAll = VisibleButton(stagedHead, "Unstage all");
+            var stageAll = VisibleButton(unstagedHead, "Stage all");
+            var discardAll = VisibleButton(unstagedHead, "Discard all");
+            Assert.Same(vm.UnstageAllCommand, unstageAll.Command);
+            Assert.Same(vm.StageAllCommand, stageAll.Command);
+            Assert.Same(vm.Files.Single(row => row.IsHeader && row.Label == "Unstaged").DiscardAllCommand, discardAll.Command);
+            Assert.True(unstageAll.Bounds.Height > 0 && unstageAll.Bounds.Height <= stagedHead.Bounds.Height);
+            Assert.True(stageAll.Bounds.Height > 0 && stageAll.Bounds.Height <= unstagedHead.Bounds.Height);
+            Assert.True(discardAll.Bounds.Height > 0 && discardAll.Bounds.Height <= unstagedHead.Bounds.Height);
             Assert.DoesNotContain("filehead", fileBorder.Classes);
             Assert.True(IsClear(fileBorder.Background));
             Assert.Equal(new Thickness(0), fileBorder.BorderThickness);
@@ -139,8 +152,18 @@ public class FileListTests
                 Assert.True(extra.Untracked);
                 Assert.Equal("?", extra.StatusText);
                 Assert.True(header.ShowUntrackedActions);
-                Assert.False(vm.Files.Single(row => row.Label == "Staged").ShowUntrackedActions);
-                Assert.False(vm.Files.Single(row => row.Label == "Unstaged").ShowUntrackedActions);
+                Assert.False(header.ShowBulk);
+                var stagedHeader = vm.Files.Single(row => row.IsHeader && row.Label == "Staged");
+                var unstagedHeader = vm.Files.Single(row => row.IsHeader && row.Label == "Unstaged");
+                Assert.False(stagedHeader.ShowUntrackedActions);
+                Assert.False(unstagedHeader.ShowUntrackedActions);
+                Assert.Equal("Unstage all", stagedHeader.BulkLabel);
+                Assert.Same(vm.UnstageAllCommand, stagedHeader.BulkCommand);
+                Assert.Equal("Stage all", unstagedHeader.BulkLabel);
+                Assert.Same(vm.StageAllCommand, unstagedHeader.BulkCommand);
+                Assert.Equal("Discard all", unstagedHeader.DiscardAllLabel);
+                Assert.True(unstagedHeader.ShowDiscardAll);
+                Assert.False(stagedHeader.ShowDiscardAll);
 
                 var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 700 };
                 window = new Window { Content = view, Width = 1100, Height = 700 };
@@ -151,7 +174,9 @@ public class FileListTests
                 Assert.NotNull(list);
 
                 Show(list, vm.Files.Single(row => row.Label == "Staged"));
-                Assert.Empty(VisibleButtons(Head(list, "Staged")));
+                Assert.Equal(["Unstage all"], VisibleButtons(Head(list, "Staged")));
+                Show(list, vm.Files.Single(row => row.Label == "Unstaged"));
+                Assert.Equal(["Discard all", "Stage all"], VisibleButtons(Head(list, "Unstaged")));
 
                 Show(list, header);
                 Show(list, extra);
@@ -227,6 +252,75 @@ public class FileListTests
             }
         }, CancellationToken.None);
     }
+
+    [Fact]
+    public async Task Unstaged_header_discards_only_unstaged_changes()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("both.txt", "one\n");
+        repo.WriteFile("plain.txt", "base\n");
+        repo.WriteFile("staged.txt", "keep\n");
+        repo.WriteFile("gone.txt", "back\n");
+        repo.CommitAll("first");
+        repo.WriteFile("both.txt", "staged\n");
+        repo.Run("add", "both.txt");
+        repo.WriteFile("both.txt", "unstaged\n");
+        repo.WriteFile("plain.txt", "changed\n");
+        repo.WriteFile("staged.txt", "keep staged\n");
+        repo.Run("add", "staged.txt");
+        repo.WriteFile("new.txt", "stay\n");
+        File.Delete(Path.Combine(repo.Directory, "gone.txt"));
+        var dialogs = new RecordingDialogs();
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new FileListHost(repo.Git, dialogs), repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                var header = vm.Files.Single(row => row.IsHeader && row.Label == "Unstaged");
+                Assert.Equal("Discard all", header.DiscardAllLabel);
+
+                dialogs.Accept = false;
+                await Assert.IsAssignableFrom<IAsyncRelayCommand>(header.DiscardAllCommand).ExecuteAsync(null);
+                Assert.Equal("Discard unstaged", dialogs.Confirms[0].Title);
+                Assert.Equal("Discard all", dialogs.Confirms[0].Label);
+                Assert.Contains("both.txt", dialogs.Confirms[0].Message, StringComparison.Ordinal);
+                Assert.Contains("plain.txt", dialogs.Confirms[0].Message, StringComparison.Ordinal);
+                Assert.Contains("gone.txt", dialogs.Confirms[0].Message, StringComparison.Ordinal);
+                Assert.DoesNotContain("new.txt", dialogs.Confirms[0].Message, StringComparison.Ordinal);
+                Assert.DoesNotContain("staged.txt", dialogs.Confirms[0].Message, StringComparison.Ordinal);
+                Assert.Equal("unstaged\n", Read(repo, "both.txt"));
+                Assert.Equal("changed\n", Read(repo, "plain.txt"));
+                Assert.False(File.Exists(Path.Combine(repo.Directory, "gone.txt")));
+
+                dialogs.Accept = true;
+                await Assert.IsAssignableFrom<IAsyncRelayCommand>(header.DiscardAllCommand).ExecuteAsync(null);
+                Assert.False(vm.HasBanner, vm.Banner);
+                Assert.Equal("staged\n", Read(repo, "both.txt"));
+                Assert.Equal("base\n", Read(repo, "plain.txt"));
+                Assert.Equal("keep staged\n", Read(repo, "staged.txt"));
+                Assert.Equal("back\n", Read(repo, "gone.txt"));
+                Assert.Equal("stay\n", Read(repo, "new.txt"));
+                Assert.Contains(vm.Files, row => row.Path == "both.txt" && row.FromStagedList && !row.Untracked);
+                Assert.DoesNotContain(vm.Files, row => row.Path == "both.txt" && !row.FromStagedList);
+                Assert.Contains(vm.Files, row => row.Path == "staged.txt" && row.FromStagedList);
+                Assert.Contains(vm.Files, row => row.Path == "new.txt" && row.Untracked);
+                Assert.DoesNotContain(vm.Files, row => row.IsHeader && row.Label == "Unstaged");
+                Assert.DoesNotContain(vm.Files, row => row.Path == "plain.txt" || row.Path == "gone.txt");
+            }
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    private static string Read(TempRepo repo, string name) =>
+        File.ReadAllText(Path.Combine(repo.Directory, name)).Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private static string[] Names(RepositoryViewModel vm) =>
         vm.Files.Select(row => row.IsHeader ? row.Label : row.Path).ToArray();

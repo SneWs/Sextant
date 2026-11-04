@@ -199,6 +199,18 @@ On 2026-10-30 a merge, rebase, cherry-pick, or revert leaves the open views alon
 
 On 2026-11-04 the Changes list keeps Conflicts, then Staged, then Unstaged, and puts untracked files in their own Untracked section. Each untracked file has Add and Delete. The Untracked title has Add all and Delete all. Add all stages only those untracked paths. Delete and Delete all ask, then remove only those untracked files and directories and leave tracked changes alone. `Untracked_files_are_their_own_section_with_add_and_delete` and `Staged_files_sit_above_unstaged_and_the_section_is_a_bar` passed. The desktop window was not launched.
 
+On 2026-11-04 the working-copy diff uses those same bars: Conflicts, then Staged, then Unstaged, then Untracked. The Untracked bar has Add all and Delete all, wired to the Changes header. Expand all and Collapse all keep the bars. A commit diff has none. `Working_copy_diff_groups_files_like_the_changes_list` passed. The desktop window was not launched.
+
+On 2026-11-04 those diff bars are taller than the file headers and use an accent stripe. The Staged bar has Unstage all and the Unstaged bar has Stage all, the same commands as the diff command bar. The Untracked bar still has Add all and Delete all. `Working_copy_diff_groups_files_like_the_changes_list` passed. The desktop window was not launched.
+
+On 2026-11-04 the Changes list uses that same accent bar for Conflicts, Staged, Unstaged, Untracked, and a commit's Changes title. Diff file headers are a shorter card, and the label and Stage file or Unstage file button still fit. `Staged_files_sit_above_unstaged_and_the_section_is_a_bar` and `Working_copy_diff_groups_files_like_the_changes_list` passed. The desktop window was not launched.
+
+On 2026-11-04 the Changes Staged bar has Unstage all and the Unstaged bar has Stage all, the same commands as the diff bars. Those bars are 40px in both views, still taller than the file rows, and the label and button fit. `Staged_files_sit_above_unstaged_and_the_section_is_a_bar`, `Untracked_files_are_their_own_section_with_add_and_delete`, and `Working_copy_diff_groups_files_like_the_changes_list` passed. The desktop window was not launched.
+
+On 2026-11-04 the Unstaged bar in Changes and in the diff has Discard all. It asks, then runs `git restore --worktree` for the unstaged paths captured on that bar. The index stays, so a partly staged file keeps its staged text, and untracked files stay. `Discard_unstaged_restores_the_worktree_and_leaves_staged_and_untracked` and `Unstaged_header_discards_only_unstaged_changes` passed. The desktop window was not launched.
+
+On 2026-11-04 Stage all is the rightmost button on the Unstaged bar in Changes and in the diff. Discard all sits to its left. `Staged_files_sit_above_unstaged_and_the_section_is_a_bar` and `Untracked_files_are_their_own_section_with_add_and_delete` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

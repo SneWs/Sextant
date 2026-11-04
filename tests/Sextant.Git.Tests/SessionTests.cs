@@ -408,6 +408,43 @@ public class SessionTests
     }
 
     [Fact]
+    public async Task Discard_unstaged_restores_the_worktree_and_leaves_staged_and_untracked()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("both.txt", "one\n");
+        repo.WriteFile("plain.txt", "base\n");
+        repo.WriteFile("staged.txt", "keep\n");
+        repo.WriteFile("gone.txt", "back\n");
+        repo.CommitAll("first");
+        repo.WriteFile("both.txt", "staged\n");
+        repo.Run("add", "both.txt");
+        repo.WriteFile("both.txt", "unstaged\n");
+        repo.WriteFile("plain.txt", "changed\n");
+        repo.WriteFile("staged.txt", "keep staged\n");
+        repo.Run("add", "staged.txt");
+        repo.WriteFile("new.txt", "stay\n");
+        File.Delete(Path.Combine(repo.Directory, "gone.txt"));
+        await using var session = await Open(repo);
+
+        await session.DiscardWorktreePathsAsync(["both.txt", "plain.txt", "gone.txt"], CancellationToken.None);
+
+        Assert.Equal("staged\n", Text(repo, "both.txt"));
+        Assert.Equal("base\n", Text(repo, "plain.txt"));
+        Assert.Equal("keep staged\n", Text(repo, "staged.txt"));
+        Assert.Equal("back\n", Text(repo, "gone.txt"));
+        Assert.Equal("stay\n", Text(repo, "new.txt"));
+        var state = session.Snapshot();
+        Assert.Contains(state.Entries, entry => entry.Path == "both.txt" && entry.Staged && !entry.Unstaged);
+        Assert.Contains(state.Entries, entry => entry.Path == "staged.txt" && entry.Staged && !entry.Unstaged);
+        Assert.Contains(state.Entries, entry => entry.Path == "new.txt" && entry.Kind == ChangeKind.Untracked);
+        Assert.DoesNotContain(state.Entries, entry => entry.Path == "plain.txt" || entry.Path == "gone.txt");
+        Assert.DoesNotContain(state.Commands, command => command.ExitCode != 0);
+    }
+
+    private static string Text(TempRepo repo, string name) =>
+        File.ReadAllText(Path.Combine(repo.Directory, name)).Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    [Fact]
     public async Task Discard_all_restores_tracked_files_and_removes_untracked_ones()
     {
         using var repo = new TempRepo();

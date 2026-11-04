@@ -622,6 +622,8 @@ public sealed class DiffVirtualizingPanel : VirtualizingPanel
             DiffImageRow => _image,
             DiffEditorRow editor => Math.Max(_editorLine, 1) * Math.Max(1, editor.LineCount),
             DiffLineRow or DiffSideRow or BlameRow => _line,
+            DiffGroupRow => 56,
+            DiffFileRow => 40,
             _ => _block,
         };
     }

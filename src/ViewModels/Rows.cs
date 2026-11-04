@@ -301,6 +301,20 @@ public partial class FileRowViewModel : ObservableObject
 
     public string DiscardLabel { get; init; } = "Discard";
 
+    /// <summary>Stage all or Unstage all on a working-copy section title. Empty on Conflicts, Untracked, and commit titles.</summary>
+    public string BulkLabel { get; init; } = "";
+
+    public ICommand BulkCommand { get; init; } = UiCommands.Disabled;
+
+    public bool ShowBulk => BulkLabel.Length > 0;
+
+    /// <summary>Discard all on the Unstaged title. Empty on the other titles.</summary>
+    public string DiscardAllLabel { get; init; } = "";
+
+    public ICommand DiscardAllCommand { get; init; } = UiCommands.Disabled;
+
+    public bool ShowDiscardAll => DiscardAllLabel.Length > 0;
+
     /// <summary>The Untracked title offers Add all and Delete all.</summary>
     public bool ShowUntrackedActions { get; init; }
 
@@ -509,6 +523,32 @@ public sealed class DiffSideRow : DiffRow
     public required IBrush RightBackground { get; init; }
 }
 
+/// <summary>A working-copy bar such as Staged, Unstaged, or Untracked. It sits above that group's files.</summary>
+public sealed class DiffGroupRow : DiffRow
+{
+    public required string Label { get; init; }
+
+    /// <summary>Stage all or Unstage all. Empty on Conflicts and on the Untracked bar.</summary>
+    public string BulkLabel { get; init; } = "";
+
+    public ICommand BulkCommand { get; init; } = UiCommands.Disabled;
+
+    public bool ShowBulk => BulkLabel.Length > 0;
+
+    /// <summary>Discard all on the Unstaged bar. Empty on the other bars.</summary>
+    public string DiscardAllLabel { get; init; } = "";
+
+    public ICommand DiscardAllCommand { get; init; } = UiCommands.Disabled;
+
+    public bool ShowDiscardAll => DiscardAllLabel.Length > 0;
+
+    public bool ShowUntrackedActions { get; init; }
+
+    public ICommand StageCommand { get; init; } = UiCommands.Disabled;
+
+    public ICommand DiscardCommand { get; init; } = UiCommands.Disabled;
+}
+
 public sealed class DiffFileRow : DiffRow, INotifyPropertyChanged
 {
     private bool _expanded = true;
@@ -528,7 +568,13 @@ public sealed class DiffFileRow : DiffRow, INotifyPropertyChanged
 
     public bool ShowAction => StagingFile is { ShowStage: true } or { ShowUnstage: true };
 
-    public string StagingLabel => StagingFile is { FromStagedList: true } ? "Staged" : "Unstaged";
+    public string StagingLabel => StagingFile switch
+    {
+        { FromStagedList: true } => "Staged",
+        { Untracked: true } => "Untracked",
+        not null => "Unstaged",
+        _ => "",
+    };
 
     public string ActionLabel => StagingFile is { ShowUnstage: true } ? "Unstage file" : "Stage file";
 

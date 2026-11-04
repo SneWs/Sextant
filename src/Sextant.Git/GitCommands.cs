@@ -737,6 +737,16 @@ public static class GitCommands
         return arguments;
     }
 
+    /// <summary>
+    /// Restore the worktree from the index. Staged changes stay, and untracked files stay.
+    /// </summary>
+    public static IReadOnlyList<string> DiscardWorktreePaths(string toplevel, IReadOnlyList<string> paths)
+    {
+        var arguments = new List<string> { "-C", toplevel, "restore", "--worktree", "--" };
+        arguments.AddRange(paths);
+        return arguments;
+    }
+
     public static IReadOnlyList<string> DiscardUnbornPaths(string toplevel, IReadOnlyList<string> paths)
     {
         var arguments = new List<string> { "-C", toplevel, "rm", "-f", "--" };

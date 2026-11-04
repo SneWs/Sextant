@@ -848,6 +848,13 @@ public sealed partial class RepositorySession : IAsyncDisposable
         return MutateAsync(command, null, cancellationToken, fallback);
     }
 
+    public Task DiscardWorktreePathsAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken)
+    {
+        if (paths.Count == 0)
+            return Task.CompletedTask;
+        return MutateAsync(GitCommands.DiscardWorktreePaths(_toplevel, paths), null, cancellationToken);
+    }
+
     public Task DiscardTrackedAsync(string path, CancellationToken cancellationToken)
     {
         var unborn = IsUnborn();

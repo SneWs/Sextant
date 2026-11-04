@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
@@ -276,6 +277,213 @@ public class DiffHeaderLayoutTests
         }, CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Working_copy_diff_groups_files_like_the_changes_list()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(App));
+        using var repo = new TempRepo();
+        repo.WriteFile("unstaged.txt", "base\n");
+        repo.CommitAll("first");
+        repo.WriteFile("staged.txt", "staged\n");
+        repo.Run("add", "staged.txt");
+        repo.WriteFile("unstaged.txt", "changed\n");
+        repo.WriteFile("new.txt", "new\n");
+        repo.WriteFile("notes/readme.txt", "inside\n");
+        var dialogs = new DiscardDialogs();
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new HeaderHost(repo.Git, dialogs), repo.Directory);
+            Window? window = null;
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                var commit = vm.Rows.Single(row => row.Subject == "first");
+                vm.SelectedGraphRow = commit;
+                Dispatcher.UIThread.RunJobs();
+                await vm.LoadDetailsCommand.ExecutionTask!;
+                Assert.Empty(vm.DiffRows.OfType<DiffGroupRow>());
+                Assert.NotEmpty(vm.DiffRows.OfType<DiffFileRow>());
+
+                vm.SelectedGraphRow = vm.Rows.Single(row => row.IsWorkingCopy);
+                Dispatcher.UIThread.RunJobs();
+                await vm.LoadDetailsCommand.ExecutionTask!;
+                AssertGroups(vm,
+                    ("Staged", ["staged.txt"]),
+                    ("Unstaged", ["unstaged.txt"]),
+                    ("Untracked", ["new.txt", "notes/readme.txt"]));
+                Assert.Equal("Staged", vm.DiffRows.OfType<DiffFileRow>().Single(row => row.Path == "staged.txt").StagingLabel);
+                Assert.Equal("Unstaged", vm.DiffRows.OfType<DiffFileRow>().Single(row => row.Path == "unstaged.txt").StagingLabel);
+                Assert.Equal("Untracked", vm.DiffRows.OfType<DiffFileRow>().Single(row => row.Path == "new.txt").StagingLabel);
+                var stagedGroup = vm.DiffRows.OfType<DiffGroupRow>().Single(row => row.Label == "Staged");
+                var unstagedGroup = vm.DiffRows.OfType<DiffGroupRow>().Single(row => row.Label == "Unstaged");
+                var untracked = vm.DiffRows.OfType<DiffGroupRow>().Single(row => row.Label == "Untracked");
+                Assert.Equal("Unstage all", stagedGroup.BulkLabel);
+                Assert.Same(vm.UnstageAllCommand, stagedGroup.BulkCommand);
+                Assert.True(stagedGroup.ShowBulk);
+                Assert.Equal("Stage all", unstagedGroup.BulkLabel);
+                Assert.Same(vm.StageAllCommand, unstagedGroup.BulkCommand);
+                Assert.True(unstagedGroup.ShowBulk);
+                Assert.Equal("Discard all", unstagedGroup.DiscardAllLabel);
+                Assert.True(unstagedGroup.ShowDiscardAll);
+                Assert.False(stagedGroup.ShowDiscardAll);
+                Assert.False(untracked.ShowDiscardAll);
+                Assert.Equal("", untracked.BulkLabel);
+                Assert.False(untracked.ShowBulk);
+                Assert.True(untracked.ShowUntrackedActions);
+                Assert.All(
+                    vm.DiffRows.OfType<DiffGroupRow>().Where(row => row.Label != "Untracked"),
+                    row => Assert.False(row.ShowUntrackedActions));
+                var listHeader = vm.Files.Single(row => row.IsHeader && row.Label == "Untracked");
+                var unstagedHeader = vm.Files.Single(row => row.IsHeader && row.Label == "Unstaged");
+                Assert.Same(listHeader.StageCommand, untracked.StageCommand);
+                Assert.Same(listHeader.DiscardCommand, untracked.DiscardCommand);
+                Assert.Same(unstagedHeader.DiscardAllCommand, unstagedGroup.DiscardAllCommand);
+
+                await vm.ExpandAllSectionsCommand.ExecuteAsync(null);
+                AssertGroups(vm,
+                    ("Staged", ["staged.txt"]),
+                    ("Unstaged", ["unstaged.txt"]),
+                    ("Untracked", ["new.txt", "notes/readme.txt"]));
+                vm.CollapseAllSectionsCommand.Execute(null);
+                AssertGroups(vm,
+                    ("Staged", ["staged.txt"]),
+                    ("Unstaged", ["unstaged.txt"]),
+                    ("Untracked", ["new.txt", "notes/readme.txt"]));
+                Assert.DoesNotContain(vm.DiffRows, row => row is DiffEditorRow or DiffHunkRow);
+
+                await Idle(vm);
+                ReleaseWatcher(vm);
+                stagedGroup = vm.DiffRows.OfType<DiffGroupRow>().Single(row => row.Label == "Staged");
+                unstagedGroup = vm.DiffRows.OfType<DiffGroupRow>().Single(row => row.Label == "Unstaged");
+                untracked = vm.DiffRows.OfType<DiffGroupRow>().Single(row => row.Label == "Untracked");
+
+                var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 700 };
+                window = new Window { Content = view, Width = 1100, Height = 700 };
+                window.Show();
+                var list = view.FindControl<CopyListBox>("DiffList");
+                Assert.NotNull(list);
+                var stagedFile = vm.DiffRows.OfType<DiffFileRow>().Single(row => row.Path == "staged.txt");
+                list.ScrollIntoView(stagedGroup);
+                Settle(view);
+                var groupBar = GroupBar(view, stagedGroup);
+                var fileBar = view.GetVisualDescendants().OfType<Border>().Single(border =>
+                    ReferenceEquals(border.DataContext, stagedFile) && border.BorderThickness.Top > 0);
+                Assert.True(groupBar.Bounds.Height > fileBar.Bounds.Height, $"group {groupBar.Bounds.Height} file {fileBar.Bounds.Height}");
+                Assert.Equal(new Thickness(8, 3), fileBar.Padding);
+                var fileLabel = view.GetVisualDescendants().OfType<TextBlock>().Single(text =>
+                    ReferenceEquals(text.DataContext, stagedFile) && text.Text == "staged.txt");
+                var fileAction = ButtonOn(view, stagedFile, "Unstage file");
+                Assert.True(fileLabel.IsEffectivelyVisible);
+                Assert.True(fileAction.IsEffectivelyVisible);
+                Assert.True(fileLabel.Bounds.Height > 0 && fileLabel.Bounds.Height <= fileBar.Bounds.Height);
+                Assert.True(fileAction.Bounds.Height > 0 && fileAction.Bounds.Height <= fileBar.Bounds.Height);
+                Assert.Equal(40, groupBar.MinHeight);
+                Assert.Equal(new Thickness(4, 0, 0, 0), groupBar.BorderThickness);
+                Assert.Equal(new CornerRadius(0), groupBar.CornerRadius);
+                var groupLabel = groupBar.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Classes.Contains("diffgrouplabel"));
+                Assert.Equal(FontWeight.Bold, groupLabel.FontWeight);
+                Assert.True(groupLabel.FontSize >= 15);
+                var unstageAll = ButtonOn(view, stagedGroup, "Unstage all");
+                Assert.True(unstageAll.IsEffectivelyVisible);
+                Assert.Same(vm.UnstageAllCommand, unstageAll.Command);
+                Assert.True(unstageAll.Bounds.Height > 0 && unstageAll.Bounds.Height <= groupBar.Bounds.Height);
+                Assert.True(groupLabel.Bounds.Height > 0 && groupLabel.Bounds.Height <= groupBar.Bounds.Height);
+                list.ScrollIntoView(unstagedGroup);
+                Settle(view);
+                var stageAll = ButtonOn(view, unstagedGroup, "Stage all");
+                var discardUnstaged = ButtonOn(view, unstagedGroup, "Discard all");
+                Assert.True(stageAll.IsEffectivelyVisible);
+                Assert.True(discardUnstaged.IsEffectivelyVisible);
+                var discardAt = discardUnstaged.TranslatePoint(default, view);
+                var stageAt = stageAll.TranslatePoint(default, view);
+                Assert.NotNull(discardAt);
+                Assert.NotNull(stageAt);
+                Assert.True(stageAt.Value.X > discardAt.Value.X, $"stage {stageAt.Value.X} discard {discardAt.Value.X}");
+                Assert.Same(vm.StageAllCommand, stageAll.Command);
+                Assert.Same(unstagedGroup.DiscardAllCommand, discardUnstaged.Command);
+                Assert.True(discardUnstaged.Bounds.Height > 0 && discardUnstaged.Bounds.Height <= GroupBar(view, unstagedGroup).Bounds.Height);
+                list.ScrollIntoView(untracked);
+                Settle(view);
+                var addAll = ButtonOn(view, untracked, "Add all");
+                var deleteAll = ButtonOn(view, untracked, "Delete all");
+                Assert.True(addAll.IsEffectivelyVisible);
+                Assert.True(deleteAll.IsEffectivelyVisible);
+                Assert.Same(untracked.StageCommand, addAll.Command);
+                Assert.Same(untracked.DiscardCommand, deleteAll.Command);
+
+                dialogs.Accept = false;
+                await Assert.IsAssignableFrom<IAsyncRelayCommand>(deleteAll.Command!).ExecuteAsync(null);
+                Assert.Equal("Delete untracked", dialogs.Title);
+                Assert.Equal("Delete all", dialogs.Confirm);
+                Assert.Contains("new.txt", dialogs.Message, StringComparison.Ordinal);
+                Assert.Contains("notes/", dialogs.Message, StringComparison.Ordinal);
+                Assert.True(File.Exists(Path.Combine(repo.Directory, "new.txt")));
+                Assert.True(Directory.Exists(Path.Combine(repo.Directory, "notes")));
+                AssertGroups(vm,
+                    ("Staged", ["staged.txt"]),
+                    ("Unstaged", ["unstaged.txt"]),
+                    ("Untracked", ["new.txt", "notes/readme.txt"]));
+
+                await Assert.IsAssignableFrom<IAsyncRelayCommand>(addAll.Command!).ExecuteAsync(null);
+                Assert.False(vm.HasBanner, vm.Banner);
+                Assert.DoesNotContain(vm.DiffRows.OfType<DiffGroupRow>(), row => row.Label == "Untracked");
+                Assert.Contains(vm.DiffRows.OfType<DiffFileRow>(), row => row.Path == "new.txt" && row.StagingLabel == "Staged");
+                Assert.Contains(vm.DiffRows.OfType<DiffFileRow>(), row => row.Path == "notes/readme.txt" && row.StagingLabel == "Staged");
+                Assert.Contains(vm.DiffRows.OfType<DiffFileRow>(), row => row.Path == "unstaged.txt" && row.StagingLabel == "Unstaged");
+                Assert.Equal("3 staged, 1 unstaged", vm.Rows.Single(row => row.IsWorkingCopy).Detail);
+            }
+            finally
+            {
+                window?.Close();
+                await vm.DisposeAsync();
+            }
+
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    private static void AssertGroups(RepositoryViewModel vm, params (string Group, string[] Files)[] expected)
+    {
+        var actual = new List<(string Group, List<string> Files)>();
+        foreach (var row in vm.DiffRows)
+        {
+            if (row is DiffGroupRow group)
+                actual.Add((group.Label, []));
+            else if (row is DiffFileRow file)
+            {
+                Assert.True(actual.Count > 0, file.Path + " is above every group");
+                actual[^1].Files.Add(file.Path);
+            }
+        }
+
+        Assert.Equal(expected.Select(group => group.Group).ToArray(), actual.Select(group => group.Group).ToArray());
+        for (var index = 0; index < expected.Length; index++)
+            Assert.Equal(expected[index].Files, actual[index].Files);
+    }
+
+    private static async Task Idle(RepositoryViewModel vm)
+    {
+        var seen = vm.WatcherEpoch;
+        var stable = 0;
+        for (var pass = 0; pass < 80; pass++)
+        {
+            Dispatcher.UIThread.RunJobs();
+            await Task.Delay(20);
+            var now = vm.WatcherEpoch;
+            if (now == seen && (now & 1) == 0)
+                stable++;
+            else
+            {
+                seen = now;
+                stable = 0;
+            }
+
+            if (pass >= 12 && stable >= 8)
+                return;
+        }
+    }
+
     private static void ReleaseWatcher(RepositoryViewModel vm)
     {
         var field = typeof(RepositoryViewModel).GetField("_watcher", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -294,6 +502,10 @@ public class DiffHeaderLayoutTests
         Assert.NotNull(toplevel);
         toplevel.SetValue(git, Path.Combine(Path.GetTempPath(), "sextant-missing-" + Guid.NewGuid().ToString("N")));
     }
+
+    private static Border GroupBar(Visual root, DiffGroupRow row) =>
+        root.GetVisualDescendants().OfType<Border>().Single(border =>
+            ReferenceEquals(border.DataContext, row) && border.Classes.Contains("diffgroup"));
 
     private static Button ButtonOn(Visual root, object row, string content) =>
         root.GetVisualDescendants().OfType<Button>().Single(button =>

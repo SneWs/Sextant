@@ -2096,7 +2096,28 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         if (entries.Count == 0)
             return;
-        _workingFiles.Add(new FileRowViewModel { IsHeader = true, Label = title });
+        var unstagedPaths = title == "Unstaged" ? entries.Select(entry => entry.Path).ToList() : null;
+        _workingFiles.Add(new FileRowViewModel
+        {
+            IsHeader = true,
+            Label = title,
+            BulkLabel = title switch
+            {
+                "Staged" => "Unstage all",
+                "Unstaged" => "Stage all",
+                _ => "",
+            },
+            BulkCommand = title switch
+            {
+                "Staged" => UnstageAllCommand,
+                "Unstaged" => StageAllCommand,
+                _ => UiCommands.Disabled,
+            },
+            DiscardAllLabel = unstagedPaths is null ? "" : "Discard all",
+            DiscardAllCommand = unstagedPaths is null
+                ? UiCommands.Disabled
+                : new AsyncRelayCommand(() => DiscardUnstagedAsync(unstagedPaths)),
+        });
         foreach (var entry in entries)
             _workingFiles.Add(FileRow(entry, stagedList, conflict));
     }
@@ -2249,6 +2270,26 @@ public partial class RepositoryViewModel : ViewModelBase
                 await RunAsync("Discarding…", ct => _session.DiscardUntrackedAsync(path, ct));
             else
                 await RunAsync("Discarding…", ct => _session.DiscardTrackedAsync(path, ct));
+        });
+    }
+
+    /// <summary>
+    /// Asks, then restores the unstaged paths captured when the row was built.
+    /// The index is the source, so staged changes and untracked files stay.
+    /// </summary>
+    private Task DiscardUnstagedAsync(IReadOnlyList<string> paths)
+    {
+        if (_host.Dialogs is not { } dialogs || _session is null || paths.Count == 0)
+            return Task.CompletedTask;
+        return HoldFocus(async () =>
+        {
+            var ok = await dialogs.ConfirmAsync(
+                "Discard unstaged",
+                Listed("Discard unstaged changes in these files? Staged changes and untracked files stay. This cannot be undone.", paths),
+                "Discard all");
+            if (!ok || _session is null)
+                return;
+            await RunAsync("Discarding unstaged…", ct => _session.DiscardWorktreePathsAsync(paths, ct));
         });
     }
 
@@ -3396,9 +3437,20 @@ public partial class RepositoryViewModel : ViewModelBase
             {
                 NoteChangelist();
                 _allFilesShown = true;
-                if (stagedDocument is not null)
-                    AppendDiffSections(stagedDocument, workingCopy, staged: true);
-                AppendDiffSections(document, workingCopy, staged: false);
+                if (workingCopy)
+                {
+                    AppendDiffSections(document, workingCopy, staged: false, onlyGroup: "Conflicts");
+                    if (stagedDocument is not null)
+                        AppendDiffSections(stagedDocument, workingCopy, staged: true, onlyGroup: "Staged");
+                    AppendDiffSections(document, workingCopy, staged: false, onlyGroup: "Unstaged");
+                    AppendDiffSections(document, workingCopy, staged: false, onlyGroup: "Untracked");
+                }
+                else
+                {
+                    if (stagedDocument is not null)
+                        AppendDiffSections(stagedDocument, workingCopy, staged: true);
+                    AppendDiffSections(document, workingCopy, staged: false);
+                }
             }
             else
             {
@@ -3440,10 +3492,12 @@ public partial class RepositoryViewModel : ViewModelBase
         _diffReady = true;
     }
 
-    private void AppendDiffSections(DiffDocument document, bool workingCopy, bool staged)
+    private void AppendDiffSections(DiffDocument document, bool workingCopy, bool staged, string? onlyGroup = null)
     {
         foreach (var entry in DiffParser.Slices(document))
         {
+            if (onlyGroup is not null && WorkingGroup(entry.Path, staged) != onlyGroup)
+                continue;
             var label = string.IsNullOrEmpty(entry.Path) ? "Diff" : entry.Path;
             var stagingFile = workingCopy ? StagingFileForDiff(entry.Path, staged) : null;
             var key = FileSectionKey(entry.Path.Length > 0 ? entry.Path : label, stagingFile?.FromStagedList);
@@ -3458,7 +3512,15 @@ public partial class RepositoryViewModel : ViewModelBase
                 FileMenu = FileMenuFor(entry.Path, trackedFile),
                 StagingFile = stagingFile,
             };
-            var section = new DiffSection(key, header) { BeforePath = RenameSource(entry.Document.RawPatch) };
+            var groupRow = onlyGroup is null || _sections.Any(section => section.GroupName == onlyGroup)
+                ? null
+                : CreateGroupRow(onlyGroup);
+            var section = new DiffSection(key, header)
+            {
+                BeforePath = RenameSource(entry.Document.RawPatch),
+                GroupName = onlyGroup,
+                GroupHeader = groupRow,
+            };
             header.ToggleCommand = new AsyncRelayCommand(() => SetExpanded(section, !header.Expanded), AsyncRelayCommandOptions.AllowConcurrentExecutions);
             _rowSink = section.Body;
             try
@@ -3478,22 +3540,151 @@ public partial class RepositoryViewModel : ViewModelBase
                 _rowSink = null;
             }
 
-            _sections.Add(section);
-            if (_deferredDiffRows is not null)
+            InsertSection(section);
+        }
+    }
+
+    private string WorkingGroup(string path, bool staged)
+    {
+        if (staged)
+            return "Staged";
+        var file = StagingFileForDiff(path, staged: false);
+        if (file is { Kind: ChangeKind.Unmerged })
+            return "Conflicts";
+        if (file is { Untracked: true } || IsUntrackedPath(path))
+            return "Untracked";
+        return "Unstaged";
+    }
+
+    private bool IsUntrackedPath(string path)
+    {
+        foreach (var file in _workingFiles)
+        {
+            if (file.IsHeader || !file.Untracked)
+                continue;
+            if (HeaderMatches(path, file))
+                return true;
+            if (!file.Path.EndsWith('/') && !file.Path.EndsWith('\\'))
+                continue;
+            var directory = file.Path.TrimEnd('/', '\\');
+            if (path.StartsWith(directory + "/", StringComparison.Ordinal)
+                || path.StartsWith(directory + "\\", StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
+    private DiffGroupRow CreateGroupRow(string group)
+    {
+        if (group == "Staged")
+            return new DiffGroupRow { Label = group, BulkLabel = "Unstage all", BulkCommand = UnstageAllCommand };
+        if (group == "Unstaged")
+        {
+            var header = _workingFiles.FirstOrDefault(row => row.IsHeader && row.Label == "Unstaged");
+            return new DiffGroupRow
             {
-                _deferredDiffRows.Add(header);
-                if (header.Expanded)
+                Label = group,
+                BulkLabel = "Stage all",
+                BulkCommand = StageAllCommand,
+                DiscardAllLabel = header?.DiscardAllLabel ?? "",
+                DiscardAllCommand = header?.DiscardAllCommand ?? UiCommands.Disabled,
+            };
+        }
+        if (group != "Untracked")
+            return new DiffGroupRow { Label = group };
+        var actions = _workingFiles.FirstOrDefault(row => row.IsHeader && row.ShowUntrackedActions);
+        return new DiffGroupRow
+        {
+            Label = group,
+            ShowUntrackedActions = actions is not null,
+            StageCommand = actions?.StageCommand ?? UiCommands.Disabled,
+            DiscardCommand = actions?.DiscardCommand ?? UiCommands.Disabled,
+        };
+    }
+
+    private static int GroupRank(string? group) => group switch
+    {
+        "Conflicts" => 0,
+        "Staged" => 1,
+        "Unstaged" => 2,
+        "Untracked" => 3,
+        _ => 4,
+    };
+
+    private int SectionInsertIndex(string? group)
+    {
+        if (group is null)
+            return _sections.Count;
+        var rank = GroupRank(group);
+        var index = _sections.Count;
+        for (var i = 0; i < _sections.Count; i++)
+        {
+            var other = _sections[i].GroupName;
+            if (other is null)
+                continue;
+            if (GroupRank(other) > rank)
+                return i;
+            index = i + 1;
+        }
+
+        return index;
+    }
+
+    private int VisibleCountBefore(int sectionIndex)
+    {
+        var count = 0;
+        for (var i = 0; i < sectionIndex; i++)
+        {
+            var prior = _sections[i];
+            if (prior.GroupHeader is not null)
+                count++;
+            count++;
+            if (prior.Header.Expanded)
+                count += prior.Body.Count;
+        }
+
+        return count;
+    }
+
+    private void InsertSection(DiffSection section)
+    {
+        var index = SectionInsertIndex(section.GroupName);
+        _sections.Insert(index, section);
+        if (_deferredDiffRows is not null)
+        {
+            if (index == _sections.Count - 1)
+            {
+                if (section.GroupHeader is not null)
+                    _deferredDiffRows.Add(section.GroupHeader);
+                _deferredDiffRows.Add(section.Header);
+                if (section.Header.Expanded)
                     _deferredDiffRows.AddRange(section.Body);
             }
             else
             {
-                DiffRows.Add(header);
-                if (header.Expanded)
+                _deferredDiffRows.Clear();
+                foreach (var item in _sections)
                 {
-                    foreach (var bodyRow in section.Body)
-                        DiffRows.Add(bodyRow);
+                    if (item.GroupHeader is not null)
+                        _deferredDiffRows.Add(item.GroupHeader);
+                    _deferredDiffRows.Add(item.Header);
+                    if (item.Header.Expanded)
+                        _deferredDiffRows.AddRange(item.Body);
                 }
             }
+
+            return;
+        }
+
+        var cursor = VisibleCountBefore(index);
+        if (section.GroupHeader is not null)
+            DiffRows.Insert(cursor++, section.GroupHeader);
+        DiffRows.Insert(cursor++, section.Header);
+        if (section.Header.Expanded)
+        {
+            foreach (var row in section.Body)
+                DiffRows.Insert(cursor++, row);
         }
     }
 
@@ -3938,6 +4129,8 @@ public partial class RepositoryViewModel : ViewModelBase
         var rows = new List<DiffRow>();
         foreach (var section in _sections)
         {
+            if (section.GroupHeader is not null)
+                rows.Add(section.GroupHeader);
             rows.Add(section.Header);
             if (section.Header.Expanded)
                 rows.AddRange(section.Body);
@@ -4552,6 +4745,11 @@ public partial class RepositoryViewModel : ViewModelBase
         public DiffFileRow Header { get; }
 
         public string? BeforePath { get; init; }
+
+        public string? GroupName { get; init; }
+
+        /// <summary>Set on the first section of a working-copy group. Folding republishes it with the files.</summary>
+        public DiffGroupRow? GroupHeader { get; init; }
 
         public List<DiffRow> Body { get; } = [];
 

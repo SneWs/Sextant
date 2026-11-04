@@ -63,15 +63,25 @@
             <DataTemplate x:DataType="vm:FileRowViewModel">
                 <Panel>
                     <Border Classes="filehead" IsVisible="{Binding IsHeader}"
-                            Margin="4,8,4,2" Padding="8,4" CornerRadius="4" BorderThickness="1"
-                            Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
-                            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+                            Margin="0,12,0,4" Padding="12,6" MinHeight="40" CornerRadius="0"
+                            BorderThickness="4,0,0,0">
+                        <Border.Background>
+                            <SolidColorBrush Color="{DynamicResource SystemAccentColor}" Opacity="0.18"/>
+                        </Border.Background>
+                        <Border.BorderBrush>
+                            <SolidColorBrush Color="{DynamicResource SystemAccentColor}"/>
+                        </Border.BorderBrush>
                         <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Classes="fileheadlabel" Text="{Binding Label}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="12,0,0,0"
-                                        VerticalAlignment="Center" IsVisible="{Binding ShowUntrackedActions}">
-                                <Button Classes="flat" Content="Add all" Command="{Binding StageCommand}" Padding="6,0"/>
-                                <Button Classes="flat" Content="Delete all" Command="{Binding DiscardCommand}" Padding="6,0"/>
+                            <TextBlock Classes="fileheadlabel" Text="{Binding Label}" FontSize="15" FontWeight="Bold" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="12,0,4,0" VerticalAlignment="Center">
+                                <Button Classes="flat" Content="{Binding DiscardAllLabel}" Command="{Binding DiscardAllCommand}"
+                                        IsVisible="{Binding ShowDiscardAll}" Padding="8,2"/>
+                                <Button Classes="flat" Content="{Binding BulkLabel}" Command="{Binding BulkCommand}"
+                                        IsVisible="{Binding ShowBulk}" Padding="8,2"/>
+                                <Button Classes="flat" Content="Add all" Command="{Binding StageCommand}"
+                                        IsVisible="{Binding ShowUntrackedActions}" Padding="8,2"/>
+                                <Button Classes="flat" Content="Delete all" Command="{Binding DiscardCommand}"
+                                        IsVisible="{Binding ShowUntrackedActions}" Padding="8,2"/>
                             </StackPanel>
                         </Grid>
                     </Border>
