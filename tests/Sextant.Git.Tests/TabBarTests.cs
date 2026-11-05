@@ -1,10 +1,15 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Templates;
 using Avalonia.Headless;
 using Avalonia.Input;
+using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using CommunityToolkit.Mvvm.Input;
 using Sextant.Git;
 using Sextant.Git.Repo;
 using Sextant.Git.Workspace;
@@ -47,6 +52,7 @@ public class TabBarTests
                 Assert.Equal(2, shown.Count);
                 Assert.False(shown[0].IsSelected);
                 Assert.True(shown[1].IsSelected);
+                Assert.False(window.FindControl<Button>("TabOverflow")!.IsVisible);
                 Assert.InRange(shown[1].Bounds.Height, 20, 32);
                 Assert.Equal(window.FindResource("DockSurfaceHeaderActiveBrush"), shown[1].Background);
                 Assert.Equal(window.FindResource("DockSurfacePanelBrush"), shown[0].Background);
@@ -142,6 +148,199 @@ public class TabBarTests
             if (Directory.Exists(directory))
                 Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task Overflowing_repository_tabs_open_from_a_menu()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        var directory = Path.Combine(Path.GetTempPath(), "sextant-tab-overflow-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await session.Dispatch(async () =>
+            {
+                var store = new WorkspaceStore(directory);
+                var vm = new MainViewModel(store, store.LoadWorkspace(), new AppSettings(), new GitProcessRunner());
+                var window = new MainWindow { DataContext = vm, Width = 1000, Height = 700 };
+                var tabs = new List<RepositoryViewModel>();
+                window.Show();
+                Settle(window);
+                Assert.False(window.FindControl<Button>("TabOverflow")!.IsVisible);
+
+                for (var i = 0; i < 12; i++)
+                {
+                    var name = i == 3 ? "repo_under_score" : $"repository-with-a-very-long-name-{i:00}";
+                    var tab = new RepositoryViewModel(vm, Path.Combine(directory, name));
+                    tabs.Add(tab);
+                    vm.Tabs.Add(tab);
+                }
+
+                vm.ActiveTab = tabs[^1];
+                Settle(window);
+
+                var bar = window.FindControl<Grid>("RepositoryTabBar")!;
+                var overflow = window.FindControl<Button>("TabOverflow")!;
+                Assert.DoesNotContain(bar.GetVisualDescendants(), visual => visual is ScrollViewer || visual is ScrollBar { IsVisible: true });
+                Assert.True(overflow.IsVisible);
+                Assert.True(overflow.Bounds.Width > 1);
+
+                var placed = PlacedTabs(window);
+                var hidden = tabs.Except(placed.Select(item => (RepositoryViewModel)item.DataContext!)).ToList();
+                Assert.NotEmpty(placed);
+                Assert.NotEmpty(hidden);
+                Assert.Contains(placed, item => ReferenceEquals(item.DataContext, tabs[^1]));
+                foreach (var item in placed)
+                {
+                    var right = item.TranslatePoint(new Point(item.Bounds.Width, 0), bar)!.Value.X;
+                    var buttonLeft = overflow.TranslatePoint(default, bar)!.Value.X;
+                    Assert.True(right <= buttonLeft + 0.5, $"tab ends at {right}, button starts at {buttonLeft}");
+                    Assert.Same(item, HitTab(window, item));
+                }
+
+                // The real app replaces the button template with a transparent content presenter. The square still has to hit.
+                overflow.Background = Brushes.Transparent;
+                overflow.Padding = new Thickness(0);
+                overflow.Template = new FuncControlTemplate<Button>((button, _) => new ContentPresenter
+                {
+                    Background = Brushes.Transparent,
+                    Content = button.Content,
+                    Padding = new Thickness(0),
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    VerticalAlignment = VerticalAlignment.Stretch,
+                    HorizontalContentAlignment = HorizontalAlignment.Center,
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                });
+                Settle(window);
+                Assert.Same(overflow, HitButton(window, overflow));
+
+                var flyout = Assert.IsType<MenuFlyout>(overflow.Flyout);
+                Assert.Equal(hidden, flyout.Items.OfType<MenuItem>().Select(item => Assert.IsType<RepositoryViewModel>(item.Tag)).ToList());
+                foreach (var item in flyout.Items.OfType<MenuItem>())
+                {
+                    var tab = Assert.IsType<RepositoryViewModel>(item.Tag);
+                    var header = Assert.IsType<string>(item.Header);
+                    Assert.StartsWith(tab.Title.Replace("_", "__", StringComparison.Ordinal), header, StringComparison.Ordinal);
+                }
+                var click = Center(overflow, window);
+                window.MouseDown(click, MouseButton.Left);
+                window.MouseUp(click, MouseButton.Left);
+                Dispatcher.UIThread.RunJobs();
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                var titles = hidden.Select(tab => tab.Title).ToList();
+                var presenter = flyout.Popup.Child;
+                var popupText = MenuText(presenter);
+                Assert.True(flyout.IsOpen, $"flyout closed. items={flyout.Items.Count}");
+                Assert.NotNull(presenter);
+                Assert.True(presenter.Bounds.Height > 40 && presenter.Bounds.Width > 40,
+                    $"presenter {presenter.Bounds} texts={string.Join("|", popupText)}");
+                var menuOrigin = presenter.TranslatePoint(default, window);
+                if (menuOrigin is { } at)
+                    Assert.True(at.Y >= 20, $"menu origin {at} presenter {presenter.Bounds}");
+                foreach (var title in titles)
+                {
+                    var escaped = title.Replace("_", "__", StringComparison.Ordinal);
+                    Assert.Contains(popupText, text =>
+                        !text.Contains("@0x", StringComparison.Ordinal)
+                        && (text.StartsWith(title, StringComparison.Ordinal) || text.StartsWith(escaped, StringComparison.Ordinal)));
+                }
+                flyout.Hide();
+
+                var chosen = hidden[0];
+                var command = Assert.IsAssignableFrom<IAsyncRelayCommand>(flyout.Items.OfType<MenuItem>().First().Command);
+                await command.ExecuteAsync(null);
+                Settle(window);
+
+                Assert.Same(chosen, vm.ActiveTab);
+                var shown = PlacedTabs(window).Single(item => ReferenceEquals(item.DataContext, chosen));
+                Assert.Same(shown, HitTab(window, shown));
+                Assert.True(overflow.IsVisible);
+
+                window.Width = 4000;
+                Settle(window);
+                Assert.False(overflow.IsVisible);
+                Assert.Equal(tabs, PlacedTabs(window).Select(item => (RepositoryViewModel)item.DataContext!).ToList());
+
+                window.Width = 1000;
+                Settle(window);
+                Assert.True(overflow.IsVisible, "button hidden after the window was narrowed");
+                flyout = Assert.IsType<MenuFlyout>(overflow.Flyout);
+                var resized = flyout.Items.OfType<MenuItem>().Select(item => item.Tag).OfType<RepositoryViewModel>().Select(tab => tab.Title).ToList();
+                Assert.NotEmpty(resized);
+                click = Center(overflow, window);
+                window.MouseDown(click, MouseButton.Left);
+                window.MouseUp(click, MouseButton.Left);
+                Dispatcher.UIThread.RunJobs();
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(flyout.IsOpen, $"flyout closed after resize. items={flyout.Items.Count} openItems={string.Join(",", flyout.Items.OfType<MenuItem>().Select(item => item.Header))}");
+                presenter = flyout.Popup.Child;
+                popupText = MenuText(presenter);
+                Assert.True(presenter is { Bounds.Height: > 40 }, $"presenter after resize {presenter?.Bounds} {string.Join("|", popupText)}");
+                Assert.Contains(popupText, text => resized.Any(title => text.StartsWith(title, StringComparison.Ordinal) && !text.Contains("@0x")));
+                flyout.Hide();
+
+                await vm.Shutdown();
+                window.DataContext = null;
+                window.Close();
+            }, CancellationToken.None);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static List<string> MenuText(Visual? presenter) =>
+        presenter?.GetVisualDescendants().OfType<TextBlock>()
+            .Select(text => $"{text.Text}@{text.Bounds.Width:0}x{text.Bounds.Height:0}")
+            .ToList() ?? [];
+
+    private static void Settle(Window window)
+    {
+        for (var i = 0; i < 4; i++)
+        {
+            window.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+        }
+    }
+
+    private static List<TabStripItem> PlacedTabs(Window window) =>
+        window.GetVisualDescendants().OfType<TabStripItem>().Where(item => item.Bounds.Width >= 1).ToList();
+
+    private static TabStripItem? HitTab(Window window, Control control)
+    {
+        var hit = Hit(window, control);
+        while (hit is not null)
+        {
+            if (hit is TabStripItem item)
+                return item;
+            hit = hit.GetVisualParent();
+        }
+
+        return null;
+    }
+
+    private static Button? HitButton(Window window, Control control)
+    {
+        var hit = Hit(window, control);
+        while (hit is not null)
+        {
+            if (hit is Button button)
+                return button;
+            hit = hit.GetVisualParent();
+        }
+
+        return null;
+    }
+
+    private static Visual? Hit(Window window, Control control)
+    {
+        var point = control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window);
+        Assert.NotNull(point);
+        return window.InputHitTest(point!.Value) as Visual;
     }
 
     private static Point Center(Control control, Visual relative)

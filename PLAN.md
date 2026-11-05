@@ -213,6 +213,10 @@ On 2026-11-04 Stage all is the rightmost button on the Unstaged bar in Changes a
 
 On 2026-11-04 a line stage no longer fails with `index.lock` still present. `git diff` was rewriting the index after a stale stat, even with `--no-optional-locks`, and cancelling that diff with SIGKILL left the lock. Diff commands now pass `-c diff.autoRefreshIndex=false`. On macOS and Linux a cancelled git process gets SIGTERM first, so it can unlink the lock. `Cancelling_on_unix_lets_the_process_remove_its_lock` and `Selected_lines_stage_and_unstage_from_the_diff_menu` passed. The desktop window was not launched.
 
+On 2026-11-04 repository tabs that do not fit the bar move into a More tabs menu instead of scrolling under a scrollbar. The open tab stays on the bar. Choosing a menu row selects that repository and brings its tab back onto the bar. `Overflowing_repository_tabs_open_from_a_menu`, `Dragging_a_repository_tab_reorders_it_and_keeps_that_order`, and `Empty_window_draws_no_tab_rule_and_an_open_tab_draws_one` passed. The desktop window was not launched.
+
+On 2026-11-04 the More tabs menu is filled before the button opens. Building the rows while the menu opened left the desktop popup empty, so adding repositories or resizing showed the button with no tabs. Each row is the repository name. `Overflowing_repository_tabs_open_from_a_menu` passed, including tabs added after the window was shown and a click after the window was narrowed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
