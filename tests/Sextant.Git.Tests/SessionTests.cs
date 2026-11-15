@@ -764,6 +764,8 @@ public class SessionTests
         var lockFile = Path.Combine(directory, "index.lock");
         try
         {
+            // The loop is a shell builtin so SIGTERM runs the trap between iterations.
+            // sleep would defer the trap until the child returned, and a kill would skip it.
             await File.WriteAllTextAsync(script, """
                 #!/bin/sh
                 lock="$1"
@@ -778,8 +780,26 @@ public class SessionTests
             var task = new GitProcessRunner().RunAsync(
                 new GitRequest { Executable = script, Arguments = [lockFile], WorkingDirectory = directory },
                 cts.Token);
-            for (var pass = 0; pass < 50 && !File.Exists(lockFile); pass++)
-                await Task.Delay(20);
+            // A loaded Linux runner can take more than a second to schedule the new process.
+            for (var pass = 0; pass < 400 && !File.Exists(lockFile); pass++)
+            {
+                if (task.IsCompleted)
+                    break;
+                await Task.Delay(25);
+            }
+
+            if (!File.Exists(lockFile))
+            {
+                if (task.IsCompletedSuccessfully)
+                {
+                    var output = await task;
+                    Assert.Fail($"lock script exited {output.ExitCode} before creating the lock: {output.StandardError}");
+                }
+
+                if (task.IsFaulted)
+                    await task;
+            }
+
             Assert.True(File.Exists(lockFile));
             cts.Cancel();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);

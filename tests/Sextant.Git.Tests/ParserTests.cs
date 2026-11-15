@@ -127,6 +127,85 @@ public class LogAndRefParserTests
     }
 
     [Fact]
+    public async Task Stream_parser_matches_bytes_when_reads_split_a_record()
+    {
+        var root = new string('a', 40);
+        var child = new string('b', 40);
+        var subject = "räk " + new string('x', 9000);
+        var text = $"{root}\u001f\u001f100\u001fAda\u001fa@b\u001froot\0{child}\u001f{root}\u001f200\u001fAda\u001fa@b\u001f{subject}";
+        var data = Encoding.UTF8.GetBytes(text);
+        var expected = LogParser.Parse(data, Encoding.UTF8);
+
+        foreach (var chunk in new[] { 1, 2, 3, 64, 8192 })
+        {
+            await using var stream = new ChunkedReadStream(data, chunk);
+            var commits = await LogParser.ParseAsync(stream, Encoding.UTF8, CancellationToken.None);
+            Assert.Equal(expected.Count, commits.Count);
+            for (var i = 0; i < expected.Count; i++)
+            {
+                Assert.Equal(expected[i].Sha, commits[i].Sha);
+                Assert.Equal(expected[i].Parents, commits[i].Parents);
+                Assert.Equal(expected[i].AuthorUnixSeconds, commits[i].AuthorUnixSeconds);
+                Assert.Equal(expected[i].AuthorName, commits[i].AuthorName);
+                Assert.Equal(expected[i].AuthorEmail, commits[i].AuthorEmail);
+                Assert.Equal(expected[i].Subject, commits[i].Subject);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Live_log_parses_from_stdout_without_keeping_the_buffer()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "base\n");
+        repo.CommitAll("base");
+        repo.WriteFile("a.txt", "next\n");
+        repo.CommitAll("next line");
+
+        var runner = new GitProcessRunner();
+        var request = new GitRequest
+        {
+            Executable = repo.Git,
+            Arguments = GitCommands.Log(repo.Directory, 0, 20),
+            WorkingDirectory = repo.Directory,
+        };
+        IReadOnlyList<CommitRecord>? streamed = null;
+        var output = await runner.RunAsync(request, async (stream, token) =>
+        {
+            streamed = await LogParser.ParseAsync(stream, Encoding.UTF8, token);
+        }, CancellationToken.None);
+
+        Assert.Equal(0, output.ExitCode);
+        Assert.Empty(output.Stdout);
+        Assert.NotNull(streamed);
+
+        var buffered = await runner.RunAsync(request, CancellationToken.None);
+        var parsed = LogParser.Parse(buffered.Stdout, Encoding.UTF8);
+        Assert.NotEmpty(buffered.Stdout);
+        Assert.Equal(parsed.Select(commit => commit.Sha), streamed.Select(commit => commit.Sha));
+        Assert.Equal(parsed.Select(commit => commit.Subject), streamed.Select(commit => commit.Subject));
+        Assert.Contains(streamed, commit => commit.Subject == "next line");
+    }
+
+    private sealed class ChunkedReadStream : MemoryStream
+    {
+        private readonly int _chunk;
+
+        public ChunkedReadStream(byte[] data, int chunk)
+            : base(data, writable: false)
+        {
+            _chunk = chunk;
+        }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (buffer.Length > _chunk)
+                buffer = buffer[.._chunk];
+            return base.ReadAsync(buffer, cancellationToken);
+        }
+    }
+
+    [Fact]
     public async Task Parses_live_log_and_refs()
     {
         using var repo = new TempRepo();

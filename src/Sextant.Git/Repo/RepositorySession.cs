@@ -1676,12 +1676,23 @@ public sealed partial class RepositorySession : IAsyncDisposable
     {
         var invocation = GitCommands.LogInvocation(
             _toplevel, skip, count, includeHead, includeStash, revision, grep, author, path, hiddenBranches, visibleStashes, firstParent, visibleBranches);
-        var output = await ExecuteAsync(invocation.Arguments, null, token, standardInput: invocation.StandardInput).ConfigureAwait(false);
+        // Parse each record as git writes it. The process stdout is not kept beside the commits.
+        IReadOnlyList<CommitRecord>? parsed = null;
+        var output = await ExecuteConsumingAsync(
+            invocation.Arguments,
+            invocation.StandardInput,
+            async (stream, readToken) => parsed = await LogParser.ParseAsync(stream, _encoding, readToken).ConfigureAwait(false),
+            token).ConfigureAwait(false);
         if (output.ExitCode != 0 && includeHead && LogParser.IsUnborn(output.StandardError))
         {
+            parsed = null;
             invocation = GitCommands.LogInvocation(
                 _toplevel, skip, count, includeHead: false, includeStash, revision, grep, author, path, hiddenBranches, visibleStashes, firstParent, visibleBranches);
-            output = await ExecuteAsync(invocation.Arguments, null, token, standardInput: invocation.StandardInput).ConfigureAwait(false);
+            output = await ExecuteConsumingAsync(
+                invocation.Arguments,
+                invocation.StandardInput,
+                async (stream, readToken) => parsed = await LogParser.ParseAsync(stream, _encoding, readToken).ConfigureAwait(false),
+                token).ConfigureAwait(false);
         }
 
         if (output.ExitCode != 0)
@@ -1693,7 +1704,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
         }
 
         Track(output);
-        var commits = LogParser.Parse(output.Stdout, _encoding);
+        var commits = parsed ?? [];
         if (firstParent)
             commits = commits.Select(FirstParent).ToList();
         return new LogLoad(commits, commits.Count < count);
@@ -1804,6 +1815,20 @@ public sealed partial class RepositorySession : IAsyncDisposable
         IReadOnlyDictionary<string, string>? environment = null,
         byte[]? standardInput = null) =>
         ExecuteInAsync(arguments, _toplevel, progress, cancellationToken, environment, standardInput);
+
+    private Task<GitOutput> ExecuteConsumingAsync(
+        IReadOnlyList<string> arguments,
+        byte[]? standardInput,
+        Func<Stream, CancellationToken, Task> consumeStdout,
+        CancellationToken cancellationToken) =>
+        _runner.RunAsync(new GitRequest
+        {
+            Executable = _executable,
+            Arguments = arguments,
+            WorkingDirectory = string.IsNullOrEmpty(_toplevel) ? null : _toplevel,
+            StandardInput = standardInput,
+            Wsl = _wsl,
+        }, consumeStdout, cancellationToken);
 
     private Task<GitOutput> ExecuteInAsync(IReadOnlyList<string> arguments, string workingDirectory, CancellationToken cancellationToken) =>
         ExecuteInAsync(arguments, workingDirectory, null, cancellationToken);
