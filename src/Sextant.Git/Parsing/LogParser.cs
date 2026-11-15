@@ -6,12 +6,184 @@ namespace Sextant.Git.Parsing;
 
 public static class LogParser
 {
-    public static IReadOnlyList<CommitRecord> Parse(byte[] data, Encoding encoding) =>
-        Parse(encoding.GetString(data));
+    private const byte Nul = 0;
+    private const byte UnitSeparator = (byte)'\u001f';
+    private const byte Space = (byte)' ';
 
+    /// <summary>
+    /// Streaming, span-based parser that walks NUL-delimited records without creating
+    /// an intermediate string or an array of all commit strings. Returns each parsed
+    /// <see cref="CommitRecord"/> in an eagerly-collected list so the existing API surface
+    /// is preserved — callers still get an <c>IReadOnlyList&lt;CommitRecord&gt;</c> but the
+    /// internal parsing avoids the giant intermediate string allocation from
+    /// <c>encoding.GetString(data)</c>.
+    /// </summary>
+    public static IReadOnlyList<CommitRecord> Parse(byte[] data, Encoding encoding)
+    {
+        var commits = new List<CommitRecord>(data.Length / 150);
+
+        int start = 0; // start of current NUL-delimited record
+        while (start < data.Length)
+        {
+            // Find next NUL delimiter using IndexOf on the raw byte array
+            int end = Array.IndexOf(data, Nul, start);
+            if (end == -1)
+                end = data.Length;
+
+            int recordLength = end - start;
+            if (recordLength == 0)
+            {
+                // Skip empty records / trailing NUL
+                start = end + 1;
+                continue;
+            }
+
+            // Walk the byte slice to extract fields delimited by unit separator.
+            // Fields: sha(0), parents(1), unix_ts(2), author_name(3), author_email(4), subject(5)
+            string? sha = null;
+            long unix = 0;
+            string? authorName = null;
+            string? authorEmail = null;
+            string? subject = null;
+
+            // Parse parent shas into a list directly (no intermediate strings until needed)
+            var parents = new List<string>();
+
+            int fieldStart = start;
+            for (int fieldIndex = 0; fieldIndex <= 5; fieldIndex++)
+            {
+                // Find next unit separator within this record
+                int nextSep = Array.IndexOf(data, UnitSeparator, fieldStart);
+                if (nextSep == -1 || nextSep >= end)
+                    nextSep = end;
+
+                int fieldLen = nextSep - fieldStart;
+
+                switch (fieldIndex)
+                {
+                    case 0: // sha — must be exactly 40 hex chars (ASCII)
+                        if (fieldLen == 40 && IsValidSha16(data, fieldStart))
+                            sha = Encoding.ASCII.GetString(data, fieldStart, fieldLen);
+                        break;
+                    case 1: // parents — space-separated shas, may be empty
+                        ParseParentShas(data, fieldStart, fieldLen, parents);
+                        break;
+                    case 2: // unix timestamp
+                        if (TryParseLong(data, fieldStart, fieldLen, out var ts))
+                            unix = ts;
+                        break;
+                    case 3: // author name
+                        authorName = Encoding.UTF8.GetString(data, fieldStart, fieldLen);
+                        break;
+                    case 4: // author email
+                        authorEmail = Encoding.UTF8.GetString(data, fieldStart, fieldLen);
+                        break;
+                    case 5: // subject
+                        subject = Encoding.UTF8.GetString(data, fieldStart, fieldLen);
+                        break;
+                }
+
+                fieldStart = nextSep + 1;
+            }
+
+            if (sha is null)
+            {
+                start = end + 1;
+                continue;
+            }
+
+            commits.Add(new CommitRecord(sha, parents.Count == 0 ? [] : parents.ToArray(), unix, authorName ?? "", authorEmail ?? "", subject ?? ""));
+
+            start = end + 1;
+        }
+
+        return commits;
+    }
+
+    private static bool IsValidSha16(byte[] data, int offset)
+    {
+        for (int i = 0; i < 40; i++)
+        {
+            byte b = data[offset + i];
+            if ((b >= '0' && b <= '9') || (b >= 'a' && b <= 'f'))
+                continue;
+            return false;
+        }
+        return true;
+    }
+
+    private static void ParseParentShas(byte[] data, int offset, int length, List<string> parents)
+    {
+        // Parents are space-separated 40-char hex shas. Parse directly from bytes.
+        int pos = offset;
+        int limit = offset + length;
+
+        while (pos < limit)
+        {
+            // Skip leading spaces
+            while (pos < limit && data[pos] == Space)
+                pos++;
+            if (pos >= limit)
+                break;
+
+            // Check for a valid 40-char sha
+            int remaining = limit - pos;
+            if (remaining >= 40 && IsValidSha16(data, pos))
+            {
+                parents.Add(Encoding.ASCII.GetString(data, pos, 40));
+                pos += 40;
+            }
+            else
+            {
+                // Scan for next space to skip garbage
+                int sp = Array.IndexOf(data, Space, pos);
+                if (sp == -1)
+                    break;
+                pos = sp + 1;
+            }
+        }
+    }
+
+    private static bool TryParseLong(byte[] data, int offset, int length, out long value)
+    {
+        // Fast path: ASCII digits only (which is the common case for unix timestamps)
+        if (length == 0)
+        {
+            value = 0;
+            return false;
+        }
+
+        int start = offset;
+        while (start < offset + length && data[start] <= ' ')
+            start++; // skip leading whitespace
+
+        if (start >= offset + length)
+        {
+            value = 0;
+            return false;
+        }
+
+        long result = 0;
+        for (int i = start; i < offset + length; i++)
+        {
+            byte b = data[i];
+            if (b < '0' || b > '9')
+                break;
+            result = result * 10 + (b - '0');
+        }
+
+        value = result;
+        return true;
+    }
+
+    /// <summary>
+    /// Legacy string-based parser kept for backward compatibility with unit tests.
+    /// For production use prefer the <c>Parse(byte[], Encoding)</c> overload which
+    /// avoids a giant intermediate string allocation.
+    /// </summary>
     public static IReadOnlyList<CommitRecord> Parse(string text)
     {
-        var commits = new List<CommitRecord>();
+        var commits = new List<CommitRecord>(text.Length / 150);
         foreach (var record in text.Split('\0', StringSplitOptions.RemoveEmptyEntries))
         {
             var fields = record.Split('\u001f');

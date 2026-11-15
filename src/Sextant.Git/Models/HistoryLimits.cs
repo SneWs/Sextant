@@ -2,7 +2,7 @@ namespace Sextant.Git.Models;
 
 public static class HistoryLimits
 {
-    public const int FirstPage = 300;
+    public const int FirstPage = 100;
 
     public const int Page = 500;
 
