@@ -58,11 +58,13 @@ public static class LogParser
                     nextSep = end;
 
                 int fieldLen = nextSep - fieldStart;
+                if (fieldLen < 0)
+                    fieldLen = 0;
 
                 switch (fieldIndex)
                 {
-                    case 0: // sha — must be exactly 40 hex chars (ASCII)
-                        if (fieldLen == 40 && IsValidSha16(data, fieldStart))
+                    case 0: // sha — must be non-empty hex string (typically 40 chars)
+                        if (fieldLen > 0 && IsValidSha(data, fieldStart, fieldLen))
                             sha = Encoding.ASCII.GetString(data, fieldStart, fieldLen);
                         break;
                     case 1: // parents — space-separated shas, may be empty
@@ -100,9 +102,9 @@ public static class LogParser
         return commits;
     }
 
-    private static bool IsValidSha16(byte[] data, int offset)
+    private static bool IsValidSha(byte[] data, int offset, int length)
     {
-        for (int i = 0; i < 40; i++)
+        for (int i = 0; i < length; i++)
         {
             byte b = data[offset + i];
             if ((b >= '0' && b <= '9') || (b >= 'a' && b <= 'f'))
@@ -114,7 +116,7 @@ public static class LogParser
 
     private static void ParseParentShas(byte[] data, int offset, int length, List<string> parents)
     {
-        // Parents are space-separated 40-char hex shas. Parse directly from bytes.
+        // Parents are space-separated hex shas. Parse directly from bytes.
         int pos = offset;
         int limit = offset + length;
 
@@ -126,20 +128,21 @@ public static class LogParser
             if (pos >= limit)
                 break;
 
-            // Check for a valid 40-char sha
-            int remaining = limit - pos;
-            if (remaining >= 40 && IsValidSha16(data, pos))
+            // Find the end of this potential SHA (next space or end of field)
+            int shaEnd = pos;
+            while (shaEnd < limit && data[shaEnd] != Space)
+                shaEnd++;
+
+            int shaLen = shaEnd - pos;
+            if (shaLen >= 1 && IsValidSha(data, pos, shaLen))
             {
-                parents.Add(Encoding.ASCII.GetString(data, pos, 40));
-                pos += 40;
+                parents.Add(Encoding.ASCII.GetString(data, pos, shaLen));
+                pos = shaEnd;
             }
             else
             {
-                // Scan for next space to skip garbage
-                int sp = Array.IndexOf(data, Space, pos);
-                if (sp == -1)
-                    break;
-                pos = sp + 1;
+                // Skip non-hex garbage to next space
+                pos = shaEnd;
             }
         }
     }
