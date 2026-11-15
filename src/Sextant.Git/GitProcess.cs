@@ -11,7 +11,25 @@ public sealed class GitProcessRunner
     /// <summary>Windows only. Set when the app can show an SSH passphrase dialog.</summary>
     public AskPassLaunch? AskPass { get; set; }
 
-    public async Task<GitOutput> RunAsync(GitRequest request, CancellationToken cancellationToken)
+    public Task<GitOutput> RunAsync(GitRequest request, CancellationToken cancellationToken) =>
+        RunCoreAsync(request, consumeStdout: null, cancellationToken);
+
+    /// <summary>
+    /// Runs git and lets <paramref name="consumeStdout"/> read stdout. Those bytes are not kept:
+    /// <see cref="GitOutput.Stdout"/> is empty. The callback should read until the stream ends;
+    /// anything left is drained so git can exit. A WSL launcher failure still keeps a short prefix
+    /// long enough to recognize wsl.exe's own message.
+    /// </summary>
+    public Task<GitOutput> RunAsync(
+        GitRequest request,
+        Func<Stream, CancellationToken, Task> consumeStdout,
+        CancellationToken cancellationToken) =>
+        RunCoreAsync(request, consumeStdout, cancellationToken);
+
+    private async Task<GitOutput> RunCoreAsync(
+        GitRequest request,
+        Func<Stream, CancellationToken, Task>? consumeStdout,
+        CancellationToken cancellationToken)
     {
         var useWsl = OperatingSystem.IsWindows() && request.Wsl is not null;
         if (!useWsl && request.Wsl is not null)
@@ -78,7 +96,9 @@ public sealed class GitProcessRunner
         }
 
         using var registration = cancellationToken.Register(() => RequestExit(process));
-        var stdoutTask = ReadAllAsync(process.StandardOutput.BaseStream);
+        var stdoutTask = consumeStdout is null
+            ? ReadAllAsync(process.StandardOutput.BaseStream)
+            : ReadConsumedAsync(process.StandardOutput.BaseStream, consumeStdout, request.Wsl is not null, cancellationToken);
         var stderrTask = ReadStandardErrorAsync(process.StandardError.BaseStream, request.Progress);
         if (request.StandardInput is { Length: > 0 })
         {
@@ -114,6 +134,9 @@ public sealed class GitProcessRunner
                 stdout = [];
             }
         }
+
+        if (consumeStdout is not null)
+            stdout = [];
 
         var display = DisplayOf(request);
         return new GitOutput
@@ -307,6 +330,57 @@ public sealed class GitProcessRunner
         return memory.ToArray();
     }
 
+    /// <summary>
+    /// The returned bytes are only a WSL launcher prefix, and only when <paramref name="capturePrefix"/> is set.
+    /// The log itself is not retained.
+    /// </summary>
+    private static async Task<byte[]> ReadConsumedAsync(
+        Stream stream,
+        Func<Stream, CancellationToken, Task> consumeStdout,
+        bool capturePrefix,
+        CancellationToken cancellationToken)
+    {
+        var source = stream;
+        PrefixStream? prefix = null;
+        if (capturePrefix)
+        {
+            prefix = new PrefixStream(stream);
+            source = prefix;
+        }
+
+        try
+        {
+            await consumeStdout(source, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            await DrainRemainderQuietAsync(source).ConfigureAwait(false);
+            throw;
+        }
+
+        await DrainRemainderAsync(source).ConfigureAwait(false);
+        return prefix?.Prefix() ?? [];
+    }
+
+    private static async Task DrainRemainderAsync(Stream stream)
+    {
+        var buffer = new byte[8192];
+        while (await stream.ReadAsync(buffer).ConfigureAwait(false) > 0)
+        {
+        }
+    }
+
+    private static async Task DrainRemainderQuietAsync(Stream stream)
+    {
+        try
+        {
+            await DrainRemainderAsync(stream).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+        }
+    }
+
     private static async Task<StderrRead> ReadStandardErrorAsync(Stream stream, IProgress<string>? progress)
     {
         var buffer = new byte[2048];
@@ -395,4 +469,70 @@ public sealed class GitProcessRunner
     }
 
     private readonly record struct StderrRead(string Error, string? Progress);
+
+    /// <summary>Copies at most the first 4KB while the consumer reads. wsl.exe errors fit in that prefix.</summary>
+    private sealed class PrefixStream : Stream
+    {
+        private const int Limit = 4096;
+        private readonly Stream _inner;
+        private readonly byte[] _prefix = new byte[Limit];
+        private int _count;
+
+        public PrefixStream(Stream inner) => _inner = inner;
+
+        public byte[] Prefix()
+        {
+            if (_count == 0)
+                return [];
+            var copy = new byte[_count];
+            _prefix.AsSpan(0, _count).CopyTo(copy);
+            return copy;
+        }
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) =>
+            throw new NotSupportedException();
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            var read = await _inner.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            Capture(buffer.Span, read);
+            return read;
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+
+        private void Capture(ReadOnlySpan<byte> data, int read)
+        {
+            if (read <= 0 || _count >= Limit)
+                return;
+            var take = Math.Min(read, Limit - _count);
+            data[..take].CopyTo(_prefix.AsSpan(_count));
+            _count += take;
+        }
+    }
 }
