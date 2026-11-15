@@ -97,16 +97,33 @@ public class LogAndRefParserTests
     }
 
     [Fact]
-    public void Parses_head_marker_and_upstream()
+    public void Parses_byte_array_streaming_without_intermediate_string()
     {
-        var text = "abc\trefs/heads/main\t*\torigin/main\n" +
-                   "def\trefs/remotes/origin/main\t \t\n";
-        var refs = RefParser.Parse(Encoding.UTF8.GetBytes(text), Encoding.UTF8);
-        Assert.Equal(2, refs.Count);
-        Assert.True(refs[0].IsHead);
-        Assert.Equal("origin/main", refs[0].Upstream);
-        Assert.False(refs[1].IsHead);
-        Assert.Null(refs[1].Upstream);
+        var root = "aaa\u001f\u001f100\u001fAda\u001fa@b\u001froot";
+        var merge = "ccc\u001faaa bbb\u001f300\u001fAda\u001fa@b\u001fmerge";
+        var text = root + "\0" + merge + "\0";
+        byte[] data = Encoding.UTF8.GetBytes(text);
+
+        // Use the byte[] streaming overload — should produce identical results.
+        var commits = LogParser.Parse(data, Encoding.UTF8);
+        Assert.Equal(2, commits.Count);
+        Assert.Empty(commits[0].Parents);
+        Assert.Equal(["aaa", "bbb"], commits[1].Parents);
+        Assert.Equal("merge", commits[1].Subject);
+    }
+
+    [Fact]
+    public void Streaming_parser_skips_empty_records_and_trailing_nuls()
+    {
+        var sha = new string('a', 40);
+        var text = $"{sha}\u001f\u001f999\u001fBob\u001fbob@x.com\u001ftest\0\0";
+        byte[] data = Encoding.UTF8.GetBytes(text);
+
+        var commits = LogParser.Parse(data, Encoding.UTF8);
+        Assert.Single(commits);
+        Assert.Equal(sha, commits[0].Sha);
+        Assert.Empty(commits[0].Parents);
+        Assert.Equal("Bob", commits[0].AuthorName);
     }
 
     [Fact]

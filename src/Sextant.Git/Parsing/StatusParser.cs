@@ -16,7 +16,7 @@ public static class StatusParser
         string? upstream = null;
         var ahead = 0;
         var behind = 0;
-        var entries = new List<StatusEntry>();
+        var entries = new List<StatusEntry>(text.Length / 80);
 
         for (var i = 0; i < records.Length; i++)
         {
