@@ -446,6 +446,12 @@ public static class GitCommands
     public static IReadOnlyList<string> Reset(string toplevel, string mode, string sha) =>
         ["-C", toplevel, "reset", mode, sha];
 
+    public static IReadOnlyList<string> ObjectType(string toplevel, string sha, string path) =>
+        ["-C", toplevel, "--no-optional-locks", "cat-file", "-t", "--", sha + ":" + path];
+
+    public static IReadOnlyList<string> RestoreFile(string toplevel, string sha, string path) =>
+        ["-C", toplevel, "--literal-pathspecs", "restore", "--source=" + sha, "--worktree", "--overlay", "--", path];
+
     public static IReadOnlyList<string> CherryPick(string toplevel, string sha) =>
         ["-C", toplevel, "cherry-pick", "--no-edit", sha];
 

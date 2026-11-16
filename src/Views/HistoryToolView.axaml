@@ -60,6 +60,7 @@
                                 <Border.ContextMenu>
                                     <ContextMenu Opening="OnMenuOpening">
                                         <MenuItem Header="Checkout" Command="{Binding CheckoutCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowCheckout}"/>
+                                        <MenuItem Header="Restore this file from commit…" Command="{Binding RestoreFileCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRestoreFile}"/>
                                         <MenuItem Header="Cherry pick commit" Command="{Binding CherryPickCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
                                         <MenuItem Header="Revert commit" Command="{Binding RevertCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
                                         <MenuItem Header="Create" IsVisible="{Binding ShowRewrite}">
@@ -70,9 +71,9 @@
                                         <Separator IsVisible="{Binding ShowRewrite}"/>
                                         <MenuItem Header="Create branch at HEAD" Command="{Binding CreateBranchCommand}" IsVisible="{Binding IsWorkingCopy}"/>
                                         <MenuItem Header="Copy SHA" Command="{Binding CopyShaCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowLanes}"/>
-                                        <MenuItem Header="Reset soft" Command="{Binding ResetSoftCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
-                                        <MenuItem Header="Reset mixed" Command="{Binding ResetMixedCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
-                                        <MenuItem Header="Reset hard" Command="{Binding ResetHardCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
+                                        <MenuItem Header="Reset branch (soft)…" Command="{Binding ResetSoftCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
+                                        <MenuItem Header="Reset branch (mixed)…" Command="{Binding ResetMixedCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
+                                        <MenuItem Header="Reset branch (hard)…" Command="{Binding ResetHardCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
                                         <MenuItem Header="Rebase interactive…" Command="{Binding RebaseCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
                                         <MenuItem Header="Reword…" Command="{Binding RewordCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
                                     </ContextMenu>

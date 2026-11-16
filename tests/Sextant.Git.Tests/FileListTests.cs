@@ -17,6 +17,56 @@ namespace Sextant.Git.Tests;
 public class FileListTests
 {
     [Fact]
+    public async Task File_history_restore_and_branch_resets_ask_before_changing_the_repository()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("first");
+        repo.WriteFile("a.txt", "two\n");
+        repo.CommitAll("second");
+        var head = repo.RunCapture("rev-parse", "HEAD").Trim();
+        repo.WriteFile("a.txt", "dirty\n");
+
+        await session.Dispatch(async () =>
+        {
+            var dialogs = new RecordingDialogs();
+            var vm = new RepositoryViewModel(new FileListHost(repo.Git, dialogs), repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                Assert.All(vm.Rows, row => Assert.False(row.ShowRestoreFile));
+                var file = vm.Files.First(row => row.Path == "a.txt");
+                await ((IAsyncRelayCommand)file.HistoryCommand).ExecuteAsync(null);
+                var first = vm.Rows.Single(row => row.Subject == "first");
+                Assert.True(first.ShowRestoreFile);
+                Assert.Equal("a.txt", first.HistoryFilePath);
+                foreach (var command in new[] { first.ResetSoftCommand, first.ResetMixedCommand, first.ResetHardCommand })
+                {
+                    await ((IAsyncRelayCommand)command).ExecuteAsync(first);
+                    Assert.Contains("entire branch", dialogs.Confirms[^1].Message, StringComparison.Ordinal);
+                    Assert.Equal(head, repo.RunCapture("rev-parse", "HEAD").Trim());
+                }
+
+                await ((IAsyncRelayCommand)first.RestoreFileCommand).ExecuteAsync(first);
+                Assert.Contains("uncommitted", dialogs.Confirms[^1].Message, StringComparison.Ordinal);
+                Assert.Equal("dirty\n", File.ReadAllText(Path.Combine(repo.Directory, "a.txt")));
+                dialogs.Accept = true;
+                await ((IAsyncRelayCommand)first.RestoreFileCommand).ExecuteAsync(first);
+                Assert.False(vm.HasBanner, vm.Banner);
+                Assert.Equal("one\n", File.ReadAllText(Path.Combine(repo.Directory, "a.txt")));
+                Assert.Equal(head, repo.RunCapture("rev-parse", "HEAD").Trim());
+                await vm.ShowAllCommitsCommand.ExecuteAsync(null);
+                Assert.All(vm.Rows, row => Assert.False(row.ShowRestoreFile));
+            }
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+        }, CancellationToken.None);
+    }
+
+    [Fact]
     public async Task Staged_files_sit_above_unstaged_and_the_section_is_a_bar()
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));

@@ -196,6 +196,17 @@ public class HistoryGraphTests
             Assert.Contains(vm.Rows, row => row.Subject == "touch a");
             Assert.Contains(vm.Rows, row => row.Subject == "touch a again");
             Assert.DoesNotContain(vm.Rows, row => row.Subject == "touch b");
+            var historyGraph = view.FindControl<ListBox>("GraphList")!;
+            var historical = vm.Rows.Single(row => row.Subject == "touch a");
+            historyGraph.ScrollIntoView(historical);
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            var historyMenu = OpenGraphMenu(historyGraph, historical);
+            var restore = GraphMenuItem(historyMenu, "Restore this file from commit…");
+            Assert.True(restore.IsVisible);
+            Assert.Same(historical, restore.CommandParameter);
+            Assert.Same(historical.RestoreFileCommand, restore.Command);
+            historyMenu.Close();
             var search = view.FindControl<TextBox>("HistorySearchBox");
             Assert.NotNull(search);
             Assert.False(search.IsEffectivelyVisible);

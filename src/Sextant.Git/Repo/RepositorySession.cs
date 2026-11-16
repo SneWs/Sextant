@@ -117,6 +117,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
                 MergeMessage = _mergeMessage,
                 HistoryLabel = BranchVisibility.Caption(_historyQuery, _hiddenBranches),
                 HasHistoryQuery = _historyQuery is not null,
+                HistoryFilePath = _historyQuery is { FilePattern: false, Path: { Length: > 0 } path } ? path : null,
                 FlatHistory = _historyQuery?.FlattensGraph == true,
                 HiddenBranches = new HashSet<string>(_hiddenBranches, StringComparer.Ordinal),
                 Stashes = _stashes.ToArray(),
@@ -623,6 +624,18 @@ public sealed partial class RepositorySession : IAsyncDisposable
 
     public Task ResetAsync(string mode, string sha, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.Reset(_toplevel, mode, sha), null, cancellationToken);
+
+    public async Task RestoreFileAsync(string sha, string path, CancellationToken cancellationToken)
+    {
+        var type = await RunAsync(ct => _scheduler.ReadAsync(async token =>
+        {
+            var output = Checked(await ExecuteAsync(GitCommands.ObjectType(_toplevel, sha, path), null, token).ConfigureAwait(false));
+            return _encoding.GetString(output.Stdout).Trim();
+        }, ct), cancellationToken).ConfigureAwait(false);
+        if (type != "blob")
+            throw new RepositoryActionException("This version does not contain a file at that path.");
+        await MutateAsync(GitCommands.RestoreFile(_toplevel, sha, path), null, cancellationToken).ConfigureAwait(false);
+    }
 
     public Task CherryPickAsync(string sha, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.CherryPick(_toplevel, sha), null, cancellationToken);
