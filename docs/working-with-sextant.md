@@ -67,6 +67,8 @@ A name with no slash matches that file in any directory. A version such as `1.2.
 
 A file's History button is the same search limited to that path.
 
+In a file's history, right-click a commit and choose **Restore this file from commit…** to replace that file in the working tree with its version at that commit. Sextant asks first because uncommitted edits to the file will be overwritten. The index and branch history stay unchanged, so the restored version can be reviewed and staged normally. If the file did not exist at that commit, Git reports an error instead. Branch reset actions affect the whole repository, not just the file shown in history, and ask for confirmation.
+
 ## Repository file tree
 
 The Files tab beside History lists the current repository's tracked files and non-ignored untracked files, not just changed files. Directories expand with the arrow or a double-click. Only visible rows are drawn, and a refresh keeps expanded directories. Sparse-checkout paths are listed from Git's index without checking them out.

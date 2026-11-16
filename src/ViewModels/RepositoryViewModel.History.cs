@@ -494,22 +494,19 @@ public partial class RepositoryViewModel
 
     private Task ResetAsync(CommitRecord commit, string mode)
     {
-        if (mode == "--hard")
+        var kind = mode switch { "--soft" => "soft", "--mixed" => "mixed", _ => "hard" };
+        var effect = mode switch
         {
-            var head = _session?.Snapshot().Branch;
-            var discarded = head?.Oid is { } oid && !string.Equals(oid, commit.Sha, StringComparison.OrdinalIgnoreCase)
-                ? $" Commit {Short(oid)} will be discarded."
-                : "";
-            return ConfirmRun(
-                "Hard reset",
-                $"Hard reset to {Short(commit.Sha)} {commit.Subject}? Uncommitted changes will be discarded.{discarded}",
-                "Reset hard",
-                "Resetting…",
-                ct => _session!.ResetAsync(mode, commit.Sha, ct));
-        }
-
-        var label = mode == "--soft" ? "Resetting soft…" : "Resetting mixed…";
-        return RunAsync(label, ct => _session!.ResetAsync(mode, commit.Sha, ct));
+            "--soft" => "Changes between the commits will be staged; the working tree will not change.",
+            "--mixed" => "The index will be reset; changes between the commits will be unstaged.",
+            _ => "The index and working tree will be reset, discarding uncommitted changes to tracked files.",
+        };
+        return ConfirmRun(
+            $"Reset branch ({kind})",
+            $"Reset the entire branch to {Short(commit.Sha)} {commit.Subject}? This moves HEAD and can remove local commits from the branch, not just changes to one file. {effect}",
+            $"Reset {kind}",
+            "Resetting…",
+            ct => _session!.ResetAsync(mode, commit.Sha, ct));
     }
 
     private Task CherryPickAsync(CommitRecord commit) =>

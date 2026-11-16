@@ -108,6 +108,10 @@ public partial class GraphRowViewModel : ObservableObject
 
     public bool ShowRewrite { get; init; }
 
+    public string? HistoryFilePath { get; init; }
+
+    public bool ShowRestoreFile => HistoryFilePath is not null;
+
     /// <summary>Repository that owns the shared history commands. Test rows leave this empty, so those commands stay disabled.</summary>
     internal RepositoryViewModel? CommandOwner { get; init; }
 
@@ -124,6 +128,8 @@ public partial class GraphRowViewModel : ObservableObject
     public ICommand PatchCommand => CommandOwner?.GraphPatchCommand ?? UiCommands.Disabled;
 
     public ICommand CopyShaCommand => CommandOwner?.GraphCopyShaCommand ?? UiCommands.Disabled;
+
+    public ICommand RestoreFileCommand => CommandOwner?.GraphRestoreFileCommand ?? UiCommands.Disabled;
 
     public ICommand ResetSoftCommand => CommandOwner?.GraphResetSoftCommand ?? UiCommands.Disabled;
 

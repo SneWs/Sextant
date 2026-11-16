@@ -107,6 +107,7 @@ public partial class RepositoryViewModel : ViewModelBase
     internal ICommand GraphPatchCommand { get; }
     internal ICommand GraphCopyShaCommand { get; }
     internal ICommand GraphResetSoftCommand { get; }
+    internal ICommand GraphRestoreFileCommand { get; }
     internal ICommand GraphResetMixedCommand { get; }
     internal ICommand GraphResetHardCommand { get; }
     internal ICommand GraphCherryPickCommand { get; }
@@ -129,6 +130,7 @@ public partial class RepositoryViewModel : ViewModelBase
         GraphPatchCommand = new AsyncRelayCommand<GraphRowViewModel>(PatchRowAsync);
         GraphCopyShaCommand = new AsyncRelayCommand<GraphRowViewModel>(CopyShaRowAsync);
         GraphResetSoftCommand = new AsyncRelayCommand<GraphRowViewModel>(ResetSoftRowAsync);
+        GraphRestoreFileCommand = new AsyncRelayCommand<GraphRowViewModel>(RestoreFileRowAsync);
         GraphResetMixedCommand = new AsyncRelayCommand<GraphRowViewModel>(ResetMixedRowAsync);
         GraphResetHardCommand = new AsyncRelayCommand<GraphRowViewModel>(ResetHardRowAsync);
         GraphCherryPickCommand = new AsyncRelayCommand<GraphRowViewModel>(CherryPickRowAsync);
@@ -2076,6 +2078,7 @@ public partial class RepositoryViewModel : ViewModelBase
             Tags = TagNames(mine, state.HiddenBranches),
             ShowCheckout = checkout,
             ShowRewrite = true,
+            HistoryFilePath = state.HistoryFilePath,
             CommandOwner = this,
             CheckoutBranch = checkout ? name : null,
         };
@@ -2084,6 +2087,12 @@ public partial class RepositoryViewModel : ViewModelBase
     private Task CheckoutRowAsync(GraphRowViewModel? row) =>
         row?.CheckoutBranch is { Length: > 0 } name
             ? RunAsync("Checking out…", ct => Session.SwitchAsync(name, ct))
+            : Task.CompletedTask;
+
+    private Task RestoreFileRowAsync(GraphRowViewModel? row) =>
+        row is { Commit: { } commit, HistoryFilePath: { } path }
+            ? ConfirmRun("Restore file", $"Restore {path} from {Short(commit.Sha)}? This replaces its working-tree contents, including uncommitted changes. The index and branch history will not change.",
+                "Restore file", "Restoring file…", ct => _session!.RestoreFileAsync(commit.Sha, path, ct))
             : Task.CompletedTask;
 
     private Task CreateBranchAtRowAsync(GraphRowViewModel? row) =>
