@@ -29,6 +29,8 @@ public partial class RepositoryFilesToolView : UserControl
     {
         if (e.InitialPressMouseButton != MouseButton.Left)
             return;
+        if (e.KeyModifiers != KeyModifiers.None)
+            return;
         // A press on the expand arrow or context menu is not a request to reveal the file.
         if (e.Source is Visual source && source.FindAncestorOfType<Button>(includeSelf: true) is not null)
             return;
@@ -49,11 +51,16 @@ public partial class RepositoryFilesToolView : UserControl
         }
     }
 
-    private void OnRepositoryFileKeyDown(object? sender, KeyEventArgs e)
+    private async void OnRepositoryFileKeyDown(object? sender, KeyEventArgs e)
     {
         if (DataContext is not RepositoryViewModel vm || vm.SelectedRepositoryFile is not { } item)
             return;
-        if (e.Key == Key.Right && item.IsDirectory && !item.IsExpanded
+        if (e.Key == Key.Delete && e.KeyModifiers == KeyModifiers.None)
+        {
+            e.Handled = true;
+            await vm.RemoveSelectedRepositoryFilesAsync();
+        }
+        else if (e.Key == Key.Right && item.IsDirectory && !item.IsExpanded
             || e.Key == Key.Left && item.IsDirectory && item.IsExpanded)
         {
             vm.ToggleRepositoryDirectory(item);

@@ -6,6 +6,41 @@ namespace Sextant.Git.Tests;
 public class RepositoryFileRemovalTests
 {
     [Fact]
+    public async Task Removing_multiple_files_handles_tracked_untracked_and_duplicate_literal_paths()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("[a].txt", "tracked\n");
+        repo.WriteFile("a.txt", "keep\n");
+        repo.CommitAll("base");
+        repo.WriteFile("--new.txt", "untracked\n");
+        await using var session = await Open(repo);
+
+        await session.RemoveRepositoryFilesAsync(["[a].txt", "--new.txt", "[a].txt"], CancellationToken.None);
+
+        Assert.False(File.Exists(Path.Combine(repo.Directory, "[a].txt")));
+        Assert.False(File.Exists(Path.Combine(repo.Directory, "--new.txt")));
+        Assert.True(File.Exists(Path.Combine(repo.Directory, "a.txt")));
+        Assert.Equal("[a].txt", Assert.Single(session.Snapshot().Entries).Path);
+        Assert.True(Assert.Single(session.Snapshot().Entries).Staged);
+    }
+
+    [Fact]
+    public async Task Removing_multiple_files_validates_every_path_before_deleting_anything()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("keep.txt", "tracked\n");
+        repo.CommitAll("base");
+        await using var session = await Open(repo);
+
+        await Assert.ThrowsAsync<RepositoryActionException>(() =>
+            session.RemoveRepositoryFilesAsync(["keep.txt", ".git/config"], CancellationToken.None));
+
+        Assert.True(File.Exists(Path.Combine(repo.Directory, "keep.txt")));
+        Assert.Empty(repo.RunCapture("diff", "--cached"));
+        Assert.DoesNotContain(session.Snapshot().Commands, command => command.Arguments.Contains("rm") || command.Arguments.Contains("clean"));
+    }
+
+    [Fact]
     public void Removal_commands_use_literal_paths_and_never_recurse()
     {
         const string path = "--force [a]*.txt";

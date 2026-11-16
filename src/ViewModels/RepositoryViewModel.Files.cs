@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Sextant.Git;
@@ -16,6 +17,7 @@ public partial class RepositoryViewModel
     private int _repositoryFilesGeneration;
 
     public ResetCollection<RepositoryFileTreeItem> RepositoryFileTree { get; } = new();
+    public ObservableCollection<RepositoryFileTreeItem> SelectedRepositoryFiles { get; } = [];
 
     [ObservableProperty]
     public partial RepositoryFileTreeItem? SelectedRepositoryFile { get; set; }
@@ -285,7 +287,7 @@ public partial class RepositoryViewModel
                 UnlockAction = () => ChangeRepositoryLockAsync(path, unlock: true, force: false),
                 ForceUnlockAction = () => ChangeRepositoryLockAsync(path, unlock: true, force: true),
                 HistoryAction = () => ShowFileHistoryAsync(path),
-                RemoveAction = () => RemoveRepositoryFileAsync(path),
+                RemoveAction = () => RemoveSelectedRepositoryFilesAsync(path),
                 FileMenuFactory = () => FileMenuFor(path, tracked),
             });
         }
@@ -311,6 +313,7 @@ public partial class RepositoryViewModel
     private void PublishRepositoryFileTree()
     {
         var selected = SelectedRepositoryFile;
+        var selection = SelectedRepositoryFiles.Select(item => (item.Path, item.IsDirectory)).ToHashSet();
         var rows = new List<RepositoryFileTreeItem>();
         void AddRows(IEnumerable<RepositoryFileTreeItem> items)
         {
@@ -323,8 +326,15 @@ public partial class RepositoryViewModel
         }
         AddRows(_repositoryFileRoots);
         RepositoryFileTree.Reset(rows);
+        SelectedRepositoryFiles.Clear();
         SelectedRepositoryFile = selected is null ? null
             : rows.FirstOrDefault(item => item.Path == selected.Path && item.IsDirectory == selected.IsDirectory);
+        var restored = SelectedRepositoryFiles.ToHashSet();
+        foreach (var row in rows)
+        {
+            if (selection.Contains((row.Path, row.IsDirectory)) && !restored.Contains(row))
+                SelectedRepositoryFiles.Add(row);
+        }
     }
 
     /// <summary>
@@ -349,9 +359,14 @@ public partial class RepositoryViewModel
         PublishRepositoryFileTree();
     }
 
-    private Task RemoveRepositoryFileAsync(string path)
+    public Task RemoveSelectedRepositoryFilesAsync(string? contextPath = null)
     {
         if (_session is null || IsBusy)
+            return Task.CompletedTask;
+        var paths = contextPath is not null && !SelectedRepositoryFiles.Any(item => item.Path == contextPath)
+            ? [contextPath]
+            : SelectedRepositoryFiles.Where(item => item.IsFile).Select(item => item.Path).Distinct(StringComparer.Ordinal).ToArray();
+        if (paths.Length == 0)
             return Task.CompletedTask;
         if (_host.Dialogs is not { } dialogs)
         {
@@ -360,12 +375,14 @@ public partial class RepositoryViewModel
         }
         return HoldFocus(async () =>
         {
-            var confirmed = await dialogs.ConfirmAsync("Remove file",
-                $"Delete {path} from disk and remove it from Git tracking? Its deletion will be staged if it is tracked. Uncommitted changes will be lost; committed history stays unchanged.",
+            var target = paths.Length == 1 ? paths[0]
+                : $"{paths.Length} selected files:\n{string.Join("\n", paths.Take(10))}{(paths.Length > 10 ? "\n…" : "")}\n";
+            var confirmed = await dialogs.ConfirmAsync(paths.Length == 1 ? "Remove file" : "Remove files",
+                $"Delete {target} from disk and remove {(paths.Length == 1 ? "it" : "them")} from Git tracking? Deletions will be staged for tracked files. Uncommitted changes will be lost; committed history stays unchanged.",
                 "Remove");
             if (!confirmed || _session is null)
                 return;
-            await RunAsync("Removing file…", ct => _session.RemoveRepositoryFileAsync(path, ct));
+            await RunAsync("Removing files…", ct => _session.RemoveRepositoryFilesAsync(paths, ct));
         });
     }
 

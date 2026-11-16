@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Sextant;
@@ -811,6 +812,118 @@ public class RepositoryFileTreeTests
             Assert.DoesNotContain(vm.RepositoryFileTree, item => item.Path == "remove.txt");
             Assert.Contains(vm.Files, item => item.Path == "remove.txt" && item.Kind == ChangeKind.Deleted && item.FromStagedList);
             Assert.Equal(2, dialogs.Confirmations);
+            await vm.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Multiple_files_can_be_selected_and_removed_from_the_menu_or_delete_key(bool deleteKey)
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "tracked\n");
+        repo.WriteFile("b.txt", "keep\n");
+        repo.WriteFile("docs/keep.txt", "keep directory\n");
+        repo.CommitAll("base");
+        repo.WriteFile("c.txt", "untracked\n");
+
+        await session.Dispatch(async () =>
+        {
+            var dialogs = new FileActionDialogs("Remove files", "Remove");
+            var vm = new RepositoryViewModel(new TreeHost(repo.Git, dialogs), repo.Directory);
+            await vm.EnsureLoadedAsync();
+            await vm.ShowRepositoryFilesTabCommand.ExecuteAsync(null);
+            var view = new RepositoryFilesToolView { DataContext = vm };
+            var window = new Window { Content = view, Width = 900, Height = 600 };
+            window.Show();
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            var list = view.FindControl<ListBox>("RepositoryFileList")!;
+            Assert.Equal(SelectionMode.Multiple, list.SelectionMode);
+            var hotkeys = Application.Current!.PlatformSettings!.HotkeyConfiguration;
+
+            void Click(string path, KeyModifiers modifiers = KeyModifiers.None, MouseButton button = MouseButton.Left)
+            {
+                var row = vm.RepositoryFileTree.Single(item => item.Path == path);
+                list.ScrollIntoView(row);
+                Dispatcher.UIThread.RunJobs();
+                var container = Assert.IsType<ListBoxItem>(list.ContainerFromItem(row));
+                var point = container.TranslatePoint(new Point(80, container.Bounds.Height / 2), window)!.Value;
+                var raw = RawInputModifiers.None;
+                if (modifiers.HasFlag(KeyModifiers.Control))
+                    raw |= RawInputModifiers.Control;
+                if (modifiers.HasFlag(KeyModifiers.Shift))
+                    raw |= RawInputModifiers.Shift;
+                if (modifiers.HasFlag(KeyModifiers.Meta))
+                    raw |= RawInputModifiers.Meta;
+                window.MouseDown(point, button, raw);
+                window.MouseUp(point, button, raw);
+                Dispatcher.UIThread.RunJobs();
+            }
+
+            string[] SelectedPaths() => vm.SelectedRepositoryFiles.Select(item => item.Path).Order(StringComparer.Ordinal).ToArray();
+
+            Click("a.txt");
+            Click("c.txt", hotkeys.SelectionModifiers);
+            Assert.Equal(["a.txt", "b.txt", "c.txt"], SelectedPaths());
+            Click("b.txt", hotkeys.CommandModifiers);
+            Click("docs", hotkeys.CommandModifiers);
+            Assert.Equal(["a.txt", "c.txt", "docs"], SelectedPaths());
+
+            vm.ToggleRepositoryDirectory(vm.RepositoryFileTree.Single(item => item.Path == "docs"));
+            Assert.Equal(["a.txt", "c.txt", "docs"], SelectedPaths());
+            await vm.RefreshRepositoryFilesCommand.ExecuteAsync(null);
+            Assert.Equal(["a.txt", "c.txt", "docs"], SelectedPaths());
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            async Task Remove()
+            {
+                if (deleteKey)
+                {
+                    list.Focus();
+                    window.KeyPress(Key.Delete, RawInputModifiers.None, PhysicalKey.Delete, null);
+                    window.KeyRelease(Key.Delete, RawInputModifiers.None, PhysicalKey.Delete, null);
+                    var deadline = DateTime.UtcNow.AddSeconds(8);
+                    while (vm.IsBusy && DateTime.UtcNow < deadline)
+                    {
+                        Dispatcher.UIThread.RunJobs();
+                        await Task.Delay(20);
+                    }
+                }
+                else
+                {
+                    Click("a.txt", button: MouseButton.Right);
+                    Assert.Equal(["a.txt", "c.txt", "docs"], SelectedPaths());
+                    var border = list.GetVisualDescendants().OfType<Border>()
+                        .Single(item => item.DataContext is RepositoryFileTreeItem { Path: "a.txt" } && item.ContextMenu is not null);
+                    var menu = border.ContextMenu!;
+                    var remove = menu.Items.OfType<MenuItem>().Single(item => item.Header as string == "Remove file…");
+                    var command = Assert.IsAssignableFrom<CommunityToolkit.Mvvm.Input.IAsyncRelayCommand>(remove.Command);
+                    menu.Close();
+                    await command.ExecuteAsync(null);
+                }
+            }
+
+            await Remove();
+            Assert.Equal(1, dialogs.Confirmations);
+            Assert.True(File.Exists(Path.Combine(repo.Directory, "a.txt")));
+            Assert.True(File.Exists(Path.Combine(repo.Directory, "c.txt")));
+            dialogs.Accept = true;
+            await Remove();
+            Assert.Equal(2, dialogs.Confirmations);
+            Assert.Contains("a.txt", dialogs.Message, StringComparison.Ordinal);
+            Assert.Contains("c.txt", dialogs.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("docs", dialogs.Message, StringComparison.Ordinal);
+            Assert.False(vm.HasBanner, vm.Banner);
+            Assert.False(File.Exists(Path.Combine(repo.Directory, "a.txt")));
+            Assert.False(File.Exists(Path.Combine(repo.Directory, "c.txt")));
+            Assert.True(File.Exists(Path.Combine(repo.Directory, "b.txt")));
+            Assert.True(File.Exists(Path.Combine(repo.Directory, "docs", "keep.txt")));
+            Assert.DoesNotContain(vm.RepositoryFileTree, item => item.Path is "a.txt" or "c.txt");
+            window.Close();
             await vm.DisposeAsync();
         }, CancellationToken.None);
     }
