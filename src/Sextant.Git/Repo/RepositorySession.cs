@@ -1446,6 +1446,9 @@ public sealed partial class RepositorySession : IAsyncDisposable
             var oldTips = _tipSignature;
             if (statusTask is not null)
                 ApplyStatus(statusTask.Result);
+            // Fetch and pull land here. A one-branch filter keeps hiding remote-tracking branches that appear.
+            foreach (var name in BranchVisibility.HiddenNewcomers(_refs, _hiddenBranches, refs.Refs))
+                _hiddenBranches.Add(name);
             _refs = refs.Refs.ToList();
             _remotes = refs.Remotes.ToList();
             _stashes = refs.Stashes.ToList();

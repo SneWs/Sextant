@@ -59,6 +59,64 @@ public static class BranchVisibility
         return seen;
     }
 
+    /// <summary>
+    /// Remote-tracking branches that appeared while one graph branch is the only one shown
+    /// and at least one graph branch is already hidden. A new local branch stays visible.
+    /// When the branch that was shown is gone, nothing new is hidden.
+    /// </summary>
+    public static IReadOnlyList<string> HiddenNewcomers(
+        IEnumerable<GitRef> previous,
+        IReadOnlySet<string> hidden,
+        IEnumerable<GitRef> next)
+    {
+        string? kept = null;
+        foreach (var reference in previous)
+        {
+            if (!IsGraphBranch(reference.Name) || hidden.Contains(reference.Name))
+                continue;
+            if (kept is not null)
+                return [];
+            kept = reference.Name;
+        }
+
+        if (kept is null || !HidesABranch(hidden))
+            return [];
+
+        var known = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var reference in previous)
+            known.Add(reference.Name);
+
+        List<string>? added = null;
+        var keptRemains = false;
+        foreach (var reference in next)
+        {
+            if (string.Equals(reference.Name, kept, StringComparison.Ordinal))
+                keptRemains = true;
+            if (!reference.Name.StartsWith("refs/remotes/", StringComparison.Ordinal)
+                || !IsGraphBranch(reference.Name)
+                || known.Contains(reference.Name)
+                || hidden.Contains(reference.Name))
+                continue;
+            added ??= [];
+            added.Add(reference.Name);
+        }
+
+        if (!keptRemains || added is null)
+            return [];
+        return added;
+    }
+
+    private static bool HidesABranch(IReadOnlySet<string> hidden)
+    {
+        foreach (var name in hidden)
+        {
+            if (IsGraphBranch(name))
+                return true;
+        }
+
+        return false;
+    }
+
     /// <summary>Every graph branch except <paramref name="keep"/>.</summary>
     public static List<string> HiddenExcept(IEnumerable<GitRef> refs, string keep)
     {

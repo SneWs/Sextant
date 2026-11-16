@@ -1801,6 +1801,7 @@ public partial class RepositoryViewModel : ViewModelBase
         var wantSha = SelectedGraphRow?.Sha;
         var wantPath = SelectedFile is { IsHeader: false } file ? file.Path : null;
         var wantStaged = SelectedFile?.FromStagedList ?? false;
+        var rememberHidden = false;
 
         _applying = true;
         try
@@ -1841,6 +1842,12 @@ public partial class RepositoryViewModel : ViewModelBase
             HistoryCaption = state.HistoryLabel ?? "";
             HasHistoryFilter = state.HistoryLabel is { Length: > 0 };
             HasHistoryQuery = state.HasHistoryQuery;
+            HasHiddenBranches = HidesABranch(state.HiddenBranches);
+            if (_session is not null && !SameHidden(_hiddenBranches, state.HiddenBranches))
+            {
+                UseHiddenBranches(state.HiddenBranches);
+                rememberHidden = true;
+            }
             CommitterName = state.Config.GetValueOrDefault("user.name", "");
             CommitterEmail = state.Config.GetValueOrDefault("user.email", "");
             if (state.Sequencer != SequencerKind.None && !_wasMerge && string.IsNullOrWhiteSpace(CommitMessage) && !string.IsNullOrWhiteSpace(state.MergeMessage))
@@ -1910,6 +1917,9 @@ public partial class RepositoryViewModel : ViewModelBase
         {
             _applying = false;
         }
+
+        if (rememberHidden)
+            _host.Save();
 
         OnPropertyChanged(nameof(CanCommit));
         OnPropertyChanged(nameof(CanAmend));
@@ -4558,12 +4568,37 @@ public partial class RepositoryViewModel : ViewModelBase
         return CommitHiddenAsync(next);
     }
 
+    [RelayCommand]
     private Task ShowAllBranchesAsync()
     {
         if (_session is null)
             return Task.CompletedTask;
         var kept = _session.Snapshot().HiddenBranches.Where(BranchVisibility.IsStashToken).ToArray();
         return CommitHiddenAsync(kept);
+    }
+
+    private static bool HidesABranch(IReadOnlySet<string> hidden)
+    {
+        foreach (var name in hidden)
+        {
+            if (BranchVisibility.IsGraphBranch(name))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool SameHidden(IReadOnlySet<string> current, IReadOnlySet<string> next)
+    {
+        if (current.Count != next.Count)
+            return false;
+        foreach (var name in next)
+        {
+            if (!current.Contains(name))
+                return false;
+        }
+
+        return true;
     }
 
     private async Task CommitHiddenAsync(IReadOnlyCollection<string> hidden)

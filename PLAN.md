@@ -223,6 +223,8 @@ On 2026-11-16 blame follows that same rule. Opening Blame lists the files and le
 
 On 2026-11-16 a commit diff's file header menu has Revert this file's changes. It reverses that commit's change to the file into the working tree without asking, staging it, or moving HEAD. A range and a stash do not offer it. `Reverting_a_commit_file_puts_the_change_in_the_working_tree` passed. The desktop window was not launched.
 
+On 2026-11-16 hiding every branch except one also hides remote-tracking branches that appear on a later fetch or pull. A new local branch stays visible. The Locations line that says what is hidden has an X on the left of that text, which shows every branch again and leaves a search or a hidden stash alone. `Fetch_hides_new_remote_branches_while_one_branch_is_shown` and `Clear_on_the_hiding_line_shows_every_branch_and_keeps_a_search` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
