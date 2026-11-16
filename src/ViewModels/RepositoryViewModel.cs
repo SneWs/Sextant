@@ -3568,26 +3568,19 @@ public partial class RepositoryViewModel : ViewModelBase
                 BeforePath = RenameSource(entry.Document.RawPatch),
                 GroupName = onlyGroup,
                 GroupHeader = groupRow,
+                Pending = new DiffPending
+                {
+                    File = entry.Document,
+                    Source = document,
+                    WorkingCopy = workingCopy,
+                    Staged = staged,
+                    Path = entry.Path,
+                },
             };
             header.ToggleCommand = new AsyncRelayCommand(() => SetExpanded(section, !header.Expanded), AsyncRelayCommandOptions.AllowConcurrentExecutions);
-            _rowSink = section.Body;
-            try
-            {
-                NoteFormat(document, entry.Path, banner: false);
-                AppendFileDiff(
-                    entry.Document,
-                    workingCopy,
-                    KindForDiff(entry.Document),
-                    path: entry.Path,
-                    notes: document.LfsFiles,
-                    formatted: IsFormatted(document, entry.Path),
-                    staged: staged);
-            }
-            finally
-            {
-                _rowSink = null;
-            }
-
+            // The changelist starts collapsed. The hunks and pictures for this file wait until it is opened.
+            if (header.Expanded)
+                LoadSection(section);
             InsertSection(section);
         }
     }
@@ -4059,18 +4052,28 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private Task SetExpanded(DiffSection section, bool expanded)
     {
+        var loaded = false;
+        if (expanded && section.Pending is not null)
+        {
+            LoadSection(section);
+            loaded = true;
+        }
+
         if (section.Header.Expanded == expanded)
-            return expanded ? RequestBlame(section) : Task.CompletedTask;
+        {
+            // The header was already open, but the hunks were still waiting.
+            if (loaded)
+                InsertBody(section);
+            return expanded ? OpenedSectionAsync(section) : Task.CompletedTask;
+        }
+
         var index = DiffRows.IndexOf(section.Header);
         section.Header.Expanded = expanded;
         SetFold(section.Key, expanded);
         if (index >= 0)
         {
             if (expanded)
-            {
-                for (var i = 0; i < section.Body.Count; i++)
-                    DiffRows.Insert(index + 1 + i, section.Body[i]);
-            }
+                InsertBody(section);
             else
             {
                 for (var i = 0; i < section.Body.Count; i++)
@@ -4079,7 +4082,49 @@ public partial class RepositoryViewModel : ViewModelBase
         }
 
         ApplyImageFolds();
-        return expanded ? RequestBlame(section) : Task.CompletedTask;
+        return expanded ? OpenedSectionAsync(section) : Task.CompletedTask;
+    }
+
+    private void InsertBody(DiffSection section)
+    {
+        var index = DiffRows.IndexOf(section.Header);
+        if (index < 0)
+            return;
+        for (var i = 0; i < section.Body.Count; i++)
+            DiffRows.Insert(index + 1 + i, section.Body[i]);
+    }
+
+    /// <summary>Builds the hunks for a file the first time it is opened. Later opens reuse that body.</summary>
+    private void LoadSection(DiffSection section)
+    {
+        if (section.Pending is not { } pending)
+            return;
+        section.Pending = null;
+        _rowSink = section.Body;
+        try
+        {
+            NoteFormat(pending.Source, pending.Path, banner: false);
+            AppendFileDiff(
+                pending.File,
+                pending.WorkingCopy,
+                KindForDiff(pending.File),
+                path: pending.Path,
+                notes: pending.Source.LfsFiles,
+                formatted: IsFormatted(pending.Source, pending.Path),
+                staged: pending.Staged);
+        }
+        finally
+        {
+            _rowSink = null;
+        }
+    }
+
+    private Task OpenedSectionAsync(DiffSection section)
+    {
+        var blame = RequestBlame(section);
+        if (ShowingBlame)
+            return blame;
+        return Task.WhenAll(blame, LoadOpenImagesAsync());
     }
 
     private Task ToggleFileSection(string path, bool? staged = null)
@@ -4141,21 +4186,29 @@ public partial class RepositoryViewModel : ViewModelBase
     private bool CanFoldSections() => ShowSectionFolds;
 
     [RelayCommand(CanExecute = nameof(CanFoldSections), AllowConcurrentExecutions = true)]
-    private Task ExpandAllSections()
+    private async Task ExpandAllSections()
     {
         if (_sections.Count == 0)
-            return Task.CompletedTask;
+            return;
         _foldsOpen = true;
         _foldExceptions.Clear();
         foreach (var section in _sections)
+        {
             section.Header.Expanded = true;
+            LoadSection(section);
+        }
+
         PublishSections();
         ApplyImageFolds();
-        if (!ShowingBlame)
-            return Task.CompletedTask;
-        foreach (var section in _sections)
-            QueueBlame(section, showLoading: false);
-        return RunBlameQueueAsync();
+        if (ShowingBlame)
+        {
+            foreach (var section in _sections)
+                QueueBlame(section, showLoading: false);
+            await RunBlameQueueAsync();
+            return;
+        }
+
+        await LoadOpenImagesAsync();
     }
 
     [RelayCommand(CanExecute = nameof(CanFoldSections))]
@@ -4802,8 +4855,24 @@ public partial class RepositoryViewModel : ViewModelBase
 
         public List<DiffRow> Body { get; } = [];
 
+        /// <summary>Set until the file is opened. The body stays empty while this is set.</summary>
+        public DiffPending? Pending { get; set; }
+
         public bool BlamePending { get; set; }
 
         public bool BlameReady { get; set; }
+    }
+
+    private sealed class DiffPending
+    {
+        public required DiffDocument File { get; init; }
+
+        public required DiffDocument Source { get; init; }
+
+        public required bool WorkingCopy { get; init; }
+
+        public required bool Staged { get; init; }
+
+        public required string Path { get; init; }
     }
 }

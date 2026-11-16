@@ -253,6 +253,8 @@ public class RepositoryAsyncCommandTests
             try
             {
                 await vm.EnsureLoadedAsync();
+                Assert.Empty(vm.ImageCompares);
+                await vm.ExpandAllSectionsCommand.ExecuteAsync(null);
                 Assert.Equal(2, vm.ImageCompares.Count);
                 var staged = vm.ImageCompares.Single(row => row.StagingFile?.FromStagedList == true);
                 var unstaged = vm.ImageCompares.Single(row => row.StagingFile?.FromStagedList == false);
@@ -270,7 +272,6 @@ public class RepositoryAsyncCommandTests
                 Assert.False(Png(staged.Before).SequenceEqual(Png(staged.After)));
                 Assert.False(Png(unstaged.Before).SequenceEqual(Png(unstaged.After)));
 
-                await vm.ExpandAllSectionsCommand.ExecuteAsync(null);
                 await Assert.IsAssignableFrom<IAsyncRelayCommand>(staged.ToggleCommand).ExecuteAsync(null);
                 Assert.False(staged.IsOpen);
                 Assert.True(unstaged.IsOpen);
@@ -283,6 +284,46 @@ public class RepositoryAsyncCommandTests
                 Assert.False(vm.HasBanner, vm.Banner);
             }
 
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Opening_one_collapsed_diff_file_builds_only_that_file()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.WriteFile("b.txt", "two\n");
+        repo.CommitAll("first");
+        repo.WriteFile("a.txt", "one changed\n");
+        repo.WriteFile("b.txt", "two changed\n");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new AsyncHost { GitExecutable = repo.Git }, repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                Assert.DoesNotContain(vm.DiffRows, row => row is DiffEditorRow or DiffHunkRow);
+                var header = vm.DiffRows.OfType<DiffFileRow>().Single(row => row.Path == "a.txt");
+                Assert.False(header.Expanded);
+                await Assert.IsAssignableFrom<IAsyncRelayCommand>(header.ToggleCommand).ExecuteAsync(null);
+
+                Assert.True(header.Expanded);
+                var editors = vm.DiffRows.OfType<DiffEditorRow>().ToArray();
+                Assert.NotEmpty(editors);
+                Assert.All(editors, row => Assert.Equal("a.txt", row.Path));
+                Assert.Contains(editors.SelectMany(row => row.Lines), line => line.Text.Contains("changed", StringComparison.Ordinal));
+                Assert.Contains(vm.DiffRows, row => row is DiffHunkRow);
+                Assert.DoesNotContain(vm.DiffRows.OfType<DiffEditorRow>(), row => row.Path == "b.txt");
+                Assert.False(vm.DiffRows.OfType<DiffFileRow>().Single(row => row.Path == "b.txt").Expanded);
+                Assert.False(vm.HasBanner, vm.Banner);
+            }
             finally
             {
                 await vm.DisposeAsync();

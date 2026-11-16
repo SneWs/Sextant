@@ -217,6 +217,8 @@ On 2026-11-04 repository tabs that do not fit the bar move into a More tabs menu
 
 On 2026-11-04 the More tabs menu is filled before the button opens. Building the rows while the menu opened left the desktop popup empty, so adding repositories or resizing showed the button with no tabs. Each row is the repository name. `Overflowing_repository_tabs_open_from_a_menu` passed, including tabs added after the window was shown and a click after the window was narrowed. The desktop window was not launched.
 
+On 2026-11-16 a working-copy or all-files diff stays a list of file headers until a file is opened. Opening one file builds that file's hunks and, for a picture, its preview. The other files stay headers. Closing a file keeps what was built, so opening it again is immediate. A diff that is already showing one file still builds that file right away. `Opening_one_collapsed_diff_file_builds_only_that_file` and `Partially_staged_image_has_separate_previews_and_folds` passed, along with the fold, line-stage, stash, and file-tree diff tests. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
