@@ -437,7 +437,13 @@ public class RepositoryAsyncCommandTests
                 await vm.EnsureLoadedAsync();
                 await vm.ShowBlameCommand.ExecuteAsync(null);
                 Assert.True(vm.ShowingBlame);
+                Assert.DoesNotContain(vm.DiffRows, row => row is DiffEditorRow or BlameRow);
+
+                var openA = Assert.IsAssignableFrom<IAsyncRelayCommand>(
+                    vm.DiffRows.OfType<DiffFileRow>().Single(row => row.Path == "a.txt").ToggleCommand);
+                await openA.ExecuteAsync(null);
                 Assert.Contains(vm.DiffRows.OfType<DiffEditorRow>(), row => row.Path == "a.txt" && row.Blame);
+                Assert.DoesNotContain(vm.DiffRows.OfType<DiffEditorRow>(), row => row.Path == "b.txt");
                 Assert.DoesNotContain(vm.DiffRows.OfType<BlameRow>(), row => row.Text == "Loading…");
 
                 var header = vm.DiffRows.OfType<DiffFileRow>().Single(row => row.Path == "b.txt");

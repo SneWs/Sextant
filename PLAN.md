@@ -219,6 +219,8 @@ On 2026-11-04 the More tabs menu is filled before the button opens. Building the
 
 On 2026-11-16 a working-copy or all-files diff stays a list of file headers until a file is opened. Opening one file builds that file's hunks and, for a picture, its preview. The other files stay headers. Closing a file keeps what was built, so opening it again is immediate. A diff that is already showing one file still builds that file right away. `Opening_one_collapsed_diff_file_builds_only_that_file` and `Partially_staged_image_has_separate_previews_and_folds` passed, along with the fold, line-stage, stash, and file-tree diff tests. The desktop window was not launched.
 
+On 2026-11-16 blame follows that same rule. Opening Blame lists the files and leaves them closed. Opening one file runs blame for that file. The others stay headers. A file that is already open stays open, and with All files off the one selected file is annotated right away. `Blame_commands_wait_for_loading_and_can_collapse_while_loading` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
