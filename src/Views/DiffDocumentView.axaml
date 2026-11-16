@@ -196,6 +196,7 @@
                                                 <MenuItem Header="Copy path" Command="{Binding FileMenu.CopyPathCommand}"/>
                                                 <MenuItem Header="Copy full path" Command="{Binding FileMenu.CopyFullPathCommand}"/>
                                                 <Separator/>
+                                                <MenuItem Header="Revert this file's changes" Command="{Binding FileMenu.RevertFileCommand}" IsVisible="{Binding FileMenu.ShowRevertFile}"/>
                                                 <MenuItem Header="{Binding FileMenu.OpenFolderLabel}" Command="{Binding FileMenu.OpenFolderCommand}"/>
                                                 <MenuItem Header="Open in editor" Command="{Binding FileMenu.OpenEditorCommand}"/>
                                                 <Separator IsVisible="{Binding FileMenu.ShowLfsMenu}"/>

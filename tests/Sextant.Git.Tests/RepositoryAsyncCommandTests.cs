@@ -571,6 +571,76 @@ public class RepositoryAsyncCommandTests
     }
 
     [Fact]
+    public async Task Reverting_a_commit_file_puts_the_change_in_the_working_tree()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.WriteFile("gone.txt", "keep\n");
+        repo.CommitAll("first");
+        repo.WriteFile("a.txt", "two\n");
+        repo.WriteFile("b.txt", "new\n");
+        repo.Run("add", "b.txt");
+        repo.Run("rm", "gone.txt");
+        repo.CommitAll("second");
+        repo.WriteFile("c.txt", "loose\n");
+        var head = repo.RunCapture("rev-parse", "HEAD").Trim();
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new AsyncHost { GitExecutable = repo.Git }, repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                Assert.False(DiffHeader(vm, "c.txt").FileMenu!.ShowRevertFile);
+
+                vm.SelectedGraphRow = vm.Rows.Single(row => row.Subject == "second");
+                Dispatcher.UIThread.RunJobs();
+                await vm.LoadDetailsCommand.ExecutionTask!;
+                Assert.True(vm.ShowingCommit);
+                var changed = DiffHeader(vm, "a.txt");
+                var added = DiffHeader(vm, "b.txt");
+                var deleted = DiffHeader(vm, "gone.txt");
+                Assert.True(changed.FileMenu!.ShowRevertFile);
+                Assert.True(added.FileMenu!.ShowRevertFile);
+                Assert.True(deleted.FileMenu!.ShowRevertFile);
+
+                var revert = Assert.IsAssignableFrom<IAsyncRelayCommand>(changed.FileMenu.RevertFileCommand);
+                await revert.ExecuteAsync(null);
+                Assert.False(vm.HasBanner, vm.Banner);
+                Assert.Equal("one\n", ReadRepoFile(repo, "a.txt"));
+                Assert.Equal(head, repo.RunCapture("rev-parse", "HEAD").Trim());
+                Assert.Equal("", repo.RunCapture("diff", "--cached", "--name-only").Trim());
+                Assert.Contains(" M a.txt", repo.RunCapture("status", "--short"), StringComparison.Ordinal);
+
+                await Assert.IsAssignableFrom<IAsyncRelayCommand>(DiffHeader(vm, "b.txt").FileMenu!.RevertFileCommand).ExecuteAsync(null);
+                Assert.False(vm.HasBanner, vm.Banner);
+                Assert.False(File.Exists(Path.Combine(repo.Directory, "b.txt")));
+                Assert.Contains(" D b.txt", repo.RunCapture("status", "--short"), StringComparison.Ordinal);
+
+                await Assert.IsAssignableFrom<IAsyncRelayCommand>(DiffHeader(vm, "gone.txt").FileMenu!.RevertFileCommand).ExecuteAsync(null);
+                Assert.False(vm.HasBanner, vm.Banner);
+                Assert.Equal("keep\n", ReadRepoFile(repo, "gone.txt"));
+                Assert.Contains("?? gone.txt", repo.RunCapture("status", "--short"), StringComparison.Ordinal);
+                Assert.Equal(head, repo.RunCapture("rev-parse", "HEAD").Trim());
+                Assert.Equal("", repo.RunCapture("diff", "--cached", "--name-only").Trim());
+            }
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    private static DiffFileRow DiffHeader(RepositoryViewModel vm, string path) =>
+        vm.DiffRows.OfType<DiffFileRow>().Single(row => row.Path == path);
+
+    private static string ReadRepoFile(TempRepo repo, string name) =>
+        File.ReadAllText(Path.Combine(repo.Directory, name)).Replace("\r\n", "\n", StringComparison.Ordinal);
+
+    [Fact]
     public async Task Disposal_waits_for_opening_and_prevents_reopening()
     {
         using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));

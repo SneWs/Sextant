@@ -662,6 +662,11 @@ public sealed class WorktreeFileMenu
 
     public ICommand OpenEditorCommand { get; init; } = UiCommands.Disabled;
 
+    /// <summary>Shown on a commit diff header. Reverses that commit's change to this file into the working tree.</summary>
+    public bool ShowRevertFile { get; init; }
+
+    public ICommand RevertFileCommand { get; init; } = UiCommands.Disabled;
+
     public bool ShowLfsTrack { get; init; }
 
     public bool ShowLfsUntrack { get; init; }

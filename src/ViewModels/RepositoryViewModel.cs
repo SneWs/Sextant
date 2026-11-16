@@ -3566,7 +3566,7 @@ public partial class RepositoryViewModel : ViewModelBase
                 LfsTracked = trackedFile,
                 CanFold = true,
                 Expanded = IsFoldOpen(key),
-                FileMenu = FileMenuFor(entry.Path, trackedFile),
+                FileMenu = FileMenuFor(entry.Path, trackedFile, CommitRevertFor(entry.Path, RenameSource(entry.Document.RawPatch))),
                 StagingFile = stagingFile,
             };
             var groupRow = onlyGroup is null || _sections.Any(section => section.GroupName == onlyGroup)
@@ -4710,7 +4710,18 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private Task CopyText(string text) => _host.Dialogs is null ? Task.CompletedTask : _host.Dialogs.CopyAsync(text);
 
-    private WorktreeFileMenu? FileMenuFor(string relative, bool? lfsTracked = null)
+    private sealed record CommitFileRevert(string Sha, string? Parent, string Path, string? OriginalPath);
+
+    private CommitFileRevert? CommitRevertFor(string path, string? originalPath)
+    {
+        if (path.Length == 0 || _stashRef is not null || _rangeOlder is not null || _rangeNewer is not null)
+            return null;
+        if (SelectedGraphRow is not { IsWorkingCopy: false, Sha: { Length: > 0 } sha })
+            return null;
+        return new CommitFileRevert(sha, _diffParent, path, originalPath);
+    }
+
+    private WorktreeFileMenu? FileMenuFor(string relative, bool? lfsTracked = null, CommitFileRevert? revert = null)
     {
         var name = DesktopOpen.FileName(relative);
         if (name is null)
@@ -4726,6 +4737,8 @@ public partial class RepositoryViewModel : ViewModelBase
             CopyFullPathCommand = full is null ? UiCommands.Disabled : new AsyncRelayCommand(() => CopyText(full)),
             OpenFolderCommand = full is null ? UiCommands.Disabled : new RelayCommand(() => OpenFolder(full)),
             OpenEditorCommand = full is null ? UiCommands.Disabled : new RelayCommand(() => OpenEditor(full)),
+            ShowRevertFile = revert is not null,
+            RevertFileCommand = revert is null ? UiCommands.Disabled : new AsyncRelayCommand(() => RevertCommitFileAsync(revert)),
             ShowLfsTrack = actions && !tracked,
             ShowLfsUntrack = actions && tracked,
             ShowLfsDownload = actions && tracked,

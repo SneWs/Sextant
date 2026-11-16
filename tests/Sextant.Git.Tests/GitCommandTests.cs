@@ -159,6 +159,17 @@ public class GitCommandTests
         Assert.DoesNotContain("filter.lfs.required=false", GitCommands.DiffWorktree("repo", false, false));
         Assert.Contains("--no-textconv", GitCommands.DiffWorktree("repo", false, false));
         Assert.Contains("diff.autoRefreshIndex=false", GitCommands.DiffWorktree("repo", false, false));
+        var filePatch = GitCommands.CommitFilePatch("repo", "abc", "def", "dir/a.txt", "dir/old.txt");
+        Assert.Contains("diff.autoRefreshIndex=false", filePatch);
+        Assert.Contains("--binary", filePatch);
+        Assert.Contains("--no-textconv", filePatch);
+        Assert.DoesNotContain("-w", filePatch);
+        Assert.DoesNotContain("--cached", filePatch);
+        Assert.Equal(["--", "dir/a.txt", "dir/old.txt"], filePatch.TakeLast(3));
+        var rootPatch = GitCommands.CommitFilePatch("repo", null, "abc", "dir/a.txt", "dir/a.txt");
+        Assert.Contains("show", rootPatch);
+        Assert.Contains("--binary", rootPatch);
+        Assert.Equal(["--", "dir/a.txt"], rootPatch.TakeLast(2));
         Assert.Contains("diff.autoRefreshIndex=false", GitCommands.DiffRange("repo", "a", "b", "file.bin"));
         Assert.Contains("diff.autoRefreshIndex=false", GitCommands.RangeNameStatus("repo", "a", "b"));
         Assert.DoesNotContain("diff.lfs.textconv=", GitCommands.DiffWorktree("repo", false, false));

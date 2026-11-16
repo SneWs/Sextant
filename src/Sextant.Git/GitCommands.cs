@@ -658,6 +658,44 @@ public static class GitCommands
         return arguments;
     }
 
+    /// <summary>
+    /// The patch this commit applied to one file, compared with its first parent.
+    /// A root commit has no parent. <c>--binary</c> keeps a binary file reversible.
+    /// Whitespace is not ignored, so the patch still matches the stored bytes.
+    /// </summary>
+    public static IReadOnlyList<string> CommitFilePatch(string toplevel, string? older, string newer, string path, string? originalPath)
+    {
+        var arguments = new List<string> { "-C", toplevel, "--no-optional-locks" };
+        if (string.IsNullOrEmpty(older))
+        {
+            arguments.Add("show");
+            arguments.Add("--no-textconv");
+            arguments.Add("--binary");
+            arguments.Add("--format=");
+            arguments.Add("-p");
+            arguments.Add(newer);
+        }
+        else
+        {
+            arguments.Add("diff");
+            arguments.Add("--no-textconv");
+            arguments.Add("--binary");
+            arguments.Add(older);
+            arguments.Add(newer);
+        }
+
+        arguments.Add("--");
+        arguments.Add(path);
+        if (originalPath is { Length: > 0 } original && !string.Equals(original, path, StringComparison.Ordinal))
+            arguments.Add(original);
+        KeepLfsPointers(arguments);
+        if (string.IsNullOrEmpty(older))
+            arguments.InsertRange(0, ["-c", "diff.autoRefreshIndex=false"]);
+        else
+            SkipIndexRefresh(arguments);
+        return arguments;
+    }
+
     public static IReadOnlyList<string> ShowPatch(string toplevel, string sha, string? path, bool ignoreWhitespace = false)
     {
         var arguments = new List<string> { "-C", toplevel, "--no-optional-locks", "show", "--no-textconv" };

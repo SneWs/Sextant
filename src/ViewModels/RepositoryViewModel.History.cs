@@ -592,6 +592,16 @@ public partial class RepositoryViewModel
         });
     }
 
+    private Task RevertCommitFileAsync(CommitFileRevert revert)
+    {
+        if (_session is null || IsBusy)
+            return Task.CompletedTask;
+        // The reversed edit stays uncommitted, so the user can discard it without a prompt here.
+        return RunAsync(
+            "Reverting file…",
+            ct => _session.RevertCommitFileAsync(revert.Parent, revert.Sha, revert.Path, revert.OriginalPath, ct));
+    }
+
     private Task ConfirmRun(string title, string message, string confirm, string busy, Func<CancellationToken, Task> action)
     {
         if (_host.Dialogs is not { } dialogs || _session is null || IsBusy)
