@@ -144,35 +144,44 @@ public sealed partial class RepositorySession
         MutateAsync(GitCommands.LfsUnlock(_toplevel, path, force), null, cancellationToken);
 
     public Task RemoveRepositoryFileAsync(string path, CancellationToken cancellationToken) =>
+        RemoveRepositoryFilesAsync([path], cancellationToken);
+
+    public Task RemoveRepositoryFilesAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken) =>
         ChangeWorktreeAsync(async token =>
         {
-            var full = RepoPath.CombineUnder(_toplevel, path);
-            if (full is null)
-                throw new RepositoryActionException("That file path is outside the repository or cannot be removed safely.");
-            if (Directory.Exists(full))
-                throw new RepositoryActionException("That path is a directory. Remove individual files instead.");
-
-            var index = Checked(await ExecuteAsync(GitCommands.RepositoryFileIndex(_toplevel, path), null, token).ConfigureAwait(false));
-            var entries = Encoding.UTF8.GetString(index.Stdout).Split('\0', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var entry in entries)
-            {
-                var tab = entry.IndexOf('\t');
-                if (tab < 0 || entry[(tab + 1)..] != path)
-                    throw new RepositoryActionException("That path is not an individual repository file.");
-                if (entry.StartsWith("160000 ", StringComparison.Ordinal))
-                    throw new RepositoryActionException("Submodules cannot be removed with Remove file.");
-            }
-
-            if (entries.Length > 0)
-            {
-                Checked(await ExecuteAsync(GitCommands.RemoveRepositoryFile(_toplevel, path), null, token).ConfigureAwait(false));
-                return;
-            }
-
-            var untracked = Checked(await ExecuteAsync(GitCommands.RepositoryFileUntracked(_toplevel, path), null, token).ConfigureAwait(false));
-            var paths = Encoding.UTF8.GetString(untracked.Stdout).Split('\0', StringSplitOptions.RemoveEmptyEntries);
-            if (paths.Length != 1 || paths[0] != path)
-                throw new RepositoryActionException("That file is no longer in the repository file list. Reactivate the Files tab before removing it.");
-            Checked(await ExecuteAsync(GitCommands.RemoveUntrackedRepositoryFile(_toplevel, path), null, token).ConfigureAwait(false));
+            var commands = new List<IReadOnlyList<string>>();
+            foreach (var path in paths.Distinct(StringComparer.Ordinal))
+                commands.Add(await RepositoryFileRemovalCommandAsync(path, token).ConfigureAwait(false));
+            foreach (var command in commands)
+                Checked(await ExecuteAsync(command, null, token).ConfigureAwait(false));
         }, cancellationToken);
+
+    private async Task<IReadOnlyList<string>> RepositoryFileRemovalCommandAsync(string path, CancellationToken token)
+    {
+        var full = RepoPath.CombineUnder(_toplevel, path);
+        if (full is null)
+            throw new RepositoryActionException("That file path is outside the repository or cannot be removed safely.");
+        if (Directory.Exists(full))
+            throw new RepositoryActionException("That path is a directory. Remove individual files instead.");
+
+        var index = Checked(await ExecuteAsync(GitCommands.RepositoryFileIndex(_toplevel, path), null, token).ConfigureAwait(false));
+        var entries = Encoding.UTF8.GetString(index.Stdout).Split('\0', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var entry in entries)
+        {
+            var tab = entry.IndexOf('\t');
+            if (tab < 0 || entry[(tab + 1)..] != path)
+                throw new RepositoryActionException("That path is not an individual repository file.");
+            if (entry.StartsWith("160000 ", StringComparison.Ordinal))
+                throw new RepositoryActionException("Submodules cannot be removed with Remove file.");
+        }
+
+        if (entries.Length > 0)
+            return GitCommands.RemoveRepositoryFile(_toplevel, path);
+
+        var untracked = Checked(await ExecuteAsync(GitCommands.RepositoryFileUntracked(_toplevel, path), null, token).ConfigureAwait(false));
+        var paths = Encoding.UTF8.GetString(untracked.Stdout).Split('\0', StringSplitOptions.RemoveEmptyEntries);
+        if (paths.Length != 1 || paths[0] != path)
+            throw new RepositoryActionException("That file is no longer in the repository file list. Reactivate the Files tab before removing it.");
+        return GitCommands.RemoveUntrackedRepositoryFile(_toplevel, path);
+    }
 }
