@@ -30,6 +30,10 @@ public partial class RepositoryViewModel
     [ObservableProperty]
     public partial bool HasHistoryQuery { get; set; }
 
+    /// <summary>A local or remote-tracking branch is hidden. A hidden stash alone does not set this.</summary>
+    [ObservableProperty]
+    public partial bool HasHiddenBranches { get; set; }
+
     [ObservableProperty]
     public partial bool ShowHistorySearch { get; set; }
 

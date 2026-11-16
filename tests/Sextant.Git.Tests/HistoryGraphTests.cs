@@ -181,6 +181,7 @@ public class HistoryGraphTests
 
             Assert.True(vm.HasHistoryQuery);
             Assert.Equal("File a.txt", vm.HistoryCaption);
+            Assert.False(vm.HasHiddenBranches);
             Assert.False(vm.ShowHistoryChrome);
             Assert.True(close.IsEffectivelyVisible);
             Assert.NotNull(close.FindAncestorOfType<LocationsToolView>());
@@ -245,6 +246,9 @@ public class HistoryGraphTests
             Dispatcher.UIThread.RunJobs();
             Assert.False(vm.ShowHistoryChrome);
             Assert.False(close.IsEffectivelyVisible);
+            var clearHidden = view.FindControl<Button>("ClearHiddenBranchesButton");
+            Assert.NotNull(clearHidden);
+            Assert.False(clearHidden.IsEffectivelyVisible);
             var caption = view.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == "Hiding side" && text.IsEffectivelyVisible);
             Assert.NotNull(caption.FindAncestorOfType<LocationsToolView>());
             Assert.Null(caption.FindAncestorOfType<RepositoryChrome>());
@@ -254,6 +258,146 @@ public class HistoryGraphTests
             window.Close();
             await vm.DisposeAsync();
         }, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Clear_on_the_hiding_line_shows_every_branch_and_keeps_a_search()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("trunk work");
+        var trunk = repo.CurrentBranch();
+        repo.Run("switch", "-c", "side");
+        repo.WriteFile("s.txt", "side\n");
+        repo.CommitAll("side work");
+        repo.Run("switch", trunk);
+        repo.Run("switch", "-c", "arrived");
+        repo.WriteFile("n.txt", "arrived\n");
+        repo.CommitAll("arrived work");
+        var arrived = repo.RunCapture("rev-parse", "HEAD").Trim();
+        repo.Run("switch", trunk);
+        repo.Run("branch", "-D", "arrived");
+        repo.Run("switch", "-c", "local-note");
+        repo.WriteFile("l.txt", "local\n");
+        repo.CommitAll("local work");
+        var local = repo.RunCapture("rev-parse", "HEAD").Trim();
+        repo.Run("switch", trunk);
+        repo.Run("branch", "-D", "local-note");
+
+        await session.Dispatch(async () =>
+        {
+            var host = new GraphHost(repo.Git);
+            var vm = new RepositoryViewModel(host, repo.Directory);
+            await vm.EnsureLoadedAsync();
+            Assert.Contains(vm.Rows, row => row.Subject == "side work");
+            Assert.DoesNotContain(vm.Rows, row => row.Subject == "arrived work");
+
+            var view = new RepositoryView { DataContext = vm, Width = 1100, Height = 700 };
+            var window = new Window { Content = view, Width = 1100, Height = 700 };
+            window.Show();
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            var current = vm.Locations.Single(item => item.Key == "b:" + trunk);
+            await ((IAsyncRelayCommand)current.HideOthersCommand).ExecuteAsync(null);
+            await WaitUntilIdle(vm);
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(vm.HasHiddenBranches);
+            Assert.False(vm.HasHistoryQuery);
+            Assert.Contains("Hiding", vm.HistoryCaption);
+            Assert.DoesNotContain(vm.Rows, row => row.Subject == "side work");
+            var clear = view.FindControl<Button>("ClearHiddenBranchesButton");
+            var close = view.FindControl<Button>("HistoryCloseButton");
+            Assert.NotNull(clear);
+            Assert.NotNull(close);
+            Assert.True(clear.IsEffectivelyVisible);
+            Assert.False(close.IsEffectivelyVisible);
+            Assert.Null(clear.Content as string);
+            Assert.Same(vm.ShowAllBranchesCommand, clear.Command);
+            Assert.Contains("accent", clear.Classes);
+            Assert.Equal(2, clear.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Line>().Count());
+            AssertMarkCentered(clear);
+            var hidingCaption = view.GetVisualDescendants().OfType<TextBlock>()
+                .First(text => text.Text == vm.HistoryCaption && text.IsEffectivelyVisible);
+            Assert.True(Left(clear, view) + clear.Bounds.Width <= Left(hidingCaption, view) + 1,
+                $"clear right {Left(clear, view) + clear.Bounds.Width} caption left {Left(hidingCaption, view)}");
+
+            var saves = host.Saves;
+            repo.Run("branch", "local-note", local);
+            repo.Run("update-ref", "refs/remotes/origin/arrived", arrived);
+            await vm.Refresh();
+            await WaitUntilIdle(vm);
+            Assert.Contains("refs/remotes/origin/arrived", vm.HiddenBranchNames);
+            Assert.DoesNotContain(vm.HiddenBranchNames, name => name == "refs/heads/local-note");
+            Assert.Contains(vm.Rows, row => row.Subject == "local work");
+            Assert.DoesNotContain(vm.Rows, row => row.Subject == "arrived work");
+            Assert.DoesNotContain(vm.Rows, row => row.Subject == "side work");
+            Assert.True(host.Saves > saves);
+            await Task.Delay(500);
+            await WaitUntilIdle(vm);
+            Assert.Contains("refs/remotes/origin/arrived", vm.HiddenBranchNames);
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(clear.IsEffectivelyVisible);
+
+            vm.HistoryText = "work";
+            await vm.SearchHistoryCommand.ExecuteAsync(null);
+            await WaitUntilIdle(vm);
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(vm.HasHistoryQuery);
+            Assert.Contains("work", vm.HistoryCaption);
+            Assert.Contains("hiding", vm.HistoryCaption, StringComparison.OrdinalIgnoreCase);
+            Assert.True(clear.IsEffectivelyVisible);
+            Assert.True(close.IsEffectivelyVisible);
+            Assert.True(Left(close, view) + close.Bounds.Width <= Left(clear, view) + 1);
+            var bothCaption = view.GetVisualDescendants().OfType<TextBlock>()
+                .First(text => text.Text == vm.HistoryCaption && text.IsEffectivelyVisible);
+            Assert.True(Left(clear, view) + clear.Bounds.Width <= Left(bothCaption, view) + 1);
+            Assert.Contains(vm.Rows, row => row.Subject == "trunk work");
+            Assert.Contains(vm.Rows, row => row.Subject == "local work");
+            Assert.DoesNotContain(vm.Rows, row => row.Subject == "arrived work");
+
+            clear.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            await WaitUntilIdle(vm);
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(vm.HasHistoryQuery);
+            Assert.Equal("work", vm.HistoryText);
+            Assert.False(vm.HasHiddenBranches);
+            Assert.DoesNotContain(vm.HiddenBranchNames, name => name.StartsWith("refs/", StringComparison.Ordinal));
+            Assert.Contains(vm.Rows, row => row.Subject == "side work");
+            Assert.Contains(vm.Rows, row => row.Subject == "arrived work");
+            Assert.Contains(vm.Rows, row => row.Subject == "local work");
+            Assert.False(clear.IsEffectivelyVisible);
+            Assert.True(close.IsEffectivelyVisible);
+            Assert.DoesNotContain(vm.HistoryCaption, "hiding", StringComparison.OrdinalIgnoreCase);
+
+            close.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            await WaitUntilIdle(vm);
+            view.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(vm.HasHistoryQuery);
+            Assert.Equal("", vm.HistoryCaption);
+            Assert.False(close.IsEffectivelyVisible);
+            Assert.Contains(vm.Rows, row => row.Subject == "side work");
+
+            window.Close();
+            await vm.DisposeAsync();
+        }, CancellationToken.None);
+    }
+
+    private static void AssertMarkCentered(Button button)
+    {
+        var mark = button.GetVisualDescendants().OfType<Canvas>().First();
+        var center = mark.TranslatePoint(new Point(mark.Bounds.Width / 2, mark.Bounds.Height / 2), button);
+        Assert.NotNull(center);
+        Assert.InRange(center.Value.X, button.Bounds.Width / 2 - 1.5, button.Bounds.Width / 2 + 1.5);
+        Assert.InRange(center.Value.Y, button.Bounds.Height / 2 - 1.5, button.Bounds.Height / 2 + 1.5);
     }
 
     private static async Task WaitUntilIdle(RepositoryViewModel vm)
@@ -295,7 +439,9 @@ public class HistoryGraphTests
                 Assert.Null(searchButton.Content as string);
                 Assert.NotEmpty(searchButton.GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Ellipse>());
                 Assert.True(searchButton.Bounds.Width <= 28);
-                Assert.DoesNotContain(view.GetVisualDescendants().OfType<Button>(), button => button.Content as string is "Search" or "Clear");
+                Assert.DoesNotContain(
+                    view.GetVisualDescendants().OfType<Button>().Where(button => button.IsEffectivelyVisible),
+                    button => button.Content as string is "Search" or "Clear");
                 var banner = view.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == "A repository message");
                 var conflict = view.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == "A merge is in progress");
                 var pull = view.GetVisualDescendants().OfType<SplitButton>().Single(button => button.Name == "PullSplitButton");
@@ -560,9 +706,9 @@ public class HistoryGraphTests
         {
         }
 
-        public void Save()
-        {
-        }
+        public int Saves { get; private set; }
+
+        public void Save() => Saves++;
 
         public Task OpenRepositoryAsync(string path) => Task.CompletedTask;
     }

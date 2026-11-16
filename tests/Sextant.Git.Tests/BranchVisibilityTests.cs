@@ -193,6 +193,59 @@ public class BranchVisibilityTests
     }
 
     [Fact]
+    public void New_remote_branches_join_a_single_branch_filter()
+    {
+        var hidden = new HashSet<string>(["refs/heads/other", "stash:abc"], StringComparer.Ordinal);
+        GitRef[] previous =
+        [
+            new("aaa", "refs/heads/keep", true, null),
+            new("bbb", "refs/heads/other", false, null),
+            new("ccc", "refs/remotes/origin/HEAD", false, null),
+        ];
+        GitRef[] next =
+        [
+            .. previous,
+            new("ddd", "refs/remotes/origin/arrived", false, null),
+            new("eee", "refs/remotes/origin/extra", false, null),
+            new("fff", "refs/heads/local-note", false, null),
+        ];
+        Assert.Equal(
+            ["refs/remotes/origin/arrived", "refs/remotes/origin/extra"],
+            BranchVisibility.HiddenNewcomers(previous, hidden, next));
+
+        var none = new HashSet<string>(StringComparer.Ordinal);
+        Assert.Empty(BranchVisibility.HiddenNewcomers(
+            [new GitRef("aaa", "refs/heads/keep", true, null)],
+            none,
+            [new GitRef("aaa", "refs/heads/keep", true, null), new GitRef("ddd", "refs/remotes/origin/arrived", false, null)]));
+        Assert.Empty(BranchVisibility.HiddenNewcomers(
+            [new GitRef("aaa", "refs/heads/keep", true, null), new GitRef("bbb", "refs/heads/other", false, null)],
+            none,
+            [
+                new GitRef("aaa", "refs/heads/keep", true, null),
+                new GitRef("bbb", "refs/heads/other", false, null),
+                new GitRef("ddd", "refs/remotes/origin/arrived", false, null),
+            ]));
+        Assert.Empty(BranchVisibility.HiddenNewcomers(
+            previous,
+            hidden,
+            [new GitRef("bbb", "refs/heads/other", false, null), new GitRef("ddd", "refs/remotes/origin/arrived", false, null)]));
+
+        var remoteKept = new HashSet<string>(["refs/heads/main"], StringComparer.Ordinal);
+        GitRef[] remotePrevious =
+        [
+            new("aaa", "refs/heads/main", true, null),
+            new("bbb", "refs/remotes/origin/main", false, null),
+        ];
+        Assert.Equal(
+            ["refs/remotes/origin/feature"],
+            BranchVisibility.HiddenNewcomers(
+                remotePrevious,
+                remoteKept,
+                [.. remotePrevious, new GitRef("ccc", "refs/remotes/origin/feature", false, null)]));
+    }
+
+    [Fact]
     public async Task Hidden_branches_drop_commits_reached_only_from_those_branches()
     {
         using var repo = new TempRepo();
@@ -430,6 +483,131 @@ public class BranchVisibilityTests
         foreach (var argument in log)
             length += argument.Length + 1;
         Assert.True(length < GitCommands.MaxCommandLine, $"log command length {length}");
+    }
+
+    [Fact]
+    public async Task Fetch_hides_new_remote_branches_while_one_branch_is_shown()
+    {
+        using var origin = new TempRepo();
+        origin.WriteFile("a.txt", "root\n");
+        origin.CommitAll("root");
+        var main = origin.CurrentBranch();
+        origin.Run("switch", "-c", "side");
+        origin.WriteFile("s.txt", "side\n");
+        origin.CommitAll("side-only");
+        origin.Run("switch", main);
+        var clone = Path.Combine(Path.GetTempPath(), "sextant-hide-fetch-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            origin.Run("clone", origin.Directory, clone);
+            origin.SetIdentity(clone);
+            await using var session = await RepositorySession.OpenAsync(
+                new GitProcessRunner(),
+                origin.Git,
+                clone,
+                CancellationToken.None);
+            Assert.Contains(session.Snapshot().Refs, reference => reference.Name == "refs/remotes/origin/side");
+            var keep = "refs/heads/" + main;
+            await session.SetHiddenBranchesAsync(
+                BranchVisibility.HiddenExcept(session.Snapshot().Refs, keep),
+                CancellationToken.None);
+            Assert.DoesNotContain(Subjects(session), subject => subject == "side-only");
+
+            origin.Run("switch", "-c", "arrived");
+            origin.WriteFile("n.txt", "arrived\n");
+            origin.CommitAll("arrived-only");
+            origin.Run("switch", main);
+            await session.FetchAsync(null, CancellationToken.None);
+            var hidden = session.Snapshot().HiddenBranches;
+            Assert.Contains("refs/remotes/origin/arrived", hidden);
+            Assert.Contains("refs/remotes/origin/side", hidden);
+            Assert.DoesNotContain(hidden, name => name == keep);
+            Assert.DoesNotContain(Subjects(session), subject => subject == "arrived-only");
+            Assert.Contains(Subjects(session), subject => subject == "root");
+
+            GitIn(origin, clone, "switch", "-c", "local-note");
+            File.WriteAllText(Path.Combine(clone, "local.txt"), "local\n");
+            GitIn(origin, clone, "add", "-A");
+            GitIn(origin, clone, "commit", "-m", "local-only");
+            GitIn(origin, clone, "switch", main);
+            await session.RefreshRefsAndStatusAsync(CancellationToken.None);
+            Assert.DoesNotContain(session.Snapshot().HiddenBranches, name => name == "refs/heads/local-note");
+            Assert.Contains(Subjects(session), subject => subject == "local-only");
+            Assert.Contains(session.Snapshot().HiddenBranches, name => name == "refs/remotes/origin/arrived");
+            Assert.DoesNotContain(Subjects(session), subject => subject == "arrived-only");
+
+            await session.SetHiddenBranchesAsync([], CancellationToken.None);
+            origin.Run("switch", "-c", "later");
+            origin.WriteFile("later.txt", "later\n");
+            origin.CommitAll("later-only");
+            origin.Run("switch", main);
+            await session.FetchAsync(null, CancellationToken.None);
+            Assert.DoesNotContain(session.Snapshot().HiddenBranches, name => name == "refs/remotes/origin/later");
+            Assert.Contains(Subjects(session), subject => subject == "later-only");
+            Assert.Contains(Subjects(session), subject => subject == "arrived-only");
+        }
+        finally
+        {
+            TryDeleteDirectory(clone);
+        }
+    }
+
+    [Fact]
+    public async Task A_new_remote_stays_visible_until_one_branch_is_the_whole_filter()
+    {
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "root\n");
+        repo.CommitAll("root");
+        var sha = repo.RunCapture("rev-parse", "HEAD").Trim();
+        var main = "refs/heads/" + repo.CurrentBranch();
+        await using var session = await Open(repo);
+        repo.Run("update-ref", "refs/remotes/origin/extra", sha);
+        await session.RefreshRefsAndStatusAsync(CancellationToken.None);
+        Assert.DoesNotContain(session.Snapshot().HiddenBranches, name => name == "refs/remotes/origin/extra");
+
+        repo.Run("branch", "side");
+        await session.RefreshRefsAndStatusAsync(CancellationToken.None);
+        await session.SetHiddenBranchesAsync(["refs/heads/side"], CancellationToken.None);
+        repo.Run("update-ref", "refs/remotes/origin/other", sha);
+        await session.RefreshRefsAndStatusAsync(CancellationToken.None);
+        Assert.DoesNotContain(session.Snapshot().HiddenBranches, name => name == "refs/remotes/origin/other");
+        Assert.Contains(session.Snapshot().HiddenBranches, name => name == "refs/heads/side");
+
+        repo.Run("update-ref", "refs/remotes/origin/keep", sha);
+        await session.RefreshRefsAndStatusAsync(CancellationToken.None);
+        await session.SetHiddenBranchesAsync(
+            BranchVisibility.HiddenExcept(session.Snapshot().Refs, "refs/remotes/origin/keep"),
+            CancellationToken.None);
+        Assert.True(BranchVisibility.OnlyOneBranch(session.Snapshot().Refs, session.Snapshot().HiddenBranches));
+        repo.Run("update-ref", "-d", "refs/remotes/origin/keep");
+        repo.Run("update-ref", "refs/remotes/origin/replacement", sha);
+        await session.RefreshRefsAndStatusAsync(CancellationToken.None);
+        var hidden = session.Snapshot().HiddenBranches;
+        Assert.DoesNotContain(hidden, name => name == "refs/remotes/origin/replacement");
+        Assert.Contains(main, hidden);
+        Assert.Contains("refs/heads/side", hidden);
+    }
+
+    private static void GitIn(TempRepo origin, string directory, params string[] args)
+    {
+        var command = new List<string> { "-C", directory };
+        command.AddRange(args);
+        origin.Run(command.ToArray());
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+                Directory.Delete(path, recursive: true);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 
     private static void UpdateRefs(TempRepo repo, string script)
