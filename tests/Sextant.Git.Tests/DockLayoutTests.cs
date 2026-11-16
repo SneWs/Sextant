@@ -1220,7 +1220,7 @@ public class DockLayoutTests
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
 
-                var graph = Graph(window);
+                var graph = await Graph(window);
                 graph.Focusable = true;
                 Assert.True(graph.Focus(), $"graph visible {graph.IsEffectivelyVisible} enabled {graph.IsEnabled}");
                 Assert.False(CommitMessage(window)!.IsFocused);
@@ -1235,7 +1235,7 @@ public class DockLayoutTests
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
                 Assert.False(vm.Dock.IsOpen(DockIds.Changes));
-                graph = Graph(window);
+                graph = await Graph(window);
                 graph.Focusable = true;
                 Assert.True(graph.Focus(), $"graph visible {graph.IsEffectivelyVisible} enabled {graph.IsEnabled}");
                 window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
@@ -1250,7 +1250,7 @@ public class DockLayoutTests
                 Assert.True(box.IsEffectivelyVisible);
                 Assert.True(box.IsFocused);
 
-                graph = Graph(window);
+                graph = await Graph(window);
                 var commit = tab.Rows.First(row => !row.IsWorkingCopy && row.Subject == "first");
                 tab.SelectedGraphRow = commit;
                 var shown = DateTime.UtcNow.AddSeconds(5);
@@ -1340,7 +1340,7 @@ public class DockLayoutTests
                 tab.HistoryText = "kept";
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
-                var graph = Graph(window);
+                var graph = await Graph(window);
                 graph.Focusable = true;
                 Assert.True(graph.Focus());
                 window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
@@ -1365,7 +1365,7 @@ public class DockLayoutTests
                 while (tab.ShowingWorkingCopy && DateTime.UtcNow < shown)
                     await Task.Delay(20);
                 Assert.False(tab.ShowingWorkingCopy);
-                graph = Graph(window);
+                graph = await Graph(window);
                 for (var i = 0; i < 40; i++)
                     tab.Rows.Add(new GraphRowViewModel { Subject = "pad " + i });
                 window.UpdateLayout();
@@ -1417,7 +1417,7 @@ public class DockLayoutTests
                 Assert.True(vm.Dock.IsOpen(DockIds.Changes));
                 Assert.True(vm.Dock.IsSelected(DockIds.Changes));
                 Assert.True(box!.IsFocused);
-                graph = Graph(window);
+                graph = await Graph(window);
                 scroll = graph.GetVisualDescendants().OfType<ScrollViewer>().First();
                 Assert.True(scroll.Offset.Y < 1, $"history offset {scroll.Offset.Y}");
                 Assert.Contains("Hiding", tab.HistoryCaption);
@@ -1483,7 +1483,7 @@ public class DockLayoutTests
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
 
-                var graph = Graph(window);
+                var graph = await Graph(window);
                 var scroll = graph.GetVisualDescendants().OfType<ScrollViewer>().First();
                 scroll.Offset = new Vector(scroll.Offset.X, 0);
                 window.UpdateLayout();
@@ -1516,7 +1516,7 @@ public class DockLayoutTests
                 Assert.True(vm.Dock.IsSelected(DockIds.History));
                 await AssertScrolledTo(window, anchor);
 
-                graph = Graph(window);
+                graph = await Graph(window);
                 scroll = graph.GetVisualDescendants().OfType<ScrollViewer>().First();
                 scroll.Offset = new Vector(scroll.Offset.X, Math.Max(scroll.Extent.Height, 2000));
                 window.UpdateLayout();
@@ -1529,7 +1529,7 @@ public class DockLayoutTests
                 Assert.Equal(trunk, repo.CurrentBranch());
                 await AssertScrolledTo(window, stashRow);
 
-                scroll = Graph(window).GetVisualDescendants().OfType<ScrollViewer>().First();
+                scroll = (await Graph(window)).GetVisualDescendants().OfType<ScrollViewer>().First();
                 scroll.Offset = new Vector(scroll.Offset.X, Math.Max(scroll.Extent.Height, 2000));
                 window.UpdateLayout();
                 Dispatcher.UIThread.RunJobs();
@@ -1639,8 +1639,31 @@ public class DockLayoutTests
         Assert.False(tab.IsBusy);
     }
 
-    private static ListBox Graph(Window window) =>
-        window.GetVisualDescendants().OfType<ListBox>().First(list => list.Name == "GraphList");
+    /// <summary>
+    /// The history list is created by the dock template. One layout pass can run before that
+    /// template is in the tree, which a loaded Linux runner hits after a history reload.
+    /// </summary>
+    private static async Task<ListBox> Graph(Window window)
+    {
+        var until = DateTime.UtcNow.AddSeconds(4);
+        var names = "";
+        while (DateTime.UtcNow < until)
+        {
+            window.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            var lists = window.GetVisualDescendants().OfType<ListBox>().ToList();
+            var graph = lists.FirstOrDefault(list => list.Name == "GraphList");
+            if (graph is not null)
+                return graph;
+            names = string.Join(", ", lists.Select(list => string.IsNullOrEmpty(list.Name) ? list.GetType().Name : list.Name));
+            await Task.Delay(20);
+        }
+
+        Assert.Fail(names.Length == 0
+            ? "The history list was not in the window."
+            : "The history list was not in the window. Lists: " + names);
+        return null!;
+    }
 
     private static TextBox? CommitMessage(Window window) =>
         window.GetVisualDescendants().OfType<TextBox>().FirstOrDefault(box => box.Name == "CommitMessageInput");
