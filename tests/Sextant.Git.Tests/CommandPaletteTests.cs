@@ -376,17 +376,9 @@ public class CommandPaletteTests
                 Assert.NotNull(list);
                 var command = vm.PaletteMatches.Single(item => item.Title == "Create branch");
                 list.ScrollIntoView(command);
-                window.UpdateLayout();
-                Dispatcher.UIThread.RunJobs();
-                var row = list.ContainerFromItem(command) as ListBoxItem;
-                Assert.NotNull(row);
-                var point = row.TranslatePoint(new Point(row.Bounds.Width / 2, row.Bounds.Height / 2), window);
-                Assert.NotNull(point);
-                window.MouseDown(point.Value, MouseButton.Left);
-                window.MouseUp(point.Value, MouseButton.Left);
-                Dispatcher.UIThread.RunJobs();
-
-                var dialog = Assert.Single(window.OwnedWindows);
+                // The row can report a point before it has a size, and the prompt is shown from
+                // an async tap handler, so neither is ready on the same turn as the click.
+                var dialog = await ClickPaletteRow(window, list, command);
                 Assert.Equal("Create branch", dialog.Title);
                 Assert.False(tab.IsBusy, tab.BusyText);
 
@@ -436,6 +428,45 @@ public class CommandPaletteTests
             await created;
         Dispatcher.UIThread.RunJobs();
         await WaitUntilIdle(tab);
+    }
+
+    private static async Task<Window> ClickPaletteRow(MainWindow window, ListBox list, object command)
+    {
+        var until = DateTime.UtcNow.AddSeconds(4);
+        var why = "the palette row was not laid out";
+        for (var attempt = 0; attempt < 2 && window.OwnedWindows.Count == 0; attempt++)
+        {
+            Point? point = null;
+            while (point is null && DateTime.UtcNow < until)
+            {
+                list.ScrollIntoView(command);
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                if (list.ContainerFromItem(command) is ListBoxItem { Bounds.Width: > 1, Bounds.Height: > 1 } row)
+                    point = row.TranslatePoint(new Point(row.Bounds.Width / 2, row.Bounds.Height / 2), window);
+                if (point is null)
+                {
+                    why = "the palette row was not attached to the window";
+                    await Task.Delay(20);
+                }
+            }
+
+            if (point is null)
+                break;
+            window.MouseDown(point.Value, MouseButton.Left);
+            window.MouseUp(point.Value, MouseButton.Left);
+            var shown = DateTime.UtcNow.AddSeconds(1);
+            while (window.OwnedWindows.Count == 0 && DateTime.UtcNow < shown && DateTime.UtcNow < until)
+            {
+                window.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                why = "the create-branch prompt did not open";
+                await Task.Delay(20);
+            }
+        }
+
+        Assert.True(window.OwnedWindows.Count == 1, why + $" ({window.OwnedWindows.Count} windows)");
+        return window.OwnedWindows[0];
     }
 
     private static async Task WaitUntilIdle(RepositoryViewModel tab)

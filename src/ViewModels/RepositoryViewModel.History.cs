@@ -709,17 +709,11 @@ public partial class RepositoryViewModel
         _allFilesShown = AllFiles;
         _diffReady = true;
         NoteSectionFolds();
+        // A collapsed file stays a header. Its blame runs when that section is opened.
         foreach (var section in _sections)
         {
             if (section.Header.Expanded)
                 QueueBlame(section);
-        }
-
-        if (AllFiles && !armJump && SelectedFile is { IsHeader: false, Path.Length: > 0 } selected)
-        {
-            armJump = true;
-            jumpPath = selected.Path;
-            jumpOriginal = selected.OriginalPath;
         }
 
         var opening = Task.CompletedTask;

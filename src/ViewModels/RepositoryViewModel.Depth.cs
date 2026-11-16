@@ -47,8 +47,12 @@ public partial class RepositoryViewModel
     [ObservableProperty]
     public partial bool ShowingImages { get; set; }
 
-    // A newer file selection bumps this so a finished load cannot clear the spinner that replaced it.
+    // A new diff bumps this so a picture finished for the previous diff cannot publish over the new one.
+    // Opening another file in the same diff does not bump it, so that picture keeps loading.
     private int _imageLoad;
+
+    // Paths whose preview has been asked for in this diff. A second open must not decode them again.
+    private readonly HashSet<string> _imageRequested = new(StringComparer.Ordinal);
 
     [RelayCommand]
     private Task AddWorktree()
@@ -470,6 +474,18 @@ public partial class RepositoryViewModel
         return false;
     }
 
+    /// <summary>Decodes pictures for files that are already open. Collapsed files wait until they are opened.</summary>
+    private Task LoadOpenImagesAsync()
+    {
+        if (ShowingBlame || _session is null || _lifetime.IsCancellationRequested)
+            return Task.CompletedTask;
+        var file = SelectedFile is { IsHeader: false } selected ? selected : null;
+        var row = SelectedGraphRow;
+        var range = _rangeOlder is not null && _rangeNewer is not null;
+        var workingCopy = !range && (row is null || row.IsWorkingCopy);
+        return LoadImageAsync(file, workingCopy, range, _details?.Token ?? CancellationToken.None);
+    }
+
     private async Task LoadImageAsync(FileRowViewModel? file, bool workingCopy, bool range, CancellationToken token)
     {
         if (_session is null || token.IsCancellationRequested)
@@ -478,7 +494,7 @@ public partial class RepositoryViewModel
         if (targets.Count == 0)
             return;
 
-        var load = ++_imageLoad;
+        var load = _imageLoad;
         var rows = new List<ImageCompareRow>(targets.Count);
         foreach (var target in targets)
         {
@@ -571,6 +587,8 @@ public partial class RepositoryViewModel
         {
             row.IsLoading = false;
             row.Release();
+            // A failed preview can be asked for again the next time the file is opened.
+            DropImageRequest(row);
             if (published)
                 RemoveImageRow(row);
             return;
@@ -607,19 +625,20 @@ public partial class RepositoryViewModel
         if (!published)
         {
             foreach (var row in rows)
+            {
                 row.Release();
+                DropImageRequest(row);
+            }
+
             return;
         }
 
-        var pending = new List<ImageCompareRow>();
-        foreach (var row in ImageCompares)
+        // Only this load's rows. Another file opened in the same diff may still be decoding.
+        foreach (var row in rows)
         {
             if (row.IsLoading)
-                pending.Add(row);
+                RemoveImageRow(row);
         }
-
-        foreach (var row in pending)
-            RemoveImageRow(row);
     }
 
     private void RemoveImageRow(ImageCompareRow row)
@@ -627,9 +646,16 @@ public partial class RepositoryViewModel
         row.Release();
         DetachImageRow(row);
         ImageCompares.Remove(row);
+        DropImageRequest(row);
         ShowingImages = ImageCompares.Count > 0;
         NoteMissingPreview(row.Path, row.StagingFile?.FromStagedList);
     }
+
+    private void DropImageRequest(ImageCompareRow row) =>
+        _imageRequested.Remove(ImageRequestKey(row.Path, row.StagingFile?.FromStagedList));
+
+    private static string ImageRequestKey(string path, bool? staged) =>
+        (staged == true ? "1\n" : "0\n") + path;
 
     /// <summary>
     /// Asks each visible window to paint. A window on another screen is not the
@@ -716,8 +742,15 @@ public partial class RepositoryViewModel
             if (targets.Exists(item => string.Equals(item.Path, path, StringComparison.Ordinal)
                 && item.StagingFile?.FromStagedList == stagingFile?.FromStagedList))
                 return;
+            var key = ImageRequestKey(path, stagingFile?.FromStagedList);
+            if (_imageRequested.Contains(key))
+                return;
+            if (ImageCompares.Any(row => string.Equals(row.Path, path, StringComparison.Ordinal)
+                && row.StagingFile?.FromStagedList == stagingFile?.FromStagedList))
+                return;
             if (string.Equals(before, path, StringComparison.Ordinal))
                 before = null;
+            _imageRequested.Add(key);
             targets.Add((path, before, stagingFile));
         }
 
@@ -730,6 +763,9 @@ public partial class RepositoryViewModel
 
         foreach (var section in _sections)
         {
+            // A collapsed file stays a header. Its picture is decoded when the section opens.
+            if (!section.Header.Expanded)
+                continue;
             Add(section.Header.Path, section.BeforePath, section.Header.StagingFile);
         }
 
@@ -881,6 +917,8 @@ public partial class RepositoryViewModel
         _lfsPointer = null;
         _lfsLocal = false;
         _lfsAfter = false;
+        _imageLoad++;
+        _imageRequested.Clear();
         ReplaceImages([]);
     }
 

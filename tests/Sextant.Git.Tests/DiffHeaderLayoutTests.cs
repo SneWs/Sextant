@@ -118,11 +118,10 @@ public class DiffHeaderLayoutTests
                 var stage = FileButton(view, header, "Stage file");
                 Assert.True(stage.IsEffectivelyVisible);
                 Assert.Same(header.ActionCommand, stage.Command);
-                var point = stage.TranslatePoint(new Point(stage.Bounds.Width / 2, stage.Bounds.Height / 2), window);
-                Assert.NotNull(point);
-                window.MouseDown(point.Value, MouseButton.Left);
+                var point = await PointInWindow(window, stage);
+                window.MouseDown(point, MouseButton.Left);
                 Assert.True(header.Expanded);
-                window.MouseUp(point.Value, MouseButton.Left);
+                window.MouseUp(point, MouseButton.Left);
                 var command = Assert.IsAssignableFrom<IAsyncRelayCommand>(header.ActionCommand);
                 Assert.NotNull(command.ExecutionTask);
                 await command.ExecutionTask;
@@ -515,13 +514,39 @@ public class DiffHeaderLayoutTests
 
     private static async Task Click(Window window, Button button)
     {
-        var point = button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window);
-        Assert.NotNull(point);
-        window.MouseDown(point.Value, MouseButton.Left);
-        window.MouseUp(point.Value, MouseButton.Left);
+        var point = await PointInWindow(window, button);
+        window.MouseDown(point, MouseButton.Left);
+        window.MouseUp(point, MouseButton.Left);
         var command = Assert.IsAssignableFrom<IAsyncRelayCommand>(button.Command);
         Assert.NotNull(command.ExecutionTask);
         await command.ExecutionTask;
+    }
+
+    /// <summary>
+    /// A realized button can still sit outside the window's visual root. TranslatePoint stays
+    /// null until the next frame attaches it.
+    /// </summary>
+    private static async Task<Point> PointInWindow(Window window, Visual visual)
+    {
+        var until = DateTime.UtcNow.AddSeconds(4);
+        var why = "the control was not attached to the window";
+        while (DateTime.UtcNow < until)
+        {
+            window.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            if (visual.Bounds.Width > 1 && visual.Bounds.Height > 1)
+            {
+                var point = visual.TranslatePoint(new Point(visual.Bounds.Width / 2, visual.Bounds.Height / 2), window);
+                if (point is not null)
+                    return point.Value;
+            }
+
+            why = $"bounds {visual.Bounds}";
+            await Task.Delay(20);
+        }
+
+        Assert.Fail(why);
+        return default;
     }
 
     private static string Read(TempRepo repo) =>
