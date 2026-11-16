@@ -42,15 +42,42 @@ public partial class GraphRowViewModel : ObservableObject
 
     public LaneGeometry? Lanes { get; init; }
 
-    public string Author { get; init; } = "";
+    // A commit row leaves these unset: the subject is the commit's own string, and the
+    // detail line is built the first time a row is shown. The working copy and tests set both.
+    private string? _subject;
+    private string? _detail;
 
-    public string When { get; init; } = "";
+    public string Subject
+    {
+        get => _subject ?? Commit?.Subject ?? "";
+        set
+        {
+            if (_subject == value)
+                return;
+            _subject = value;
+            OnPropertyChanged(nameof(Subject));
+        }
+    }
 
-    [ObservableProperty]
-    public partial string Subject { get; set; } = "";
-
-    [ObservableProperty]
-    public partial string Detail { get; set; } = "";
+    public string Detail
+    {
+        get
+        {
+            if (_detail is not null)
+                return _detail;
+            if (Commit is not { } commit)
+                return "";
+            _detail = RepositoryViewModel.CommitDetail(commit);
+            return _detail;
+        }
+        set
+        {
+            if (_detail == value)
+                return;
+            _detail = value;
+            OnPropertyChanged(nameof(Detail));
+        }
+    }
 
     /// <summary>Changed-file count drawn as a pill on the right of the history row. Empty until the batch load fills it.</summary>
     [ObservableProperty]
@@ -81,31 +108,38 @@ public partial class GraphRowViewModel : ObservableObject
 
     public bool ShowRewrite { get; init; }
 
-    public ICommand CheckoutCommand { get; init; } = UiCommands.Disabled;
+    /// <summary>Repository that owns the shared history commands. Test rows leave this empty, so those commands stay disabled.</summary>
+    internal RepositoryViewModel? CommandOwner { get; init; }
+
+    /// <summary>Local branch checkout switches to. Set only when <see cref="ShowCheckout"/> is true.</summary>
+    public string? CheckoutBranch { get; init; }
+
+    public ICommand CheckoutCommand =>
+        ShowCheckout && CommandOwner is { } owner ? owner.GraphCheckoutCommand : UiCommands.Disabled;
 
     public ICommand CreateBranchCommand { get; init; } = UiCommands.Disabled;
 
-    public ICommand CreateBranchAtCommand { get; init; } = UiCommands.Disabled;
+    public ICommand CreateBranchAtCommand => CommandOwner?.GraphCreateBranchAtCommand ?? UiCommands.Disabled;
 
-    public ICommand PatchCommand { get; init; } = UiCommands.Disabled;
+    public ICommand PatchCommand => CommandOwner?.GraphPatchCommand ?? UiCommands.Disabled;
 
-    public ICommand CopyShaCommand { get; init; } = UiCommands.Disabled;
+    public ICommand CopyShaCommand => CommandOwner?.GraphCopyShaCommand ?? UiCommands.Disabled;
 
-    public ICommand ResetSoftCommand { get; init; } = UiCommands.Disabled;
+    public ICommand ResetSoftCommand => CommandOwner?.GraphResetSoftCommand ?? UiCommands.Disabled;
 
-    public ICommand ResetMixedCommand { get; init; } = UiCommands.Disabled;
+    public ICommand ResetMixedCommand => CommandOwner?.GraphResetMixedCommand ?? UiCommands.Disabled;
 
-    public ICommand ResetHardCommand { get; init; } = UiCommands.Disabled;
+    public ICommand ResetHardCommand => CommandOwner?.GraphResetHardCommand ?? UiCommands.Disabled;
 
-    public ICommand CherryPickCommand { get; init; } = UiCommands.Disabled;
+    public ICommand CherryPickCommand => CommandOwner?.GraphCherryPickCommand ?? UiCommands.Disabled;
 
-    public ICommand RevertCommand { get; init; } = UiCommands.Disabled;
+    public ICommand RevertCommand => CommandOwner?.GraphRevertCommand ?? UiCommands.Disabled;
 
-    public ICommand RebaseCommand { get; init; } = UiCommands.Disabled;
+    public ICommand RebaseCommand => CommandOwner?.GraphRebaseCommand ?? UiCommands.Disabled;
 
-    public ICommand RewordCommand { get; init; } = UiCommands.Disabled;
+    public ICommand RewordCommand => CommandOwner?.GraphRewordCommand ?? UiCommands.Disabled;
 
-    public ICommand TagCommand { get; init; } = UiCommands.Disabled;
+    public ICommand TagCommand => CommandOwner?.GraphTagCommand ?? UiCommands.Disabled;
 }
 
 public sealed class ResetCollection<T> : ObservableCollection<T>

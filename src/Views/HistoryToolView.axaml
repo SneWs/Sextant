@@ -59,22 +59,22 @@
                                 </Border.Styles>
                                 <Border.ContextMenu>
                                     <ContextMenu Opening="OnMenuOpening">
-                                        <MenuItem Header="Checkout" Command="{Binding CheckoutCommand}" IsVisible="{Binding ShowCheckout}"/>
-                                        <MenuItem Header="Cherry pick commit" Command="{Binding CherryPickCommand}" IsVisible="{Binding ShowRewrite}"/>
-                                        <MenuItem Header="Revert commit" Command="{Binding RevertCommand}" IsVisible="{Binding ShowRewrite}"/>
+                                        <MenuItem Header="Checkout" Command="{Binding CheckoutCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowCheckout}"/>
+                                        <MenuItem Header="Cherry pick commit" Command="{Binding CherryPickCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
+                                        <MenuItem Header="Revert commit" Command="{Binding RevertCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
                                         <MenuItem Header="Create" IsVisible="{Binding ShowRewrite}">
-                                            <MenuItem Header="Create branch at commit" Command="{Binding CreateBranchAtCommand}"/>
-                                            <MenuItem Header="Create tag at commit" Command="{Binding TagCommand}"/>
-                                            <MenuItem Header="Patch" Command="{Binding PatchCommand}"/>
+                                            <MenuItem Header="Create branch at commit" Command="{Binding CreateBranchAtCommand}" CommandParameter="{Binding .}"/>
+                                            <MenuItem Header="Create tag at commit" Command="{Binding TagCommand}" CommandParameter="{Binding .}"/>
+                                            <MenuItem Header="Patch" Command="{Binding PatchCommand}" CommandParameter="{Binding .}"/>
                                         </MenuItem>
                                         <Separator IsVisible="{Binding ShowRewrite}"/>
                                         <MenuItem Header="Create branch at HEAD" Command="{Binding CreateBranchCommand}" IsVisible="{Binding IsWorkingCopy}"/>
-                                        <MenuItem Header="Copy SHA" Command="{Binding CopyShaCommand}" IsVisible="{Binding ShowLanes}"/>
-                                        <MenuItem Header="Reset soft" Command="{Binding ResetSoftCommand}" IsVisible="{Binding ShowRewrite}"/>
-                                        <MenuItem Header="Reset mixed" Command="{Binding ResetMixedCommand}" IsVisible="{Binding ShowRewrite}"/>
-                                        <MenuItem Header="Reset hard" Command="{Binding ResetHardCommand}" IsVisible="{Binding ShowRewrite}"/>
-                                        <MenuItem Header="Rebase interactive…" Command="{Binding RebaseCommand}" IsVisible="{Binding ShowRewrite}"/>
-                                        <MenuItem Header="Reword…" Command="{Binding RewordCommand}" IsVisible="{Binding ShowRewrite}"/>
+                                        <MenuItem Header="Copy SHA" Command="{Binding CopyShaCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowLanes}"/>
+                                        <MenuItem Header="Reset soft" Command="{Binding ResetSoftCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
+                                        <MenuItem Header="Reset mixed" Command="{Binding ResetMixedCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
+                                        <MenuItem Header="Reset hard" Command="{Binding ResetHardCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
+                                        <MenuItem Header="Rebase interactive…" Command="{Binding RebaseCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
+                                        <MenuItem Header="Reword…" Command="{Binding RewordCommand}" CommandParameter="{Binding .}" IsVisible="{Binding ShowRewrite}"/>
                                     </ContextMenu>
                                 </Border.ContextMenu>
                                 <controls:GraphRowPanel>

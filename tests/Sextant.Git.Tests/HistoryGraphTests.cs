@@ -392,6 +392,116 @@ public class HistoryGraphTests
         }, CancellationToken.None);
     }
 
+    [Fact]
+    public async Task Commit_rows_share_commands_and_read_the_subject_from_the_commit()
+    {
+        using var session = HeadlessUnitTestSession.StartNew(typeof(DialogFocusApp));
+        using var repo = new TempRepo();
+        repo.WriteFile("a.txt", "one\n");
+        repo.CommitAll("alpha");
+        repo.Run("branch", "topic");
+        repo.WriteFile("b.txt", "two\n");
+        repo.CommitAll("beta");
+
+        await session.Dispatch(async () =>
+        {
+            var vm = new RepositoryViewModel(new GraphHost(repo.Git), repo.Directory);
+            try
+            {
+                await vm.EnsureLoadedAsync();
+                var alpha = vm.Rows.Single(row => row.Subject == "alpha");
+                var beta = vm.Rows.Single(row => row.Subject == "beta");
+                var work = vm.Rows.Single(row => row.IsWorkingCopy);
+
+                Assert.Same(alpha.Commit!.Subject, alpha.Subject);
+                Assert.Same(beta.Commit!.Subject, beta.Subject);
+                Assert.Contains(alpha.Commit.AuthorName, alpha.Detail);
+                Assert.Same(alpha.Detail, alpha.Detail);
+                Assert.Equal("Working copy", work.Subject);
+                Assert.Same(vm.CreateBranchCommand, work.CreateBranchCommand);
+                Assert.Same(UiCommands.Disabled, work.CherryPickCommand);
+
+                Assert.Same(alpha.CherryPickCommand, beta.CherryPickCommand);
+                Assert.Same(alpha.RevertCommand, beta.RevertCommand);
+                Assert.Same(alpha.ResetSoftCommand, beta.ResetSoftCommand);
+                Assert.Same(alpha.ResetMixedCommand, beta.ResetMixedCommand);
+                Assert.Same(alpha.ResetHardCommand, beta.ResetHardCommand);
+                Assert.Same(alpha.CreateBranchAtCommand, beta.CreateBranchAtCommand);
+                Assert.Same(alpha.CopyShaCommand, beta.CopyShaCommand);
+                Assert.Same(alpha.PatchCommand, beta.PatchCommand);
+                Assert.Same(alpha.RebaseCommand, beta.RebaseCommand);
+                Assert.Same(alpha.RewordCommand, beta.RewordCommand);
+                Assert.Same(alpha.TagCommand, beta.TagCommand);
+                Assert.NotSame(UiCommands.Disabled, alpha.CherryPickCommand);
+
+                Assert.True(alpha.ShowCheckout);
+                Assert.Equal("topic", alpha.CheckoutBranch);
+                Assert.False(beta.ShowCheckout);
+                Assert.NotSame(UiCommands.Disabled, alpha.CheckoutCommand);
+                Assert.Same(UiCommands.Disabled, beta.CheckoutCommand);
+
+                var view = new HistoryToolView { DataContext = vm, Width = 1100, Height = 700 };
+                var window = new Window { Content = view, Width = 1100, Height = 700 };
+                window.Show();
+                view.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                var graph = view.FindControl<ListBox>("GraphList");
+                Assert.NotNull(graph);
+                graph.ScrollIntoView(alpha);
+                view.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                var alphaMenu = OpenGraphMenu(graph, alpha);
+                var checkout = GraphMenuItem(alphaMenu, "Checkout");
+                Assert.True(checkout.IsVisible);
+                Assert.Same(alpha, checkout.CommandParameter);
+                Assert.Same(alpha.CheckoutCommand, checkout.Command);
+                var cherry = GraphMenuItem(alphaMenu, "Cherry pick commit");
+                Assert.Same(alpha, cherry.CommandParameter);
+                Assert.Same(alpha.CherryPickCommand, cherry.Command);
+                var create = GraphMenuItem(alphaMenu, "Create");
+                var branchAt = create.Items.OfType<MenuItem>().Single(item => item.Header as string == "Create branch at commit");
+                Assert.Same(alpha, branchAt.CommandParameter);
+                var atHead = GraphMenuItem(alphaMenu, "Create branch at HEAD");
+                Assert.False(atHead.IsVisible);
+                Assert.Null(atHead.CommandParameter);
+                alphaMenu.Close();
+
+                graph.ScrollIntoView(work);
+                view.UpdateLayout();
+                Dispatcher.UIThread.RunJobs();
+                var workMenu = OpenGraphMenu(graph, work);
+                var workBranch = GraphMenuItem(workMenu, "Create branch at HEAD");
+                Assert.True(workBranch.IsVisible);
+                Assert.Null(workBranch.CommandParameter);
+                Assert.Same(vm.CreateBranchCommand, workBranch.Command);
+                workMenu.Close();
+                window.Close();
+
+                await Assert.IsAssignableFrom<IAsyncRelayCommand>(alpha.CheckoutCommand).ExecuteAsync(alpha);
+                Assert.Equal("topic", repo.CurrentBranch());
+            }
+            finally
+            {
+                await vm.DisposeAsync();
+            }
+
+            return 0;
+        }, CancellationToken.None);
+    }
+
+    private static ContextMenu OpenGraphMenu(ListBox graph, GraphRowViewModel row)
+    {
+        var border = graph.GetVisualDescendants().OfType<Border>()
+            .Single(item => item.DataContext == row && item.ContextMenu is not null);
+        var menu = border.ContextMenu!;
+        menu.Open(border);
+        Dispatcher.UIThread.RunJobs();
+        return menu;
+    }
+
+    private static MenuItem GraphMenuItem(ContextMenu menu, string header) =>
+        menu.Items.OfType<MenuItem>().Single(item => item.Header as string == header);
+
     private static Control TipOwner(Control start)
     {
         for (Control? control = start; control is not null; control = control.GetVisualParent() as Control)

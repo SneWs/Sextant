@@ -101,6 +101,20 @@ public partial class RepositoryViewModel : ViewModelBase
 
     private string? _wslDistribution;
 
+    // One instance of each history action. The menu passes the row, which carries the commit.
+    internal ICommand GraphCheckoutCommand { get; }
+    internal ICommand GraphCreateBranchAtCommand { get; }
+    internal ICommand GraphPatchCommand { get; }
+    internal ICommand GraphCopyShaCommand { get; }
+    internal ICommand GraphResetSoftCommand { get; }
+    internal ICommand GraphResetMixedCommand { get; }
+    internal ICommand GraphResetHardCommand { get; }
+    internal ICommand GraphCherryPickCommand { get; }
+    internal ICommand GraphRevertCommand { get; }
+    internal ICommand GraphRebaseCommand { get; }
+    internal ICommand GraphRewordCommand { get; }
+    internal ICommand GraphTagCommand { get; }
+
     public RepositoryViewModel(IWorkspaceHost host, string requestedPath, WslGit? wsl = null, string? distribution = null)
     {
         _host = host;
@@ -110,6 +124,18 @@ public partial class RepositoryViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(_wslDistribution) && WslPath.TryParseUnc(requestedPath, out var fromPath, out _))
             _wslDistribution = fromPath;
         Title = TabTitle(FolderName(requestedPath));
+        GraphCheckoutCommand = new AsyncRelayCommand<GraphRowViewModel>(CheckoutRowAsync);
+        GraphCreateBranchAtCommand = new AsyncRelayCommand<GraphRowViewModel>(CreateBranchAtRowAsync);
+        GraphPatchCommand = new AsyncRelayCommand<GraphRowViewModel>(PatchRowAsync);
+        GraphCopyShaCommand = new AsyncRelayCommand<GraphRowViewModel>(CopyShaRowAsync);
+        GraphResetSoftCommand = new AsyncRelayCommand<GraphRowViewModel>(ResetSoftRowAsync);
+        GraphResetMixedCommand = new AsyncRelayCommand<GraphRowViewModel>(ResetMixedRowAsync);
+        GraphResetHardCommand = new AsyncRelayCommand<GraphRowViewModel>(ResetHardRowAsync);
+        GraphCherryPickCommand = new AsyncRelayCommand<GraphRowViewModel>(CherryPickRowAsync);
+        GraphRevertCommand = new AsyncRelayCommand<GraphRowViewModel>(RevertRowAsync);
+        GraphRebaseCommand = new AsyncRelayCommand<GraphRowViewModel>(RebaseRowAsync);
+        GraphRewordCommand = new AsyncRelayCommand<GraphRowViewModel>(RewordRowAsync);
+        GraphTagCommand = new AsyncRelayCommand<GraphRowViewModel>(TagRowAsync);
     }
 
     public WslGit? Wsl => _wsl;
@@ -2045,31 +2071,53 @@ public partial class RepositoryViewModel : ViewModelBase
             Lanes = commit.Lanes,
             ShowLanes = true,
             DrawLanes = !state.FlatHistory,
-            Subject = commit.Commit.Subject,
-            Author = commit.Commit.AuthorName,
-            When = Relative(commit.Commit.AuthorUnixSeconds),
             IsHead = head,
-            Detail = CommitDetail(commit.Commit),
             Refs = RefNames(mine, state.HiddenBranches, head),
             Tags = TagNames(mine, state.HiddenBranches),
             ShowCheckout = checkout,
             ShowRewrite = true,
-            CheckoutCommand = checkout
-                ? new AsyncRelayCommand(() => RunAsync("Checking out…", ct => Session.SwitchAsync(name, ct)))
-                : UiCommands.Disabled,
-            CreateBranchAtCommand = new AsyncRelayCommand(() => CreateBranchAtAsync(commit.Commit)),
-            CopyShaCommand = new AsyncRelayCommand(() => CopyText(commit.Commit.Sha)),
-            PatchCommand = new AsyncRelayCommand(() => SavePatchAsync(commit.Commit)),
-            ResetSoftCommand = new AsyncRelayCommand(() => ResetAsync(commit.Commit, "--soft")),
-            ResetMixedCommand = new AsyncRelayCommand(() => ResetAsync(commit.Commit, "--mixed")),
-            ResetHardCommand = new AsyncRelayCommand(() => ResetAsync(commit.Commit, "--hard")),
-            CherryPickCommand = new AsyncRelayCommand(() => CherryPickAsync(commit.Commit)),
-            RevertCommand = new AsyncRelayCommand(() => RevertAsync(commit.Commit)),
-            RebaseCommand = new AsyncRelayCommand(() => RebaseFromRowAsync(commit.Commit.Sha, reword: false)),
-            RewordCommand = new AsyncRelayCommand(() => RebaseFromRowAsync(commit.Commit.Sha, reword: true)),
-            TagCommand = new AsyncRelayCommand(() => TagAsync(commit.Commit)),
+            CommandOwner = this,
+            CheckoutBranch = checkout ? name : null,
         };
     }
+
+    private Task CheckoutRowAsync(GraphRowViewModel? row) =>
+        row?.CheckoutBranch is { Length: > 0 } name
+            ? RunAsync("Checking out…", ct => Session.SwitchAsync(name, ct))
+            : Task.CompletedTask;
+
+    private Task CreateBranchAtRowAsync(GraphRowViewModel? row) =>
+        row?.Commit is { } commit ? CreateBranchAtAsync(commit) : Task.CompletedTask;
+
+    private Task CopyShaRowAsync(GraphRowViewModel? row) =>
+        row?.Sha is { Length: > 0 } sha ? CopyText(sha) : Task.CompletedTask;
+
+    private Task PatchRowAsync(GraphRowViewModel? row) =>
+        row?.Commit is { } commit ? SavePatchAsync(commit) : Task.CompletedTask;
+
+    private Task ResetSoftRowAsync(GraphRowViewModel? row) =>
+        row?.Commit is { } commit ? ResetAsync(commit, "--soft") : Task.CompletedTask;
+
+    private Task ResetMixedRowAsync(GraphRowViewModel? row) =>
+        row?.Commit is { } commit ? ResetAsync(commit, "--mixed") : Task.CompletedTask;
+
+    private Task ResetHardRowAsync(GraphRowViewModel? row) =>
+        row?.Commit is { } commit ? ResetAsync(commit, "--hard") : Task.CompletedTask;
+
+    private Task CherryPickRowAsync(GraphRowViewModel? row) =>
+        row?.Commit is { } commit ? CherryPickAsync(commit) : Task.CompletedTask;
+
+    private Task RevertRowAsync(GraphRowViewModel? row) =>
+        row?.Commit is { } commit ? RevertAsync(commit) : Task.CompletedTask;
+
+    private Task RebaseRowAsync(GraphRowViewModel? row) =>
+        row?.Commit is { } commit ? RebaseFromRowAsync(commit.Sha, reword: false) : Task.CompletedTask;
+
+    private Task RewordRowAsync(GraphRowViewModel? row) =>
+        row?.Commit is { } commit ? RebaseFromRowAsync(commit.Sha, reword: true) : Task.CompletedTask;
+
+    private Task TagRowAsync(GraphRowViewModel? row) =>
+        row?.Commit is { } commit ? TagAsync(commit) : Task.CompletedTask;
 
     private void RebuildFiles(SessionState state)
     {
@@ -4287,7 +4335,8 @@ public partial class RepositoryViewModel : ViewModelBase
         return builder.ToString();
     }
 
-    private static string CommitDetail(CommitRecord commit)
+    /// <summary>Author, relative time, date, and short SHA. A history row builds this the first time it is shown.</summary>
+    internal static string CommitDetail(CommitRecord commit)
     {
         var parts = new List<string>();
         if (commit.AuthorName.Length > 0)
