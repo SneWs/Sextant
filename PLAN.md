@@ -221,6 +221,8 @@ On 2026-11-16 a working-copy or all-files diff stays a list of file headers unti
 
 On 2026-11-16 blame follows that same rule. Opening Blame lists the files and leaves them closed. Opening one file runs blame for that file. The others stay headers. A file that is already open stays open, and with All files off the one selected file is annotated right away. `Blame_commands_wait_for_loading_and_can_collapse_while_loading` passed. The desktop window was not launched.
 
+On 2026-11-16 a commit diff's file header menu has Revert this file's changes. It reverses that commit's change to the file into the working tree without asking, staging it, or moving HEAD. A range and a stash do not offer it. `Reverting_a_commit_file_puts_the_change_in_the_working_tree` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

@@ -637,6 +637,36 @@ public sealed partial class RepositorySession : IAsyncDisposable
         await MutateAsync(GitCommands.RestoreFile(_toplevel, sha, path), null, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Reverses one file's change from a commit into the working tree.
+    /// The index and branch history stay as they are.
+    /// </summary>
+    public Task RevertCommitFileAsync(string? parent, string sha, string path, string? originalPath, CancellationToken cancellationToken) =>
+        RunAsync(async ct =>
+        {
+            await _scheduler.WriteAsync(async token =>
+            {
+                var output = Checked(await ExecuteAsync(
+                    GitCommands.CommitFilePatch(_toplevel, parent, sha, path, originalPath),
+                    null,
+                    token).ConfigureAwait(false));
+                if (output.Stdout.Length == 0)
+                    throw new RepositoryActionException("This commit does not change that file.");
+                var file = Path.Combine(Path.GetTempPath(), "sextant-revert-" + Guid.NewGuid().ToString("N") + ".patch");
+                try
+                {
+                    await File.WriteAllBytesAsync(file, output.Stdout, token).ConfigureAwait(false);
+                    Checked(await ExecuteAsync(GitCommands.ApplyReverse(_toplevel, file), null, token).ConfigureAwait(false));
+                    return 0;
+                }
+                finally
+                {
+                    TryDelete(file);
+                }
+            }, ct).ConfigureAwait(false);
+            await LoadRefsAndMaybeHistoryAsync(ct, statusAlreadyApplied: false).ConfigureAwait(false);
+        }, cancellationToken);
+
     public Task CherryPickAsync(string sha, CancellationToken cancellationToken) =>
         MutateAsync(GitCommands.CherryPick(_toplevel, sha), null, cancellationToken);
 
