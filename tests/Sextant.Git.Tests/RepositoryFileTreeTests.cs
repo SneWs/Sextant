@@ -403,12 +403,12 @@ public class RepositoryFileTreeTests
             {
                 Path = "locked.bin", Label = "locked.bin", LfsTracked = true, LocksKnown = true,
                 Lock = new LfsLock("123", "locked.bin", "Teammate"),
-                FileMenuFactory = () => desktopMenu,
+                FileMenuOverride = desktopMenu,
             };
             var unlocked = new RepositoryFileTreeItem
             {
                 Path = "unlocked.bin", Label = "unlocked.bin", LfsTracked = true, LocksKnown = true,
-                FileMenuFactory = () => desktopMenu,
+                FileMenuOverride = desktopMenu,
             };
             var plain = new RepositoryFileTreeItem
             {

@@ -30,7 +30,7 @@ public sealed class LoadingSpinner : Panel
         Children.Add(_arc);
         RenderTransform = _rotate;
         RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative);
-        _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+        _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         _timer.Tick += (_, _) => _rotate.Angle = (_rotate.Angle + 7) % 360;
     }
 

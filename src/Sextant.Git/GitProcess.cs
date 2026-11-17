@@ -325,8 +325,33 @@ public sealed class GitProcessRunner
 
     private static async Task<byte[]> ReadAllAsync(Stream stream)
     {
-        using var memory = new MemoryStream();
+        var capacity = 0;
+        if (stream.CanSeek)
+        {
+            try
+            {
+                var remaining = stream.Length - stream.Position;
+                if (remaining > 0)
+                    capacity = (int)Math.Min(remaining, int.MaxValue);
+            }
+            catch (Exception)
+            {
+            }
+        }
+
+        using var memory = capacity > 0 ? new MemoryStream(capacity) : new MemoryStream();
         await stream.CopyToAsync(memory).ConfigureAwait(false);
+        if (memory.TryGetBuffer(out var buffer)
+            && buffer.Offset == 0
+            && buffer.Array is { } array)
+        {
+            if (buffer.Count == array.Length)
+                return array;
+            var copy = GC.AllocateUninitializedArray<byte>(buffer.Count);
+            buffer.AsSpan().CopyTo(copy);
+            return copy;
+        }
+
         return memory.ToArray();
     }
 
@@ -410,14 +435,13 @@ public sealed class GitProcessRunner
     {
         while (true)
         {
-            var text = pending.ToString();
-            var split = text.IndexOfAny(['\r', '\n']);
+            var split = IndexOfLineBreak(pending);
             if (split < 0)
                 break;
 
-            var line = text[..split];
+            var line = pending.ToString(0, split);
             var consume = split + 1;
-            if (split + 1 < text.Length && text[split] == '\r' && text[split + 1] == '\n')
+            if (split + 1 < pending.Length && pending[split] == '\r' && pending[split + 1] == '\n')
                 consume++;
             pending.Remove(0, consume);
             Classify(line, errors, progress, ref lastProgress);
@@ -430,29 +454,40 @@ public sealed class GitProcessRunner
         }
     }
 
-    private static void Classify(string line, StringBuilder errors, IProgress<string>? progress, ref string? lastProgress)
+    private static int IndexOfLineBreak(StringBuilder text)
     {
+        for (var i = 0; i < text.Length; i++)
+        {
+            var ch = text[i];
+            if (ch == '\r' || ch == '\n')
+                return i;
+        }
+
+        return -1;
+    }
+
+    private static void Classify(ReadOnlySpan<char> line, StringBuilder errors, IProgress<string>? progress, ref string? lastProgress)
+    {
+        line = line.Trim();
         if (line.Length == 0)
             return;
         if (IsProgress(line))
         {
-            lastProgress = line.Trim();
+            lastProgress = line.ToString();
             progress?.Report(lastProgress);
             return;
         }
 
-        errors.AppendLine(line);
+        errors.Append(line);
+        errors.AppendLine();
     }
 
-    private static bool IsProgress(string line)
+    private static bool IsProgress(ReadOnlySpan<char> text)
     {
-        var text = line.Trim();
-        if (text.Length == 0)
-            return false;
         if (text.Contains("error", StringComparison.OrdinalIgnoreCase)
             || text.Contains("fatal", StringComparison.OrdinalIgnoreCase))
             return false;
-        if (text.Contains('%', StringComparison.Ordinal))
+        if (text.Contains('%'))
             return true;
 
         return text.StartsWith("Enumerating", StringComparison.Ordinal)

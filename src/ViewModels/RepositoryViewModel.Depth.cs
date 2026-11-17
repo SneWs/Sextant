@@ -687,8 +687,8 @@ public partial class RepositoryViewModel
         // tree building would land back on the UI thread.
         // Background is below render. Normal is above it, and a burst of those posts used to
         // keep the tab strip from presenting until the whole load had finished.
-        // A watcher refresh raises _uiPriority to Render so the same posts still run
-        // while this window is not the foreground window.
+        // Watcher refreshes use Background priority so UI work stays deferred when the app
+        // is minimized or in the background, avoiding unnecessary CPU usage.
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         Dispatcher.UIThread.Post(() =>
         {

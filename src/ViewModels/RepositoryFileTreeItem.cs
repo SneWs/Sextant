@@ -39,21 +39,37 @@ public partial class RepositoryFileTreeItem : ObservableObject
     public bool ShowLock => IsFile && LocksKnown && Lock is null;
     public bool ShowUnlock => IsFile && LocksKnown && Lock is not null;
     public bool ShowLockActions => ShowLock || ShowUnlock;
-    public Func<Task> LockAction { get; init; } = () => Task.CompletedTask;
-    public Func<Task> UnlockAction { get; init; } = () => Task.CompletedTask;
-    public Func<Task> ForceUnlockAction { get; init; } = () => Task.CompletedTask;
-    public Func<Task> HistoryAction { get; init; } = () => Task.CompletedTask;
-    public Func<Task> RemoveAction { get; init; } = () => Task.CompletedTask;
-    public Func<WorktreeFileMenu?>? FileMenuFactory { get; init; }
-    public Func<bool> CanRun { get; init; } = () => false;
+    public RepositoryViewModel? Owner { get; init; }
+    public WorktreeFileMenu? FileMenuOverride { get; init; }
 
-    public WorktreeFileMenu? FileMenu => _fileMenu ??= FileMenuFactory?.Invoke();
+    public WorktreeFileMenu? FileMenu => _fileMenu ??= FileMenuOverride ?? Owner?.FileMenuForRepositoryFile(Path, LfsTracked);
     public bool ShowOpen => FileMenu is not null;
-    public IAsyncRelayCommand LockCommand => _lockCommand ??= new AsyncRelayCommand(LockAction, () => ShowLock && CanRun());
-    public IAsyncRelayCommand UnlockCommand => _unlockCommand ??= new AsyncRelayCommand(UnlockAction, () => ShowUnlock && CanRun());
-    public IAsyncRelayCommand ForceUnlockCommand => _forceUnlockCommand ??= new AsyncRelayCommand(ForceUnlockAction, () => ShowUnlock && CanRun());
-    public IAsyncRelayCommand HistoryCommand => _historyCommand ??= new AsyncRelayCommand(HistoryAction, () => IsFile && CanRun());
-    public IAsyncRelayCommand RemoveCommand => _removeCommand ??= new AsyncRelayCommand(RemoveAction, () => IsFile && CanRun());
+    public IAsyncRelayCommand LockCommand => _lockCommand ??= new AsyncRelayCommand(LockAsync, CanLock);
+    public IAsyncRelayCommand UnlockCommand => _unlockCommand ??= new AsyncRelayCommand(UnlockAsync, CanUnlock);
+    public IAsyncRelayCommand ForceUnlockCommand => _forceUnlockCommand ??= new AsyncRelayCommand(ForceUnlockAsync, CanUnlock);
+    public IAsyncRelayCommand HistoryCommand => _historyCommand ??= new AsyncRelayCommand(ShowHistoryAsync, CanRunForFile);
+    public IAsyncRelayCommand RemoveCommand => _removeCommand ??= new AsyncRelayCommand(RemoveAsync, CanRunForFile);
+
+    private bool CanRunCommands() => Owner?.CanRunRepositoryFileActions ?? false;
+
+    private bool CanLock() => ShowLock && CanRunCommands();
+
+    private bool CanUnlock() => ShowUnlock && CanRunCommands();
+
+    private bool CanRunForFile() => IsFile && CanRunCommands();
+
+    private Task LockAsync() => Owner is null ? Task.CompletedTask
+        : Owner.ChangeRepositoryFileLockAsync(Path, unlock: false, force: false);
+
+    private Task UnlockAsync() => Owner is null ? Task.CompletedTask
+        : Owner.ChangeRepositoryFileLockAsync(Path, unlock: true, force: false);
+
+    private Task ForceUnlockAsync() => Owner is null ? Task.CompletedTask
+        : Owner.ChangeRepositoryFileLockAsync(Path, unlock: true, force: true);
+
+    private Task ShowHistoryAsync() => Owner is null ? Task.CompletedTask : Owner.ShowRepositoryFileHistoryAsync(Path);
+
+    private Task RemoveAsync() => Owner is null ? Task.CompletedTask : Owner.RemoveRepositoryFileAsync(Path);
 
     public void NotifyCommands()
     {

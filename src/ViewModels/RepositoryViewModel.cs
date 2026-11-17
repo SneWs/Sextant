@@ -1409,10 +1409,11 @@ public partial class RepositoryViewModel : ViewModelBase
                         Interlocked.Exchange(ref _watcherRefs, 1);
                     // Render still runs while this window is not the foreground window.
                     // Background work does not: Windows keeps reporting input, and the
-                    // dispatcher holds it until the window is activated.
+                    // dispatcher holds it until the window is activated. Use Background
+                    // so minimized or background refreshes do not burn CPU.
                     Dispatcher.UIThread.Post(
                         () => RefreshFromWatcherCommand.Execute(null),
-                        DispatcherPriority.Render);
+                        DispatcherPriority.Background);
                 },
                 _session.Toplevel);
             _watcher.Failed += () => Dispatcher.UIThread.Post(OnWatcherFailed);
@@ -1442,7 +1443,8 @@ public partial class RepositoryViewModel : ViewModelBase
 
         Interlocked.Increment(ref _watcherEpoch);
         var previous = _uiPriority;
-        _uiPriority = DispatcherPriority.Render;
+        // Keep Background so UI posts from OnUi stay deferred when the app is not active.
+        _uiPriority = DispatcherPriority.Background;
         try
         {
             using var pending = new PendingRepositoryWork(this);
@@ -1462,11 +1464,6 @@ public partial class RepositoryViewModel : ViewModelBase
                 Apply(_session.Snapshot());
                 PresentOpenWindows();
             }).ConfigureAwait(false);
-            if (_lifetime.IsCancellationRequested || _session is null || IsBusy)
-                return;
-            await LoadDetailsAsync().ConfigureAwait(false);
-            if (RepositoryFilesTabOn && _session is not null && !_lifetime.IsCancellationRequested && !IsBusy)
-                await LoadRepositoryFilesAsync(_lifetime.Token, refreshLocks: false).ConfigureAwait(false);
             if (_lifetime.IsCancellationRequested || _session is null)
                 return;
             await OnUi(PresentOpenWindows).ConfigureAwait(false);
@@ -1506,7 +1503,7 @@ public partial class RepositoryViewModel : ViewModelBase
             {
                 Dispatcher.UIThread.Post(
                     () => RefreshFromWatcherCommand.Execute(null),
-                    DispatcherPriority.Render);
+                    DispatcherPriority.Background);
             }
         }
     }
