@@ -24,6 +24,9 @@ public sealed partial class RepositorySession : IAsyncDisposable
     private string _gitDirectory = "";
     private Encoding _encoding = Encoding.UTF8;
     private BranchHeader _branch = new(null, null, false, true, null, 0, 0);
+
+    /// <summary>Bumped when ahead/behind is stored. A tab-title read publishes only if this is still its write.</summary>
+    private int _statusGeneration;
     private List<StatusEntry> _entries = [];
     private List<GitRef> _refs = [];
     private List<GraphCommit> _commits = [];
@@ -154,6 +157,40 @@ public sealed partial class RepositorySession : IAsyncDisposable
 
     public Task RefreshRefsAndStatusAsync(CancellationToken cancellationToken) =>
         RunAsync(ct => LoadRefsAndMaybeHistoryAsync(ct, statusAlreadyApplied: false), cancellationToken);
+
+    /// <summary>
+    /// Re-reads the checked-out branch's ahead/behind from <c>git status</c>.
+    /// The file list, history, and open diff stay as they are.
+    /// Returns the generation stored with that write.
+    /// </summary>
+    public Task<int> RefreshAheadBehindAsync(CancellationToken cancellationToken) =>
+        RunAsync(async ct =>
+        {
+            return await _scheduler.ReadAsync(async token =>
+            {
+                var output = Checked(await ExecuteAsync(GitCommands.Status(_toplevel), null, token).ConfigureAwait(false));
+                var branch = StatusParser.Parse(output.Stdout).Branch;
+                lock (_stateLock)
+                {
+                    _branch = _branch with
+                    {
+                        Ahead = branch.Ahead,
+                        Behind = branch.Behind,
+                        Upstream = branch.Upstream,
+                    };
+                    return ++_statusGeneration;
+                }
+            }, ct).ConfigureAwait(false);
+        }, cancellationToken);
+
+    public int StatusGeneration
+    {
+        get
+        {
+            lock (_stateLock)
+                return _statusGeneration;
+        }
+    }
 
     public Task ReloadHistoryAsync(CancellationToken cancellationToken) =>
         RunAsync(ReloadHistoryCoreAsync, cancellationToken);
@@ -1951,6 +1988,7 @@ public sealed partial class RepositorySession : IAsyncDisposable
     private void ApplyStatus(StatusLoad status)
     {
         _branch = status.Snapshot.Branch;
+        _statusGeneration++;
         _entries = status.Snapshot.Entries.ToList();
         _lfsPaths = new HashSet<string>(status.LfsPaths, StringComparer.Ordinal);
         _statusDuration = status.Duration;

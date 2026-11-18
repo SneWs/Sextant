@@ -621,10 +621,47 @@ public partial class RepositoryViewModel : ViewModelBase
     {
         // A dialog closes by activating this window. HoldFocus keeps that
         // activation from starting a refresh that takes IsBusy and drops the
-        // command the dialog just confirmed. An open merge or rebase keeps its views.
-        if (_session is null || IsBusy || _holdFocusRefresh > 0 || HoldsOpenViews)
+        // command the dialog just confirmed. An open merge or rebase keeps its
+        // views, and still re-reads the tab's ahead/behind.
+        if (_session is null || IsBusy || _holdFocusRefresh > 0)
             return Task.CompletedTask;
+        if (HoldsOpenViews)
+            return RefreshAheadBehindAsync();
         return Refresh();
+    }
+
+    /// <summary>
+    /// Reads the checked-out branch's ahead/behind into the tab title.
+    /// Does not take IsBusy, and does not reload the diff, history, or file list.
+    /// A command that already owns the tab publishes its own result.
+    /// </summary>
+    internal async Task RefreshAheadBehindAsync()
+    {
+        if (_session is null || IsBusy || _lifetime.IsCancellationRequested || _holdFocusRefresh > 0)
+            return;
+        using var pending = new PendingRepositoryWork(this);
+        int generation;
+        try
+        {
+            generation = await _session.RefreshAheadBehindAsync(_lifetime.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (GitCommandFailedException)
+        {
+            return;
+        }
+
+        await OnUi(() =>
+        {
+            if (_session is null || IsBusy || _lifetime.IsCancellationRequested || _holdFocusRefresh > 0)
+                return;
+            if (_session.StatusGeneration != generation)
+                return;
+            PublishAheadBehind(_session.Snapshot().Branch);
+        }).ConfigureAwait(false);
     }
 
     private async Task HoldFocus(Func<Task> action)
@@ -1393,6 +1430,13 @@ public partial class RepositoryViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Test hook. External commits then stay out of the tab until a switch or a command reads them.</summary>
+    internal void QuietWatcher()
+    {
+        _watcher?.Dispose();
+        _watcher = null;
+    }
+
     private void StartWatcher()
     {
         if (_session is null)
@@ -1787,6 +1831,12 @@ public partial class RepositoryViewModel : ViewModelBase
         HasBanner = true;
     }
 
+    private void PublishAheadBehind(BranchHeader branch)
+    {
+        ShowAheadBehind = branch.Ahead != 0 || branch.Behind != 0;
+        AheadBehindText = ShowAheadBehind ? $"↑{branch.Ahead}  ↓{branch.Behind}" : "";
+    }
+
     private void Apply(SessionState state)
     {
         _rangeOlder = null;
@@ -1807,8 +1857,7 @@ public partial class RepositoryViewModel : ViewModelBase
             if (_session is not null && !string.IsNullOrEmpty(_session.DisplayName))
                 Title = TabTitle(_session.DisplayName);
             BranchText = DescribeBranch(state.Branch);
-            ShowAheadBehind = state.Branch.Ahead != 0 || state.Branch.Behind != 0;
-            AheadBehindText = ShowAheadBehind ? $"↑{state.Branch.Ahead}  ↓{state.Branch.Behind}" : "";
+            PublishAheadBehind(state.Branch);
             var canPush = HasCommitsToPush(state);
             if (canPush != _canPush)
             {

@@ -225,6 +225,8 @@ On 2026-11-16 a commit diff's file header menu has Revert this file's changes. I
 
 On 2026-11-16 hiding every branch except one also hides remote-tracking branches that appear on a later fetch or pull. A new local branch stays visible. The Locations line that says what is hidden has an X on the left of that text, which shows every branch again and leaves a search or a hidden stash alone. `Fetch_hides_new_remote_branches_while_one_branch_is_shown` and `Clear_on_the_hiding_line_shows_every_branch_and_keeps_a_search` passed. The desktop window was not launched.
 
+On 2026-11-18 a repository tab reads ahead and behind again when you select it or leave it, and after a fetch, pull, or push. Leaving a tab updates that title and does not reload its history or diff. A merge, rebase, cherry-pick, or revert still keeps the open editor. `Switching_tabs_refreshes_ahead_behind_without_reloading_the_one_you_leave` and `Fetch_pull_and_push_update_the_tab_ahead_behind` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions
