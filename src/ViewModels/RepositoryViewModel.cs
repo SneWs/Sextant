@@ -369,6 +369,19 @@ public partial class RepositoryViewModel : ViewModelBase
     [ObservableProperty]
     public partial string BusyText { get; set; } = "";
 
+    /// <summary>The command that started the work, shown above the progress lines. It stays until the next command.</summary>
+    [ObservableProperty]
+    public partial string ProgressHeadline { get; set; } = "";
+
+    /// <summary>Progress lines for the branch-bar flyout. The current step is first and each step keeps several lines. The log stays after the command finishes until the next one starts.</summary>
+    [ObservableProperty]
+    public partial string ProgressDetail { get; set; } = "";
+
+    private readonly List<(string Phase, List<string> Lines)> _progressSteps = [];
+
+    /// <summary>The log belongs to a finished command. The next progress line starts a new one.</summary>
+    private bool _progressHeld;
+
     [ObservableProperty]
     public partial string Banner { get; set; } = "";
 
@@ -957,6 +970,8 @@ public partial class RepositoryViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanCommitOrAmend));
     }
 
+    partial void OnBusyTextChanged(string value) => NoteProgress(value);
+
     partial void OnIsBusyChanged(bool value)
     {
         OnPropertyChanged(nameof(CanCommit));
@@ -969,6 +984,8 @@ public partial class RepositoryViewModel : ViewModelBase
         NotifyRepositoryFileCommands();
         NotifyLfsLockCommands();
         NotifyStashCommands();
+        if (!value)
+            _progressHeld = _progressSteps.Count > 0;
     }
 
     partial void OnShowAheadBehindChanged(bool value) => OnPropertyChanged(nameof(ShowBranchStatus));
@@ -1816,6 +1833,67 @@ public partial class RepositoryViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(text))
             BusyText = text;
     });
+
+    private void NoteProgress(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        var text = value.Trim();
+        if (_progressHeld || ProgressHeadline.Length == 0)
+        {
+            _progressSteps.Clear();
+            _progressHeld = false;
+            ProgressHeadline = text;
+            ProgressDetail = "";
+            return;
+        }
+
+        var phase = ProgressPhase(text);
+        if (_progressSteps.Count == 0 || _progressSteps[^1].Phase != phase)
+        {
+            _progressSteps.Add((phase, []));
+            while (_progressSteps.Count > 24)
+                _progressSteps.RemoveAt(0);
+        }
+
+        var lines = _progressSteps[^1].Lines;
+        if (lines.Contains(text))
+            return;
+        lines.Add(text);
+        while (lines.Count > 6)
+            lines.RemoveAt(0);
+        ProgressDetail = FormatProgress();
+    }
+
+    /// <summary>Current step first. Within a step the newest line is first, and a blank line separates steps.</summary>
+    private string FormatProgress()
+    {
+        var blocks = new string[_progressSteps.Count];
+        for (var step = 0; step < _progressSteps.Count; step++)
+        {
+            var lines = _progressSteps[_progressSteps.Count - 1 - step].Lines;
+            var ordered = new string[lines.Count];
+            for (var line = 0; line < lines.Count; line++)
+                ordered[line] = lines[lines.Count - 1 - line];
+            blocks[step] = string.Join(Environment.NewLine, ordered);
+        }
+
+        return string.Join(Environment.NewLine + Environment.NewLine, blocks);
+    }
+
+    /// <summary>
+    /// Groups "Receiving objects: 12%" with later lines of that same step.
+    /// A <c>remote:</c> prefix stays distinct from the local step of the same name.
+    /// </summary>
+    private static string ProgressPhase(string text)
+    {
+        var remote = text.StartsWith("remote:", StringComparison.Ordinal);
+        var body = remote ? text["remote:".Length..].TrimStart() : text;
+        var colon = body.IndexOf(':');
+        var name = colon > 0 ? body[..colon] : body;
+        return remote ? "remote:" + name : name;
+    }
 
     private void NotifyBulkStage()
     {

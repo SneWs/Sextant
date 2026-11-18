@@ -227,6 +227,16 @@ On 2026-11-16 hiding every branch except one also hides remote-tracking branches
 
 On 2026-11-18 a repository tab reads ahead and behind again when you select it or leave it, and after a fetch, pull, or push. Leaving a tab updates that title and does not reload its history or diff. A merge, rebase, cherry-pick, or revert still keeps the open editor. `Switching_tabs_refreshes_ahead_behind_without_reloading_the_one_you_leave` and `Fetch_pull_and_push_update_the_tab_ahead_behind` passed. The desktop window was not launched.
 
+On 2026-11-18 the branch pill turns accent while a command runs, and clicking that label opens the progress lines. A repeated git phase keeps its latest percent. `Busy_pill_highlights_and_a_click_shows_progress_lines` passed. The desktop window was not launched.
+
+On 2026-11-18 the progress flyout is larger. Each step keeps several lines, the work in progress at the top and completed steps below. A long step keeps its latest lines. `Busy_pill_highlights_and_a_click_shows_progress_lines` passed. The desktop window was not launched.
+
+On 2026-11-18 the progress flyout is wider and taller, and the popup itself does not scroll. The text scrolls only when the steps do not fit. `Busy_pill_highlights_and_a_click_shows_progress_lines` passed. The desktop window was not launched.
+
+On 2026-11-18 an open progress flyout stays up when the command finishes, and the lines stay with it. It closes from a click outside or the X at the top right. The next command starts a new log. `Busy_pill_highlights_and_a_click_shows_progress_lines` passed. The desktop window was not launched.
+
+On 2026-11-18 the progress flyout headlines the command that started the work, and the steps sit under that headline. `Busy_pill_highlights_and_a_click_shows_progress_lines` passed. The desktop window was not launched.
+
 Update this block at the end of any session that lands or revises a step.
 
 ## Locked decisions

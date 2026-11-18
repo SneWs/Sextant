@@ -1,7 +1,10 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using System.ComponentModel;
 using Sextant.ViewModels;
 
@@ -66,6 +69,35 @@ public partial class RepositoryChrome : UserControl
                 HistorySearchBox.SelectAll();
             }, DispatcherPriority.Background);
         }
+
+        if (e.PropertyName == nameof(RepositoryViewModel.ProgressDetail))
+            RevealProgressStart();
+    }
+
+    private Flyout ProgressLog => (Flyout)FlyoutBase.GetAttachedFlyout(BranchPill)!;
+
+    private void OnProgressClick(object? sender, RoutedEventArgs e)
+    {
+        if (!ProgressLog.IsOpen)
+            ProgressLog.ShowAt(BranchPill);
+    }
+
+    private void OnProgressClose(object? sender, RoutedEventArgs e) => ProgressLog.Hide();
+
+    private void OnProgressOpened(object? sender, EventArgs e) => RevealProgressStart();
+
+    private void RevealProgressStart()
+    {
+        if (!ProgressLog.IsOpen)
+            return;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (ProgressDetailBox is null)
+                return;
+            ProgressDetailBox.CaretIndex = 0;
+            if (ProgressDetailBox.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault() is { } scroll)
+                scroll.Offset = new Vector(0, 0);
+        }, DispatcherPriority.Background);
     }
 
     private void OnChromeKeyDown(object? sender, KeyEventArgs e)
