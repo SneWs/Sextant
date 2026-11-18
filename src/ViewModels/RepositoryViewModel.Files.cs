@@ -34,6 +34,17 @@ public partial class RepositoryViewModel
     [ObservableProperty]
     public partial bool RepositoryFilesChangesOnly { get; set; }
 
+    public bool CanRunRepositoryFileActions => !IsBusy && !_lifetime.IsCancellationRequested;
+
+    public Task ChangeRepositoryFileLockAsync(string path, bool unlock, bool force) =>
+        ChangeRepositoryLockAsync(path, unlock, force);
+
+    public Task ShowRepositoryFileHistoryAsync(string path) => ShowFileHistoryAsync(path);
+
+    public Task RemoveRepositoryFileAsync(string path) => RemoveSelectedRepositoryFilesAsync(path);
+
+    public WorktreeFileMenu? FileMenuForRepositoryFile(string path, bool tracked) => FileMenuFor(path, tracked);
+
     partial void OnRepositoryFilesChangesOnlyChanged(bool value)
     {
         OnPropertyChanged(nameof(RepositoryTreeEmptyText));
@@ -239,25 +250,33 @@ public partial class RepositoryViewModel
         bool locksKnown,
         IReadOnlyDictionary<string, StatusEntry>? status = null)
     {
-        var roots = new List<RepositoryFileTreeItem>();
-        var directories = new Dictionary<string, RepositoryFileTreeItem>(StringComparer.Ordinal);
+        var roots = new List<RepositoryFileTreeItem>(Math.Min(files.Count, 512));
+        var directories = new Dictionary<string, RepositoryFileTreeItem>(Math.Min(files.Count, 4096), StringComparer.Ordinal);
         foreach (var file in files)
         {
             StatusEntry? entry = null;
             if (status is not null && !status.TryGetValue(file.Path, out entry))
                 continue;
-            var parts = file.Path.Split('/');
+
+            var path = file.Path;
             var children = roots;
-            var prefix = "";
-            for (var depth = 0; depth < parts.Length - 1; depth++)
+            var segmentStart = 0;
+            var depth = 0;
+            while (segmentStart < path.Length)
             {
-                prefix = prefix.Length == 0 ? parts[depth] : prefix + "/" + parts[depth];
+                var slashOffset = path.AsSpan(segmentStart).IndexOf('/');
+                if (slashOffset < 0)
+                    break;
+                var segmentLength = slashOffset;
+                var segmentEnd = segmentStart + segmentLength;
+                var prefix = path[..segmentEnd];
                 if (!directories.TryGetValue(prefix, out var directory))
                 {
+                    var label = path.Substring(segmentStart, segmentLength);
                     directory = new RepositoryFileTreeItem
                     {
                         Path = prefix,
-                        Label = parts[depth],
+                        Label = label,
                         Depth = depth,
                         IsDirectory = true,
                         // In changes-only mode every directory is opened so a changed file nested at any depth stays visible. This does not touch the saved expansion set, so turning the toggle off restores it.
@@ -268,27 +287,23 @@ public partial class RepositoryViewModel
                 }
 
                 children = directory.Children;
+                segmentStart = segmentEnd + 1;
+                depth++;
             }
 
-            locks.TryGetValue(file.Path, out var fileLock);
-            var path = file.Path;
+            locks.TryGetValue(path, out var fileLock);
             var tracked = file.LfsTracked;
+            var fileLabel = segmentStart == 0 ? path : path[segmentStart..];
             children.Add(new RepositoryFileTreeItem
             {
+                Owner = this,
                 Path = path,
-                Label = parts[^1],
-                Depth = parts.Length - 1,
+                Label = fileLabel,
+                Depth = depth,
                 StatusText = entry is null ? "" : StatusTextFor(entry),
                 LfsTracked = tracked,
                 LocksKnown = locksKnown,
                 Lock = fileLock,
-                CanRun = () => !IsBusy && !_lifetime.IsCancellationRequested,
-                LockAction = () => ChangeRepositoryLockAsync(path, unlock: false, force: false),
-                UnlockAction = () => ChangeRepositoryLockAsync(path, unlock: true, force: false),
-                ForceUnlockAction = () => ChangeRepositoryLockAsync(path, unlock: true, force: true),
-                HistoryAction = () => ShowFileHistoryAsync(path),
-                RemoveAction = () => RemoveSelectedRepositoryFilesAsync(path),
-                FileMenuFactory = () => FileMenuFor(path, tracked),
             });
         }
 

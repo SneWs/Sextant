@@ -150,7 +150,7 @@ public partial class MainWindow : Window
             vm.Save();
     }
 
-    private string[]? _overflowKey;
+    private (string Title, string ShortcutHint)[]? _overflowKey;
 
     private void OnRepositoryTabLayout(object? sender, EventArgs e)
     {
@@ -168,9 +168,9 @@ public partial class MainWindow : Window
             return;
         if (TabOverflow.Flyout is MenuFlyout { IsOpen: true })
             return;
-        var key = new string[tabs.Count];
+        var key = tabs.Count == 0 ? Array.Empty<(string Title, string ShortcutHint)>() : new (string Title, string ShortcutHint)[tabs.Count];
         for (var i = 0; i < tabs.Count; i++)
-            key[i] = tabs[i].Title + "\n" + tabs[i].ShortcutHint;
+            key[i] = (tabs[i].Title, tabs[i].ShortcutHint);
         if (_overflowKey is not null && SameKey(_overflowKey, key))
             return;
 
@@ -199,13 +199,14 @@ public partial class MainWindow : Window
             UpdateOverflowMenu(panel.OverflowTabs);
     }
 
-    private static bool SameKey(string[] left, string[] right)
+    private static bool SameKey((string Title, string ShortcutHint)[] left, (string Title, string ShortcutHint)[] right)
     {
         if (left.Length != right.Length)
             return false;
         for (var i = 0; i < left.Length; i++)
         {
-            if (!string.Equals(left[i], right[i], StringComparison.Ordinal))
+            if (!string.Equals(left[i].Title, right[i].Title, StringComparison.Ordinal)
+                || !string.Equals(left[i].ShortcutHint, right[i].ShortcutHint, StringComparison.Ordinal))
                 return false;
         }
 

@@ -123,8 +123,7 @@ public class DiffHeaderLayoutTests
                 Assert.True(header.Expanded);
                 window.MouseUp(point, MouseButton.Left);
                 var command = Assert.IsAssignableFrom<IAsyncRelayCommand>(header.ActionCommand);
-                Assert.NotNull(command.ExecutionTask);
-                await command.ExecutionTask;
+                await AwaitExecution(command);
 
                 Assert.False(vm.HasBanner, vm.Banner);
                 Assert.Equal("all changes\n", repo.RunCapture("show", ":a.txt").Replace("\r\n", "\n", StringComparison.Ordinal));
@@ -518,8 +517,21 @@ public class DiffHeaderLayoutTests
         window.MouseDown(point, MouseButton.Left);
         window.MouseUp(point, MouseButton.Left);
         var command = Assert.IsAssignableFrom<IAsyncRelayCommand>(button.Command);
-        Assert.NotNull(command.ExecutionTask);
-        await command.ExecutionTask;
+        await AwaitExecution(command);
+    }
+
+    private static async Task AwaitExecution(IAsyncRelayCommand command)
+    {
+        var until = DateTime.UtcNow.AddSeconds(2);
+        while (command.ExecutionTask is null && DateTime.UtcNow < until)
+        {
+            Dispatcher.UIThread.RunJobs();
+            await Task.Delay(20);
+        }
+
+        var running = command.ExecutionTask;
+        Assert.NotNull(running);
+        await running;
     }
 
     /// <summary>
