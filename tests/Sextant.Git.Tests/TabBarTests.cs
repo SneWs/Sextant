@@ -42,6 +42,9 @@ public class TabBarTests
 
                 var tab = new RepositoryViewModel(vm, Path.Combine(directory, "repo"));
                 var other = new RepositoryViewModel(vm, Path.Combine(directory, "other"));
+                other.AheadBehindText = "↑2  ↓4";
+                other.ShowAheadBehind = true;
+                other.IsDirty = true;
                 vm.Tabs.Add(tab);
                 vm.Tabs.Add(other);
                 vm.ActiveTab = other;
@@ -61,6 +64,9 @@ public class TabBarTests
                 Assert.InRange(close.Bounds.Height, 1, 10);
                 var dot = shown[1].GetVisualDescendants().OfType<Avalonia.Controls.Shapes.Ellipse>().First(item => item.IsVisible);
                 var title = shown[1].GetVisualDescendants().OfType<TextBlock>().First(item => item.Text == other.Title);
+                var aheadBehind = shown[1].GetVisualDescendants().OfType<TextBlock>().Single(item => item.Text == other.AheadBehindText);
+                Assert.Equal(Color.Parse("#2F81F7"), Assert.IsAssignableFrom<ISolidColorBrush>(dot.Fill).Color);
+                Assert.True(aheadBehind.IsVisible);
                 var dotRight = dot.TranslatePoint(new Point(dot.Bounds.Width, 0), shown[1])!.Value.X;
                 var titleLeft = title.TranslatePoint(new Point(0, 0), shown[1])!.Value.X;
                 Assert.InRange(titleLeft - dotRight, 3, 8);

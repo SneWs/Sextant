@@ -217,16 +217,19 @@
                             </TabStrip.ItemsPanel>
                             <TabStrip.ItemTemplate>
                                 <DataTemplate x:DataType="vm:RepositoryViewModel">
-                                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="{DynamicResource DockToolChromeHeaderMargin}">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="{DynamicResource DockToolChromeHeaderMargin}">
                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                             <Ellipse Width="6" Height="6" Margin="0,0,4,0" Fill="#D04040" IsVisible="{Binding IsConflicted}"/>
-                                            <Ellipse Width="6" Height="6" Margin="0,0,4,0" Fill="#E0A100" IsVisible="{Binding ShowDirtyDot}"/>
+                                            <Ellipse Width="6" Height="6" Margin="0,0,4,0" Fill="#2F81F7" IsVisible="{Binding ShowDirtyDot}"/>
                                             <Ellipse Width="6" Height="6" Margin="0,0,4,0" Fill="#3CB44B" IsVisible="{Binding ShowCleanDot}"/>
                                         </StackPanel>
                                         <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center"
                                                    TextTrimming="CharacterEllipsis"
                                                    Margin="{DynamicResource DockToolChromeTitleMargin}"/>
-                                        <Button Grid.Column="2" Theme="{StaticResource RepositoryTabClose}"
+                                        <TextBlock Grid.Column="2" Text="{Binding AheadBehindText}"
+                                                   IsVisible="{Binding ShowAheadBehind}"
+                                                   VerticalAlignment="Center" Opacity="0.72" FontSize="11" Margin="0,0,8,0"/>
+                                        <Button Grid.Column="3" Theme="{StaticResource RepositoryTabClose}"
                                                 Command="{Binding CloseTabCommand}"
                                                 Margin="{DynamicResource DockChromeButtonMargin}">
                                             <Viewbox Width="8" Height="8">
