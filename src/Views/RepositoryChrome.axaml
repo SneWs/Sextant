@@ -10,6 +10,54 @@
              x:Class="Sextant.Views.RepositoryChrome"
              x:DataType="vm:RepositoryViewModel"
              KeyDown="OnChromeKeyDown">
+    <UserControl.Styles>
+        <Style Selector="Border.branchpill">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Padding" Value="16,5"/>
+            <Setter Property="MinWidth" Value="210"/>
+            <Setter Property="MaxWidth" Value="840"/>
+        </Style>
+        <Style Selector="Border.branchpill.busy">
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="BorderBrush">
+                <Setter.Value>
+                    <SolidColorBrush Color="{DynamicResource SystemAccentColor}"/>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Background">
+                <Setter.Value>
+                    <SolidColorBrush Color="{DynamicResource SystemAccentColor}" Opacity="0.18"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.progress">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="8,0,0,0"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Background="{TemplateBinding Background}"
+                                      Padding="{TemplateBinding Padding}"
+                                      CornerRadius="{TemplateBinding CornerRadius}"
+                                      Content="{TemplateBinding Content}"
+                                      HorizontalContentAlignment="Left"
+                                      VerticalContentAlignment="Center"/>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Button.progress:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}"/>
+        </Style>
+    </UserControl.Styles>
     <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto">
         <Border Grid.Row="0" IsVisible="{Binding HasBanner}" Padding="10,6" MaxHeight="168"
                 ClipToBounds="True" Background="#33C42B1C">
@@ -61,31 +109,78 @@
                         </MenuFlyout>
                     </SplitButton.Flyout>
                 </SplitButton>
-                <Border VerticalAlignment="Center"
-                    MinWidth="210"
-                    MaxWidth="840"
-                    Padding="16,5"
-                    CornerRadius="14"
-                    BorderThickness="1"
-                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
-                    Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+                <Border x:Name="BranchPill" Classes="branchpill" Classes.busy="{Binding IsBusy}" VerticalAlignment="Center">
+                    <FlyoutBase.AttachedFlyout>
+                        <Flyout Placement="Bottom" Opened="OnProgressOpened">
+                            <Flyout.FlyoutPresenterTheme>
+                                <ControlTheme TargetType="FlyoutPresenter" BasedOn="{StaticResource {x:Type FlyoutPresenter}}">
+                                    <Setter Property="Padding" Value="0"/>
+                                    <Setter Property="MaxWidth" Value="960"/>
+                                    <Setter Property="MaxHeight" Value="780"/>
+                                    <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+                                    <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled"/>
+                                </ControlTheme>
+                            </Flyout.FlyoutPresenterTheme>
+                            <Border x:Name="ProgressFlyoutCard" MinWidth="560" MaxWidth="840" Padding="16">
+                                <DockPanel>
+                                    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                                        <TextBlock x:Name="ProgressHeadlineText" Text="{Binding ProgressHeadline}"
+                                                   FontWeight="SemiBold" FontSize="16" TextWrapping="Wrap"
+                                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <Button x:Name="ProgressFlyoutClose" Grid.Column="1"
+                                                VerticalAlignment="Top"
+                                                Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0"
+                                                Background="Transparent" BorderThickness="0"
+                                                HorizontalAlignment="Right"
+                                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                ToolTip.Tip="Close" AutomationProperties.Name="Close progress"
+                                                Click="OnProgressClose">
+                                            <Canvas Width="12" Height="12">
+                                                <Line StartPoint="1,1" EndPoint="11,11"
+                                                      Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                                                      StrokeThickness="1.6" StrokeLineCap="Round"/>
+                                                <Line StartPoint="11,1" EndPoint="1,11"
+                                                      Stroke="{DynamicResource SystemControlForegroundBaseHighBrush}"
+                                                      StrokeThickness="1.6" StrokeLineCap="Round"/>
+                                            </Canvas>
+                                        </Button>
+                                    </Grid>
+                                    <TextBox x:Name="ProgressDetailBox" IsReadOnly="True" AcceptsReturn="True"
+                                             IsUndoEnabled="False" TextWrapping="Wrap" BorderThickness="0"
+                                             Background="Transparent" MinHeight="280" MaxHeight="480"
+                                             FontFamily="Cascadia Mono, Consolas, DejaVu Sans Mono" FontSize="12"
+                                             Text="{Binding ProgressDetail}"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                                </DockPanel>
+                            </Border>
+                        </Flyout>
+                    </FlyoutBase.AttachedFlyout>
                     <Grid ColumnDefinitions="Auto,Auto,Auto,*" HorizontalAlignment="Center">
                         <TextBlock Text="{Binding BranchText}" FontWeight="SemiBold" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" MaxWidth="275"/>
-                        
+
                         <TextBlock Grid.Column="1" Text="·" Opacity="0.45" VerticalAlignment="Center" Margin="8,0,0,0"
                                    IsVisible="{Binding ShowBranchStatus}"/>
-                        
-                        <TextBlock Grid.Column="2" Text="{Binding AheadBehindText}" 
+
+                        <TextBlock Grid.Column="2" Text="{Binding AheadBehindText}"
                                    IsVisible="{Binding ShowAheadBehind}"
                                    VerticalAlignment="Center" Opacity="0.72" FontSize="12" Margin="8,0,0,0"/>
-                        
-                        <TextBlock Grid.Column="3" Text="{Binding BusyText}" 
-                                   IsVisible="{Binding IsBusy}"
-                                   VerticalAlignment="Center" Opacity="0.72" 
-                                   FontSize="12" 
-                                   Margin="8,0,0,0"
-                                   TextTrimming="CharacterEllipsis" MaxWidth="400" />
+
+                        <Button x:Name="ProgressButton" Grid.Column="3" Classes="progress"
+                                IsVisible="{Binding IsBusy}"
+                                ToolTip.Tip="Show progress" AutomationProperties.Name="Show progress"
+                                Click="OnProgressClick">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <controls:LoadingSpinner Width="12" Height="12" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding BusyText}" FontWeight="SemiBold" FontSize="13"
+                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="400">
+                                    <TextBlock.Foreground>
+                                        <SolidColorBrush Color="{DynamicResource SystemAccentColor}"/>
+                                    </TextBlock.Foreground>
+                                </TextBlock>
+                            </StackPanel>
+                        </Button>
                     </Grid>
                 </Border>
                 <Button x:Name="HistorySearchToggleButton" Classes="locationsearch" Padding="7,0" 

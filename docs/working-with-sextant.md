@@ -12,7 +12,7 @@ The command palette (Ctrl+P, or Command+P on macOS) lists the actions for the op
 
 On GNOME, the window uses the desktop's own frame, including that theme's corners and caption buttons. KDE, Cinnamon, Windows, and macOS keep the frame from the desktop too.
 
-Under the tabs, the branch bar names the checked-out branch and, when Git knows, how many commits you are ahead of or behind the upstream. The name sits in a rounded pill with a Stash button beside it on the left and a search button beside it on the right, and the group stays centered. The Stash split menu holds the stash variants, and the search button toggles the history search box, the same as the Search menu item. The down and up arrow buttons for Pull and Push sit on the right of the bar. While a command runs, its label replaces that status, and Cancel appears when the command can be cancelled.
+Under the tabs, the branch bar names the checked-out branch and, when Git knows, how many commits you are ahead of or behind the upstream. The name sits in a rounded pill with a Stash button beside it on the left and a search button beside it on the right, and the group stays centered. The Stash split menu holds the stash variants, and the search button toggles the history search box, the same as the Search menu item. The down and up arrow buttons for Pull and Push sit on the right of the bar. While a command runs, that pill is drawn in the accent color and names the work, with a spinner beside the latest line. Click the label to open the progress. The command that started the work is the headline, and the steps sit under it, each on several lines, with the work in progress at the top and completed steps below. The list scrolls only when those steps do not fit. It stays open when the command finishes. Click outside it, or the X at the top right, to close it. Cancel appears when the command can be cancelled.
 
 A conflict replaces that quiet state with a banner and Continue and Abort. A sparse checkout adds a banner: excluded paths stay out of the working tree. Sextant does not check those paths out to read them.
 
@@ -109,7 +109,7 @@ Pull takes the upstream of the current branch. Settings → Git → When pulling
 
 Push sends the current branch. The menu offers Push ignoring local checks, which skips hooks, and Push with force-with-lease. Force-with-lease refuses to overwrite remote commits that you have not seen. It is not a plain force.
 
-Network commands run one at a time per repository and report progress on the branch bar. Your credential helper answers any prompt. Sextant does not store a GitHub token of its own.
+Network commands run one at a time per repository and report progress on the branch bar. Click that label to read the command as the headline, with the current work at the top of the steps and completed steps below it. The list stays open after the command finishes until you click outside it or the X. Your credential helper answers any prompt. Sextant does not store a GitHub token of its own.
 
 Settings → Git → Fetch every runs Fetch for the active repository. 0 minutes leaves it off. Any other value is how many minutes pass between fetches. The first one waits that long after you set it. Switching tabs fetches the repository you selected, on the next interval.
 
