@@ -2,7 +2,7 @@
 
 A repository is a tab. The active tab is the one Sextant loads. History, the file watcher, and diffs run there. An inactive tab stays unloaded until you select it. Drag a tab sideways to change the order. That order is restored the next time Sextant opens. When the tabs are wider than the window, the ones that do not fit move into a More tabs button at the end of the bar. Choosing a repository there selects it and brings that tab onto the bar. The open tab stays on the bar. The bar does not scroll. Close a tab with the × on the tab, or with Ctrl+W (Command+W on macOS). Ctrl+Tab moves to the next tab on every platform. Command+Tab is left to macOS.
 
-The tab shows a green dot when the working tree is clean, an amber dot when it is dirty, and a red dot during a conflict.
+The tab shows a green dot when the working tree is clean, an amber dot when it is dirty, and a red dot during a conflict. When the checked-out branch is ahead of or behind its upstream, the tab also shows both counts, written ↑ and ↓. Those counts are read again when you select a tab or leave it, and after a fetch, pull, or push.
 
 The empty window, and the File menu, open, clone, or init a repository. File → Exit, after a separator, closes Sextant the same way as closing the window. On Windows, they also open a repository from WSL; see [Getting started](getting-started.md#wsl-windows-only). A closed repository is opened again from the folder. There is no list of recent repositories beyond the tabs that restore on launch.
 

@@ -198,28 +198,42 @@ public partial class MainViewModel : ViewModelBase, IWorkspaceHost
     {
         if (!Tabs.Contains(tab))
             return;
-        var refresh = ActiveTab != tab && tab.IsReady;
+        var previous = ActiveTab;
+        var refresh = previous != tab && tab.IsReady;
+        // The tab we leave is still in the strip. Closing the active tab removes it
+        // before selecting the neighbor, so that close does not start another read.
+        var leaving = previous is { IsReady: true } current && current != tab && Tabs.Contains(current)
+            ? current
+            : null;
         foreach (var other in Tabs)
             other.IsActive = other == tab;
         ActiveTab = tab;
         TitleText = $"Sextant — {tab.Title}";
         Save();
-        // The strip is bound already. Present it before open, diff, and locks.
-        // Those continuations resume above render and would hold the first frame.
-        await Dispatcher.Yield(DispatcherPriority.Background);
-        if (!Tabs.Contains(tab) || _lifetime.IsCancellationRequested)
-            return;
-        // The tab label already shows the saved distribution. Binding git inside
-        // that distribution waits until this tab is the one being opened.
-        await EnsureTabWslAsync(tab);
-        if (!Tabs.Contains(tab) || _lifetime.IsCancellationRequested)
-            return;
-        TitleText = $"Sextant — {tab.Title}";
-        await tab.EnsureLoadedAsync();
-        // The first selection loads the repository. A later switch refreshes it
-        // the same way focusing the window does, so commits and files stay current.
-        if (refresh && ActiveTab == tab)
-            await tab.RefreshFromFocusAsync();
+        var leaveSync = leaving?.RefreshAheadBehindAsync() ?? Task.CompletedTask;
+        try
+        {
+            // The strip is bound already. Present it before open, diff, and locks.
+            // Those continuations resume above render and would hold the first frame.
+            await Dispatcher.Yield(DispatcherPriority.Background);
+            if (!Tabs.Contains(tab) || _lifetime.IsCancellationRequested)
+                return;
+            // The tab label already shows the saved distribution. Binding git inside
+            // that distribution waits until this tab is the one being opened.
+            await EnsureTabWslAsync(tab);
+            if (!Tabs.Contains(tab) || _lifetime.IsCancellationRequested)
+                return;
+            TitleText = $"Sextant — {tab.Title}";
+            await tab.EnsureLoadedAsync();
+            // The first selection loads the repository. A later switch refreshes it
+            // the same way focusing the window does, so commits and files stay current.
+            if (refresh && ActiveTab == tab)
+                await tab.RefreshFromFocusAsync();
+        }
+        finally
+        {
+            await leaveSync;
+        }
     }
 
     public async Task Close(RepositoryViewModel tab)
