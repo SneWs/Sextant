@@ -76,7 +76,7 @@ public static class DockChrome
             Spacing = 8,
         };
         panel.Children.Add(Dot("#D04040", nameof(RepositoryViewModel.IsConflicted)));
-        panel.Children.Add(Dot("#E0A100", nameof(RepositoryViewModel.ShowDirtyDot)));
+        panel.Children.Add(Dot("#2F81F7", nameof(RepositoryViewModel.ShowDirtyDot)));
         panel.Children.Add(Dot("#3CB44B", nameof(RepositoryViewModel.ShowCleanDot)));
         var title = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Background = Brushes.Transparent };
         title.Bind(TextBlock.TextProperty, new Binding(nameof(RepositoryDocument.Title)));
