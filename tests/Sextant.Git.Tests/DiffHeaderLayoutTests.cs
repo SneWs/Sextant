@@ -179,6 +179,10 @@ public class DiffHeaderLayoutTests
             try
             {
                 await vm.EnsureLoadedAsync();
+                // A watcher refresh replaces the hunk row while the click is in flight, and the
+                // recycled button's command is cleared before the test can read it.
+                await Idle(vm);
+                vm.QuietWatcher();
                 await vm.ExpandAllSectionsCommand.ExecuteAsync(null);
                 var unstaged = vm.DiffRows.OfType<DiffHunkRow>().Where(row => row.ActionLabel == "Stage hunk").ToList();
                 var staged = vm.DiffRows.OfType<DiffHunkRow>().Where(row => row.ActionLabel == "Unstage hunk").ToList();
@@ -514,9 +518,11 @@ public class DiffHeaderLayoutTests
     private static async Task Click(Window window, Button button)
     {
         var point = await PointInWindow(window, button);
+        // Read the command before the gesture. The pointer can recycle the row, and the
+        // button's command property is then null even though this click already ran it.
+        var command = Assert.IsAssignableFrom<IAsyncRelayCommand>(button.Command);
         window.MouseDown(point, MouseButton.Left);
         window.MouseUp(point, MouseButton.Left);
-        var command = Assert.IsAssignableFrom<IAsyncRelayCommand>(button.Command);
         await AwaitExecution(command);
     }
 
